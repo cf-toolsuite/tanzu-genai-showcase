@@ -1,5 +1,6 @@
 require('dotenv').config();
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const path = require('path');
 const { ChatOpenAI } = require('langchain/chat_models/openai');
@@ -7,6 +8,12 @@ const { HumanMessage, SystemMessage } = require('langchain/schema');
 const axios = require('axios');
 
 const app = express();
+
+// Set up rate limiter: maximum of 100 requests per 15 minutes
+const limiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 100, // limit each IP to 100 requests per windowMs
+});
 const PORT = process.env.PORT || 3001;
 
 // Middleware
@@ -125,7 +132,7 @@ app.get('/api/news', async (req, res) => {
 });
 
 // Serve React app for all other routes
-app.get('*', (req, res) => {
+app.get('*', limiter, (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
