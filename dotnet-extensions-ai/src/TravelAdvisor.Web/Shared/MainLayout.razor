@@ -1,34 +1,19 @@
 @inherits LayoutComponentBase
 
-<div class="page">
-    <div class="sidebar">
+<div class="flex h-screen bg-gray-50">
+    <div class="bg-primary w-64 shadow-lg">
         <NavMenu />
     </div>
 
-    <main>
-        <div class="top-row px-4">
-            <a href="/about">About</a>
-        </div>
+    <div class="flex-1 flex flex-col overflow-hidden">
+        <header class="bg-white shadow-sm z-10">
+            <div class="flex items-center justify-end h-14 px-6">
+                <a href="/about" class="text-gray-600 hover:text-primary transition-colors">About</a>
+            </div>
+        </header>
 
-        <article class="content px-4">
+        <main class="flex-1 overflow-x-hidden overflow-y-auto bg-gray-50 p-6">
             @Body
-        </article>
-    </main>
+        </main>
+    </div>
 </div>
-
-<style>
-    main {
-        background-color: var(--gray-100);
-    }
-
-    article {
-        padding-top: 1.5rem;
-        padding-bottom: 2rem;
-    }
-
-    @@media (min-width: 641px) {
-        main {
-            padding-left: 0;
-        }
-    }
-</style>

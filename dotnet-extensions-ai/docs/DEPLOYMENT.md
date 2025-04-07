@@ -1,234 +1,146 @@
-# Tanzu Platform for Cloud Foundry Deployment Guide
+# Deploying Travel Advisor to Tanzu Platform for Cloud Foundry
 
-This guide provides detailed instructions for deploying the Transportation Recommendation Bot to VMware Tanzu Platform for Cloud Foundry (TAS).
+This document provides detailed instructions for deploying the Travel Advisor application to Tanzu Platform for Cloud Foundry.
 
 ## Prerequisites
 
-Before you begin, ensure you have:
+- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0) installed on your local machine
+- [CF CLI](https://docs.cloudfoundry.org/cf-cli/install-go-cli.html) installed on your local machine
+- Access to a Tanzu Platform for Cloud Foundry environment
+- Proper permissions to create and bind services
+- Access to the GenAI tile in your Tanzu Platform environment
+- Google Maps API key
 
-1. **Cloud Foundry CLI** installed ([CF CLI Installation Guide](https://docs.cloudfoundry.org/cf-cli/install-go-cli.html))
-2. **Access credentials** for your Tanzu Application Service environment
-3. **Sufficient rights** to create service instances and push applications
-4. **.NET 9 SDK** installed for local builds
+## Pre-deployment Configuration
 
-## Step 1: Build the Application
-
-First, build and publish the application for deployment:
+1. Set up your `.env` file in the `src` directory:
 
 ```bash
-# Navigate to the project directory
-cd tanzu-genai-showcase/dotnet-extensions-ai
-
-# Restore dependencies
-dotnet restore
-
-# Publish the application
-dotnet publish src/TravelAdvisor.Web -c Release -o publish
+cp src/.env.example src/.env
 ```
 
-## Step 2: Prepare Environment Variables
+2. Edit the `.env` file to include:
 
-The application requires certain environment variables to function properly. You have two options:
-
-### Option A: Set in manifest.yml (Recommended for non-sensitive values)
-
-Edit the `manifest.yml` file to include environment variables:
-
-```yaml
----
-applications:
-- name: travel-advisor
-  path: publish
-  memory: 512M
-  buildpacks:
-    - dotnet_core_buildpack
-  env:
-    ASPNETCORE_ENVIRONMENT: Production
-    DOTNET_CLI_TELEMETRY_OPTOUT: 1
-    DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
-    DOTNET_NOLOGO: true
-    # Add other non-sensitive environment variables here
-  services:
-    - travel-advisor-llm
+```
+GENAI__APIKEY=your_llm_api_key
+GENAI__APIURL=your_llm_api_url
+GENAI__MODEL=your_llm_model_name
+GOOGLEMAPS__APIKEY=your_google_maps_api_key
 ```
 
-### Option B: Use cf set-env (Recommended for sensitive values)
+## Building for Deployment
 
-After deployment, use the CLI to set sensitive variables:
+1. Build the application in Release mode:
+
+```bash
+dotnet publish -c Release -r linux-x64 --self-contained false
+```
+
+## Creating Required Services in Tanzu Platform
+
+1. Log in to your Tanzu Platform for Cloud Foundry environment:
+
+```bash
+cf login -a <API_ENDPOINT> -u <USERNAME> -p <PASSWORD> -o <ORG> -s <SPACE>
+```
+
+2. Create a service instance for the LLM from the GenAI tile:
+
+```bash
+cf create-service genai standard travel-advisor-llm -c '{"model": "your_llm_model_name"}'
+```
+
+## Deployment Steps
+
+1. Push the application to Cloud Foundry:
+
+```bash
+cf push
+```
+
+2. If you need to set environment variables for the Google Maps API key (if not provided through service binding):
 
 ```bash
 cf set-env travel-advisor GOOGLEMAPS__APIKEY your_google_maps_api_key
+cf restage travel-advisor
 ```
 
-## Step 3: Create Required Services
+## Verifying Deployment
 
-The application uses several services that need to be created:
-
-### GenAI LLM Service
+1. After deployment, verify the application is running:
 
 ```bash
-# Create a GenAI service instance
-cf create-service genai standard travel-advisor-llm
-
-# Alternatively, if you need to provide configuration
-cf create-user-provided-service travel-advisor-llm -p '{
-  "api_key":"your_api_key",
-  "api_url":"https://api.openai.com/v1",
-  "model":"gpt-4o-mini"
-}'
+cf apps
 ```
 
-## Step 4: Deploy the Application
-
-Now deploy the application to your Tanzu environment:
+2. Find the route where the application is deployed:
 
 ```bash
-# Log in to your CF environment
-cf login -a API_ENDPOINT -u YOUR_USERNAME -p YOUR_PASSWORD -o YOUR_ORG -s YOUR_SPACE
-
-# Push the application using the manifest
-cf push -f manifest.yml
-```
-
-## Step 5: Bind Services
-
-If your services weren't specified in the manifest, bind them now:
-
-```bash
-cf bind-service travel-advisor travel-advisor-llm
-cf restart travel-advisor
-```
-
-## Step 6: Verify Deployment
-
-Verify your application is running correctly:
-
-```bash
-# Check the application status
 cf app travel-advisor
-
-# View logs
-cf logs travel-advisor --recent
 ```
 
-Visit the application URL to test its functionality.
+3. Open the application URL in a browser to test it.
 
 ## Troubleshooting
 
-### Application Crashes on Startup
+### Service Binding Issues
 
-Check the logs for error messages:
+If there are issues with service bindings, check the logs:
 
 ```bash
 cf logs travel-advisor --recent
 ```
 
-Common issues include:
+### Viewing Application Health
 
-1. **Missing environment variables**
-   - Solution: Set required environment variables using `cf set-env`
-
-2. **Service binding issues**
-   - Solution: Verify service instances exist and are bound correctly:
-
-     ```bash
-     cf services
-     ```
-
-3. **Memory limitations**
-   - Solution: Increase memory allocation in manifest.yml
-
-     ```yaml
-     memory: 1G
-     ```
-
-4. **Missing permissions**
-   - Solution: Ensure your CF user has sufficient permissions
-
-### API Key Issues
-
-If the application cannot connect to external APIs:
-
-1. Verify the API keys are set correctly
-2. Check if your Tanzu environment allows outbound connections to these APIs
-3. Set up network policies if required
-
-## Advanced Configuration
-
-### Scaling
-
-To handle increased load, you can scale the application:
+To view the health of the application using Steeltoe actuators:
 
 ```bash
-# Vertical scaling (increase memory)
-cf scale travel-advisor -m 1G
+curl https://<APP_URL>/health
+```
 
-# Horizontal scaling (increase instances)
+### Restarting the Application
+
+If you need to restart the application:
+
+```bash
+cf restart travel-advisor
+```
+
+## Updating the Application
+
+1. Make your changes to the application
+2. Rebuild in Release mode
+3. Push the updated application:
+
+```bash
+cf push
+```
+
+## Scaling the Application
+
+To scale the application vertically (change memory):
+
+```bash
+cf scale travel-advisor -m 1G
+```
+
+To scale the application horizontally (change instance count):
+
+```bash
 cf scale travel-advisor -i 3
 ```
 
-### Route Configuration
+## Rollback
 
-To use a custom domain:
-
-```bash
-# Map a custom route
-cf map-route travel-advisor your-domain.com --hostname travel-advisor
-```
-
-### Health Monitoring
-
-The application includes health endpoints via Steeltoe. You can monitor:
+If a deployment goes wrong, you can rollback to the previous state:
 
 ```bash
-# Get the application route
-cf app travel-advisor
-
-# Access health endpoint
-curl https://travel-advisor.your-domain.com/actuator/health
+cf rollback travel-advisor
 ```
 
-## Multiple Environment Deployment
+## Additional Resources
 
-For organizations with development, test, and production environments:
-
-1. **Create environment-specific manifests**:
-   - `manifest-dev.yml`
-   - `manifest-test.yml`
-   - `manifest-prod.yml`
-
-2. **Deploy to specific environment**:
-
-   ```bash
-   cf push -f manifest-dev.yml
-   ```
-
-3. **Use different service instances**:
-   - Configure different service bindings per environment
-   - Create environment-specific service instances
-
-## Continuous Integration/Deployment
-
-For CI/CD pipelines:
-
-1. **Build**:
-
-   ```bash
-   dotnet restore
-   dotnet build
-   dotnet test
-   dotnet publish -c Release -o publish
-   ```
-
-2. **Deploy**:
-
-   ```bash
-   cf login -a $CF_API -u $CF_USERNAME -p $CF_PASSWORD -o $CF_ORG -s $CF_SPACE
-   cf push -f manifest.yml
-   ```
-
-## Conclusion
-
-This deployment guide provides the steps necessary to deploy the Transportation Recommendation Bot to Tanzu Platform for Cloud Foundry. For more information on Tanzu Application Service features and capabilities, refer to the [official documentation](https://docs.vmware.com/en/VMware-Tanzu-Application-Platform/).
-
-For application-specific questions or issues, refer to the project's README.md file or submit an issue in the project repository.
+- [Steeltoe Documentation](https://docs.steeltoe.io)
+- [Cloud Foundry Documentation](https://docs.cloudfoundry.org)
+- [.NET Core Buildpack Documentation](https://docs.cloudfoundry.org/buildpacks/dotnet-core/index.html)

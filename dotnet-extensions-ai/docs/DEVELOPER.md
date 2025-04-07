@@ -1,206 +1,156 @@
-# Transportation Recommendation Bot: Implementation Guide
+# Travel Advisor Developer Guide
 
-This guide explains the architecture, components, and implementation details of the Transportation Recommendation Bot developed using .NET 9 with Microsoft.Extensions.AI, Semantic Kernel, and Google Maps API integration.
+This document provides detailed instructions for setting up and developing the Travel Advisor application.
 
-## Architecture Overview
+## Project Structure
 
-The application follows a three-tier architecture pattern:
+The Travel Advisor application follows a clean architecture pattern with three main projects:
 
-1. **Presentation Layer** (TravelAdvisor.Web): Blazor-based web interface that allows users to interact with the application.
-2. **Business Logic Layer** (TravelAdvisor.Core): Contains core business logic, models, and service interfaces.
-3. **Infrastructure Layer** (TravelAdvisor.Infrastructure): Implements service interfaces, handles external API integrations, and provides dependency injection.
+- **TravelAdvisor.Core**: Contains the domain models, interfaces, and core business logic
+- **TravelAdvisor.Infrastructure**: Implements services defined in the Core project
+- **TravelAdvisor.Web**: The Blazor Server web application
 
-The application also follows the dependency inversion principle, with higher layers depending on abstractions (interfaces) rather than concrete implementations.
+## Prerequisites
+
+- [.NET 9 SDK](https://dotnet.microsoft.com/download/dotnet/9.0)
+- [Visual Studio 2025](https://visualstudio.microsoft.com/) or [VS Code](https://code.visualstudio.com/) with C# extensions
+- [Google Maps API key](https://developers.google.com/maps/documentation/javascript/get-api-key)
+- Access to an LLM service compatible with the OpenAI API format
+
+## Getting Started
+
+### 1. Clone the Repository
+
+```bash
+git clone <repository-url>
+cd tanzu-genai-showcase/dotnet-extensions-ai
+```
+
+### 2. Configure Environment Variables
+
+Create a `.env` file in the `src` directory:
+
+```bash
+cp src/.env.example src/.env
+```
+
+Edit the `.env` file to include:
+
+```
+GENAI__APIKEY=your_llm_api_key
+GENAI__APIURL=your_llm_api_url
+GENAI__MODEL=your_llm_model_name
+GOOGLEMAPS__APIKEY=your_google_maps_api_key
+```
+
+### 3. Build and Run
+
+#### Using dotnet CLI
+
+```bash
+# Restore dependencies
+dotnet restore
+
+# Build the solution
+dotnet build
+
+# Run the web project
+cd src/TravelAdvisor.Web
+dotnet run
+```
+
+#### Using Visual Studio
+
+1. Open the `TravelAdvisor.sln` file in Visual Studio
+2. Right-click on the `TravelAdvisor.Web` project and select "Set as Startup Project"
+3. Press F5 to build and run the application
 
 ## Key Components
 
-### Core Components
+### GenAI Integration
 
-#### TravelQuery Model
+The application uses the Semantic Kernel library to interact with LLMs. The main integration is in:
 
-Represents a user's transportation query, including:
+- `TravelAdvisorService.cs`: Handles communication with the LLM to process queries and generate recommendations
 
-- Origin and destination locations
-- Travel time preferences (departure/arrival times)
-- Transportation preferences (modes, priorities, constraints)
+### Google Maps Integration
 
-#### TravelRecommendation Model
+The application uses the Google Maps API to get real travel data:
 
-Represents a recommendation for a specific transportation mode, including:
+- `GoogleMapsService.cs`: Provides methods to get distance, duration, and other travel information
 
-- Mode (walk, bike, bus, car, train, plane)
-- Distance and duration
-- Cost estimate
-- Environmental and convenience scores
-- Pros and cons
-- Detailed journey steps
+### Steeltoe Integration
 
-#### Service Interfaces
+The application uses Steeltoe for Cloud Foundry integration:
 
-- `IMapService`: Interface for mapping and distance services
-- `ITravelAdvisorService`: Interface for generating travel recommendations
-- `IPromptFactory`: Interface for creating AI prompts
+- Service bindings are configured in `ServiceBindingConfiguration.cs`
+- Actuators for health monitoring and management are configured in `Program.cs`
 
-### Infrastructure Components
+## Development Workflow
 
-#### GoogleMapsService
+### Adding New Features
 
-Implements the `IMapService` interface using the Google Maps API:
+1. Start by defining interfaces in the Core project
+2. Implement the interfaces in the Infrastructure project
+3. Wire up dependencies in the `DependencyInjection.cs` file
+4. Add UI components in the Web project
 
-- Calculates distances and durations between locations
-- Provides detailed journey steps
-- Determines feasibility of transportation modes based on distance
+### Testing
 
-#### TravelAdvisorService
+The application supports different testing approaches:
 
-Implements the `ITravelAdvisorService` interface using Microsoft.Extensions.AI and Semantic Kernel:
+- Unit tests for core business logic
+- Integration tests for services
+- End-to-end tests for UI workflows
 
-- Processes natural language queries to extract structured data
-- Generates recommendations for different transportation modes
-- Calculates scores based on user preferences
-- Generates natural language explanations for recommendations
-- Answers follow-up questions about recommendations
+To run tests:
 
-#### PromptFactory
+```bash
+dotnet test
+```
 
-Implements the `IPromptFactory` interface to create and manage AI prompts:
+### UI Development
 
-- Creates prompts with parameter placeholders
-- Replaces parameters with actual values
-- Submits prompts to the LLM and returns responses
+The application uses Tailwind CSS for styling. When making UI changes:
 
-### Web Interface
-
-The web interface is built using Blazor and consists of the following pages:
-
-- `Index.razor`: Landing page
-- `Advisor.razor`: Main transportation advisor interface
-- `About.razor`: Information about the application
-
-The main advisor page allows users to:
-
-1. Enter a natural language query about transportation options
-2. View and compare recommendations for different transportation modes
-3. See detailed information about each recommendation
-4. Ask follow-up questions about specific recommendations
-
-## AI Integration
-
-### Microsoft.Extensions.AI
-
-The application uses Microsoft.Extensions.AI for AI service integration:
-
-- Provides abstractions for chat completion services
-- Simplifies interaction with different AI providers (Azure OpenAI, OpenAI)
-- Includes middleware for caching, logging, and other cross-cutting concerns
-
-Implementation steps:
-
-1. Register IChatClient in dependency injection
-2. Configure client with API key and endpoint
-3. Use client to send prompts and receive responses
-
-### Semantic Kernel
-
-Semantic Kernel is used for AI orchestration and prompt management:
-
-- Manages conversation context
-- Provides utilities for prompt engineering
-- Supports plugins and function calling
-
-## Data Flow
-
-1. User enters a natural language query about transportation options
-2. The query is processed by TravelAdvisorService using the LLM to extract structured data
-3. The service uses GoogleMapsService to calculate distances, durations, and steps for each feasible transportation mode
-4. Scores are calculated for each mode based on environmental impact, convenience, and user preferences
-5. The service generates recommendations and sorts them by overall score
-6. The UI displays the recommendations, allowing the user to view details and compare options
-7. The user can select a recommendation to see a detailed explanation
-8. The user can ask follow-up questions about the recommendation
-
-## Integration with Cloud Foundry
-
-The application is designed to be deployed on Tanzu Platform for Cloud Foundry:
-
-- Uses Steeltoe for service binding and configuration
-- Supports binding to GenAI services for LLM access
-- Includes health monitoring endpoints for platform integration
-
-Configuration steps:
-
-1. Create a GenAI service instance in Cloud Foundry
-2. Bind the service to the application
-3. Configure environment variables or service bindings for Google Maps API access
-
-## API Key Management
-
-The application supports multiple methods for API key management:
-
-1. Environment variables
-2. .env file
-3. User secrets
-4. Cloud Foundry service bindings
-
-For production deployments, it's recommended to use service bindings rather than environment variables for better security.
-
-## Extension Points
-
-The application is designed to be extensible in several ways:
-
-1. Support for additional AI providers by implementing IChatClient
-2. Support for additional mapping services by implementing IMapService
-3. Additional transportation modes by extending the TransportMode enum
-4. Enhanced scoring algorithms by modifying the calculation methods
-
-## Testing
-
-The application includes test cases for key components:
-
-- Unit tests for service implementations
-- Integration tests for API interactions
-- End-to-end tests for the complete workflow
-
-## Best Practices
-
-The implementation follows several best practices:
-
-1. Dependency injection for loose coupling
-2. Interface-based design for testability
-3. Separation of concerns with clear responsibility boundaries
-4. Error handling and fallback mechanisms
-5. Logging and telemetry for monitoring
-6. Configuration management via environment variables and service bindings
-
-## Usage Guide
-
-### Local Development
-
-1. Set up API keys for OpenAI/Azure OpenAI and Google Maps
-2. Configure environment variables or .env file
-3. Run the application using `dotnet run`
-4. Access the web interface at https://localhost:5001
-
-### Cloud Foundry Deployment
-
-1. Create necessary service instances
-2. Update manifest.yml if needed
-3. Build and publish the application
-4. Push to Cloud Foundry
-5. Bind services
-6. Access the application at the provided URL
+1. Edit the Razor files in the `TravelAdvisor.Web/Pages` and `TravelAdvisor.Web/Shared` folders
+2. The application uses the Tailwind CDN, so styles will update automatically
+3. For production, consider setting up a build process to optimize Tailwind CSS
 
 ## Troubleshooting
 
-Common issues and solutions:
+### Common Issues
 
-1. API key authentication failures: Verify keys and endpoints
-2. Service binding issues: Check service instance names and types
-3. Google Maps API limitations: Be aware of rate limits and billing
-4. LLM response parsing errors: Validate prompt formats and expectations
+1. **Missing Environment Variables**: Ensure the `.env` file is properly configured and loaded
+2. **API Key Issues**: Verify your API keys are valid and have the necessary permissions
+3. **Build Errors**: Run `dotnet clean` followed by `dotnet build` to resolve build issues
 
-## Conclusion
+### Debugging
 
-This implementation demonstrates how to build a comprehensive AI-powered application using .NET 9, Microsoft.Extensions.AI, Semantic Kernel, and Google Maps API. The application showcases best practices for AI integration, external service consumption, and Cloud Foundry deployment.
+1. Use `Console.WriteLine` statements for simple logging
+2. For more advanced logging, configure Steeltoe's dynamic logger
+3. Use breakpoints in Visual Studio or VS Code to step through code
 
-By following this architecture and implementation approach, you can create similar AI-powered applications that leverage the power of large language models while maintaining a clean, modular, and maintainable codebase.
+## Best Practices
+
+1. **Separation of Concerns**: Keep business logic in the Core project
+2. **Dependency Injection**: Use interfaces and DI for testable components
+3. **Error Handling**: Use try-catch blocks and provide user-friendly error messages
+4. **Environment Configuration**: Use environment variables for all configuration
+5. **Security**: Never commit API keys or secrets to version control
+
+## Contributing
+
+1. Create a feature branch for your changes
+2. Make your changes following the coding standards
+3. Write/update tests for your changes
+4. Ensure all tests pass
+5. Submit a pull request
+
+## Further Resources
+
+- [.NET 9 Documentation](https://learn.microsoft.com/en-us/dotnet)
+- [Blazor Documentation](https://learn.microsoft.com/en-us/aspnet/core/blazor)
+- [Semantic Kernel Documentation](https://learn.microsoft.com/en-us/semantic-kernel/overview/)
+- [Steeltoe Documentation](https://docs.steeltoe.io)
+- [Tailwind CSS Documentation](https://tailwindcss.com/docs)

@@ -8,7 +8,6 @@ using Microsoft.SemanticKernel.ChatCompletion;
 using TravelAdvisor.Infrastructure;
 using TravelAdvisor.Infrastructure.Options;
 using Steeltoe.Extensions.Configuration.CloudFoundry;
-using Steeltoe.Management.CloudFoundry;
 using Steeltoe.Management.Endpoint;
 using System;
 using System.IO;
@@ -52,7 +51,11 @@ builder.Services.AddRazorPages();
 builder.Services.AddServerSideBlazor();
 
 // Add actuators for health monitoring
-builder.Services.AddAllActuators();
+// Configure OpenTelemetry for Steeltoe Management
+builder.Services.AddAllActuators(builder.Configuration);
+
+// Temporarily comment out CloudFoundry actuator due to compatibility issues
+// builder.Services.AddCloudFoundryActuator();
 
 // Add infrastructure services (including AI and Google Maps services)
 builder.Services.AddInfrastructureServices(builder.Configuration);
@@ -73,8 +76,12 @@ app.UseHttpsRedirection();
 app.UseStaticFiles();
 app.UseRouting();
 
+// Use top-level route registrations (addressing the warning)
 app.MapRazorPages();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
+
+// Map Steeltoe actuator endpoints
+app.MapAllActuators();
 
 app.Run();

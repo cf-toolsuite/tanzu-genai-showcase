@@ -8,7 +8,23 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <base href="~/" />
-    <link rel="stylesheet" href="css/bootstrap/bootstrap.min.css" />
+        <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+          theme: {
+            extend: {
+              colors: {
+                primary: '#4F46E5',
+                secondary: '#0EA5E9',
+                accent: '#F97316',
+                success: '#22C55E',
+                warning: '#F59E0B',
+                danger: '#EF4444',
+              }
+            }
+          }
+        }
+    </script>
     <link href="css/site.css" rel="stylesheet" />
     <link href="TravelAdvisor.Web.styles.css" rel="stylesheet" />
     <component type="typeof(HeadOutlet)" render-mode="ServerPrerendered" />
