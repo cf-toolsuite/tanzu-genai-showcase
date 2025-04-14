@@ -365,6 +365,112 @@ header a[href="about"],
     z-index: 1; /* Ensure the button text is above any background */
 }
 
+/* Improve readability for transportation options */
+button[class*="bg-primary"] p,
+[class*="bg-primary"] p,
+[class*="text-primary"] + p,
+button[class*="border-primary"] p {
+    color: #1E293B !important; /* Dark gray text for better contrast */
+    font-weight: 500 !important; /* Medium weight for better visibility */
+}
+
+/* Specifically target price and duration information in transportation options */
+p.text-sm.text-gray-600,
+p.text-xs.text-gray-500 {
+    color: #1E293B !important; /* Darker text for better readability */
+    font-weight: 500 !important; /* Medium weight for better visibility */
+    background-color: rgba(255, 255, 255, 0.7) !important; /* Semi-transparent white background */
+    padding: 2px 5px !important;
+    border-radius: 4px !important;
+    display: inline-block !important;
+    margin-bottom: 4px !important;
+}
+
+/* Make sure the transportation option cards have a lighter background */
+button[class*="bg-primary/10"] {
+    background-color: rgba(93, 80, 232, 0.05) !important; /* Lighter purple background */
+    border-color: var(--primary) !important;
+}
+
+/* Ensure text in transportation option cards is readable */
+button[class*="text-primary"] {
+    color: var(--primary-dark) !important; /* Darker purple for better contrast */
+}
+
+/* Improve transportation option display */
+.space-y-2 button {
+    border: 1px solid #E2E8F0 !important;
+    background-color: white !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+    transition: all 0.2s ease !important;
+    padding: 12px !important; /* Add more padding */
+}
+
+/* Highlight selected transportation option */
+.space-y-2 button[class*="border-primary"] {
+    border: 2px solid var(--primary) !important;
+    background-color: rgba(255, 255, 255, 0.95) !important; /* Nearly white background for better contrast */
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Hover effect for transportation options */
+.space-y-2 button:hover {
+    transform: translateY(-1px) !important;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15) !important;
+}
+
+/* Ensure headers in transportation options stand out */
+.space-y-2 h4.font-semibold {
+    color: var(--gray-900) !important;
+    font-weight: 600 !important;
+}
+
+/* Make all score bubbles consistent */
+.space-y-2 span[class*="rounded-full"],
+span[class*="rounded-full"],
+.px-2.py-1.text-sm.font-medium.rounded-full {
+    background-color: white !important;
+    border: 1px solid var(--primary) !important;
+    color: var(--primary-dark) !important;
+    font-weight: 600 !important;
+    padding: 2px 8px !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Improve visibility for journey details section */
+div.bg-gray-50.rounded-lg.p-4 {
+    background-color: white !important;
+    border: 1px solid var(--gray-200) !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Make spans with font-medium stand out more */
+span.font-medium {
+    color: var(--gray-900) !important;
+    font-weight: 600 !important;
+}
+
+/* Improve pro/con lists readability */
+.bg-green-50.border-l-4.border-green-500,
+.bg-red-50.border-l-4.border-red-500 {
+    border-width: 3px !important; /* Reduced from 4px to 3px */
+    padding: 8px 12px !important;
+    border-radius: 0 6px 6px 0 !important;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05) !important;
+}
+
+/* Enhance the visibility of pros text */
+.text-green-700 {
+    color: #15803d !important; /* Darker green */
+    font-weight: 500 !important;
+}
+
+/* Enhance the visibility of cons text */
+.text-red-700 {
+    color: #b91c1c !important; /* Darker red */
+    font-weight: 500 !important;
+}
+
 /* New styling for buttons to match the Advisor page */
 .btn-primary, 
 a.btn-primary,
