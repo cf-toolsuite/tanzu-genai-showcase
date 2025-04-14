@@ -2,8 +2,8 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using TravelAdvisor.Core.Models;
 using TravelAdvisor.Core.Services;
@@ -11,158 +11,87 @@ using TravelAdvisor.Core.Services;
 namespace TravelAdvisor.Infrastructure.Services
 {
     /// <summary>
-    /// Implementation of ITravelAdvisorService using Microsoft.Extensions.AI and Semantic Kernel
+    /// Mock implementation of ITravelAdvisorService for development/testing
     /// </summary>
-    public class TravelAdvisorService : ITravelAdvisorService
+    public class MockTravelAdvisorService : ITravelAdvisorService
     {
-        private readonly ILogger<TravelAdvisorService> _logger;
+        private readonly ILogger<MockTravelAdvisorService> _logger;
         private readonly IMapService _mapService;
-        private readonly IChatClient _chatClient;
-        private readonly IPromptFactory _promptFactory;
 
-        public TravelAdvisorService(
-            IChatClient chatClient,
-            IPromptFactory promptFactory,
+        public MockTravelAdvisorService(
             IMapService mapService,
-            ILogger<TravelAdvisorService> logger)
+            ILogger<MockTravelAdvisorService> logger)
         {
-            _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
-            _promptFactory = promptFactory ?? throw new ArgumentNullException(nameof(promptFactory));
             _mapService = mapService ?? throw new ArgumentNullException(nameof(mapService));
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         }
 
         /// <inheritdoc />
-        public async Task<TravelQuery> ProcessNaturalLanguageQueryAsync(string query)
+        public Task<TravelQuery> ProcessNaturalLanguageQueryAsync(string query)
         {
             try
             {
-                _logger.LogInformation("Processing natural language query: {Query}", query);
+                _logger.LogInformation("Processing natural language query with mock service: {Query}", query);
 
-                // Create a conversation history with the system prompt and user query
-                var history = new List<ChatMessage>
-                {
-                    new ChatMessage(ChatRole.System, @"
-                        You are a travel advisor assistant. Your primary task is to CAREFULLY extract the origin and destination locations from the user's query.
-
-                        IMPORTANT: Your most critical task is to identify the specific origin and destination locations mentioned in the query.
-                        - Look for locations that follow phrases like 'from', 'starting at', 'in', 'near', etc. for the origin.
-                        - Look for locations that follow phrases like 'to', 'heading to', 'going to', 'destination', etc. for the destination.
-                        - Always include the full location name, including city, state, and country if provided.
-                        - Never leave Origin or Destination empty or as 'Unknown' if they are mentioned in the query.
-
-                        Extract origin, destination, travel time information, and any preferences mentioned.
-
-                        Return a JSON object with the following structure:
-                        {
-                            ""Origin"": ""extracted origin location with full details"",
-                            ""Destination"": ""extracted destination location with full details"",
-                            ""TravelTime"": {
-                                ""DepartureTime"": ""extracted departure time or null"",
-                                ""ArrivalTime"": ""extracted arrival time or null"",
-                                ""IsFlexible"": true/false
-                            },
-                            ""Preferences"": {
-                                ""Priority"": ""extracted priority (e.g., faster, cheaper, etc.)"",
-                                ""ConsiderWalking"": true/false,
-                                ""ConsiderBiking"": true/false,
-                                ""ConsiderPublicTransport"": true/false,
-                                ""ConsiderDriving"": true/false,
-                                ""ConsiderTrain"": true/false,
-                                ""ConsiderFlying"": true/false,
-                                ""MaxWalkingDistance"": number or null,
-                                ""MaxBikingDistance"": number or null,
-                                ""MaxTravelTime"": number or null,
-                                ""MaxCost"": number or null
-                            },
-                            ""AdditionalContext"": ""any other relevant information""
-                        }
-
-                        Always use true for transportation modes unless the user specifically rules them out.
-
-                        IMPORTANT: Your response must ONLY contain valid JSON - no explanations, no prefixes, no additional text.
-
-                        Examples:
-                        1. For 'What's the best way to get from Seattle to Portland?', you should extract 'Seattle' as Origin and 'Portland' as Destination.
-                        2. For 'How can I travel cheaply from Mill Creek, WA to Lynnwood, WA?', you should extract 'Mill Creek, WA' as Origin and 'Lynnwood, WA' as Destination.
-                    "),
-                    new ChatMessage(ChatRole.User, query)
-                };
-
-                // Get response from AI
-                var response = await _chatClient.GetResponseAsync(history, new ChatOptions { Temperature = 0 });
-
-                // Check if the response contains an error (e.g., service unavailable)
-                var errorProperty = response.GetType().GetProperty("Error");
-                if (errorProperty != null)
-                {
-                    var errorValue = errorProperty.GetValue(response) as string;
-                    if (!string.IsNullOrEmpty(errorValue))
-                    {
-                        _logger.LogWarning("Error received from chat client: {Error}", errorValue);
-                        return CreateDefaultQuery(query, true, "Service temporarily unavailable. Please try again later.");
-                    }
-                }
-
-                var jsonResponse = ChatMessageContentBuilder.GetContentFromResponse(response);
-
-                // Parse the JSON response
-                if (string.IsNullOrEmpty(jsonResponse))
-                {
-                    _logger.LogWarning("Empty response received from chat client");
-                    // Try parsing directly from the query instead of using default values
-                    return ExtractQueryFromText(query) ?? CreateDefaultQuery(query);
-                }
-
-                // Check if the response is an error message
-                if (jsonResponse.Contains("Service temporarily unavailable"))
-                {
-                    _logger.LogWarning("Service unavailable message received from chat client");
-                    return CreateDefaultQuery(query, true, jsonResponse);
-                }
+                // Provide a substantial mock response with example travel data
+                string jsonResponse = @"{
+                  ""Origin"": ""Mill Creek, WA"",
+                  ""Destination"": ""Ballard, WA"",
+                  ""TravelTime"": {
+                    ""DepartureTime"": null,
+                    ""ArrivalTime"": null,
+                    ""IsFlexible"": true
+                  },
+                  ""Preferences"": {
+                    ""Priority"": ""faster"",
+                    ""ConsiderWalking"": true,
+                    ""ConsiderBiking"": true,
+                    ""ConsiderPublicTransport"": true,
+                    ""ConsiderDriving"": true,
+                    ""ConsiderTrain"": true,
+                    ""ConsiderFlying"": false,
+                    ""MaxWalkingDistance"": null,
+                    ""MaxBikingDistance"": null,
+                    ""MaxTravelTime"": null,
+                    ""MaxCost"": null
+                  },
+                  ""AdditionalContext"": ""Travel from Mill Creek to Ballard""
+                }";
 
                 try
                 {
-                    // Attempt to clean the response in case it has extra text before or after the JSON
-                    jsonResponse = CleanJsonResponse(jsonResponse);
-
                     var travelQuery = JsonSerializer.Deserialize<TravelQuery>(jsonResponse,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
                     if (travelQuery == null)
                     {
-                        _logger.LogWarning("Failed to parse travel query from response: {Response}", jsonResponse);
-                        return ExtractQueryFromText(query) ?? CreateDefaultQuery(query);
+                        _logger.LogWarning("Failed to parse mock travel query from response");
+                        var fallbackQuery = ExtractQueryFromText(query) ?? CreateDefaultQuery(query);
+                        return Task.FromResult(fallbackQuery);
                     }
 
-                    // Validate the extracted origin and destination - if they're empty or "Unknown", try a fallback extraction
-                    if (string.IsNullOrWhiteSpace(travelQuery.Origin) || travelQuery.Origin == "Unknown" ||
-                        string.IsNullOrWhiteSpace(travelQuery.Destination) || travelQuery.Destination == "Unknown")
+                    // If we can extract something from the actual query text, use it
+                    var extractedQuery = ExtractQueryFromText(query);
+                    if (extractedQuery != null)
                     {
-                        _logger.LogWarning("Origin or destination missing in parsed response. Attempting fallback extraction.");
-                        var fallbackQuery = ExtractQueryFromText(query);
-                        if (fallbackQuery != null)
-                        {
-                            // Keep any valid data from the original parsed query
-                            if (string.IsNullOrWhiteSpace(travelQuery.Origin) || travelQuery.Origin == "Unknown")
-                                travelQuery.Origin = fallbackQuery.Origin;
-                            if (string.IsNullOrWhiteSpace(travelQuery.Destination) || travelQuery.Destination == "Unknown")
-                                travelQuery.Destination = fallbackQuery.Destination;
-                        }
+                        travelQuery.Origin = extractedQuery.Origin;
+                        travelQuery.Destination = extractedQuery.Destination;
+                        travelQuery.AdditionalContext = query;
                     }
 
-                    return travelQuery;
+                    return Task.FromResult(travelQuery);
                 }
                 catch (JsonException ex)
                 {
-                    _logger.LogError(ex, "Error parsing JSON response: {Response}", jsonResponse);
-                    return ExtractQueryFromText(query) ?? CreateDefaultQuery(query);
+                    _logger.LogError(ex, "Error parsing mock JSON response");
+                    var fallbackQuery = ExtractQueryFromText(query) ?? CreateDefaultQuery(query);
+                    return Task.FromResult(fallbackQuery);
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error processing natural language query");
-                return CreateDefaultQuery(query);
+                _logger.LogError(ex, "Error processing natural language query with mock service");
+                return Task.FromResult(CreateDefaultQuery(query));
             }
         }
 
@@ -261,149 +190,133 @@ namespace TravelAdvisor.Infrastructure.Services
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error generating recommendations");
+                _logger.LogError(ex, "Error generating recommendations with mock service");
                 return new List<TravelRecommendation>();
             }
         }
 
         /// <inheritdoc />
-        public async Task<string> GenerateExplanationAsync(
+        public Task<string> GenerateExplanationAsync(
             TravelRecommendation recommendation,
             TravelQuery query)
         {
             try
             {
-                // Create message history for the explanation
-                var history = new List<ChatMessage>
+                _logger.LogInformation("Generating mock explanation for {Mode} recommendation from {Origin} to {Destination}",
+                    recommendation.Mode, query.Origin, query.Destination);
+
+                // Generate a standard explanation based on mode
+                string explanation = recommendation.Mode switch
                 {
-                    new ChatMessage(ChatRole.System, @"
-                        You are a travel advisor assistant. Generate a detailed explanation for the recommended travel mode.
-                        Provide a natural, conversational explanation that covers:
-                        1. Why this mode is suitable for the distance
-                        2. How it aligns with the user's preferences
-                        3. Trade-offs between time, cost, convenience, and environmental impact
-                        4. Any special considerations for this journey
+                    TransportMode.Walk => $"Walking from {query.Origin} to {query.Destination} is a great option for this distance " +
+                        $"of {recommendation.DistanceKm:F1} km. It will take approximately {recommendation.DurationMinutes} minutes, " +
+                        $"but it's healthy, environmentally friendly, and completely free. The route is straightforward and pleasant for walking.",
 
-                        Keep the explanation conversational and friendly. Avoid using technical jargon.
-                    "),
-                    new ChatMessage(ChatRole.User, $@"
-                        Origin: {query.Origin}
-                        Destination: {query.Destination}
-                        Recommended Mode: {recommendation.Mode}
-                        Travel Distance: {recommendation.DistanceKm:F1} km
-                        Travel Duration: {recommendation.DurationMinutes} minutes
-                        Estimated Cost: {(recommendation.EstimatedCost.HasValue ? $"${recommendation.EstimatedCost.Value:F2}" : "Unavailable")}
+                    TransportMode.Bike => $"Biking from {query.Origin} to {query.Destination} is an excellent choice. " +
+                        $"The {recommendation.DistanceKm:F1} km route will take about {recommendation.DurationMinutes} minutes. " +
+                        $"Biking offers a good balance of speed and flexibility while being environmentally friendly and good exercise.",
 
-                        Pros:
-                        {string.Join("\n", recommendation.Pros.Select(p => $"- {p}"))}
+                    TransportMode.Bus => $"Taking public transportation from {query.Origin} to {query.Destination} is convenient " +
+                        $"and affordable. The journey of {recommendation.DistanceKm:F1} km will take approximately {recommendation.DurationMinutes} minutes. " +
+                        $"While there may be a few transfers, you'll be able to rest or use your time productively during the trip.",
 
-                        Cons:
-                        {string.Join("\n", recommendation.Cons.Select(c => $"- {c}"))}
+                    TransportMode.Car => $"Driving from {query.Origin} to {query.Destination} is the most flexible option. " +
+                        $"The {recommendation.DistanceKm:F1} km journey will take about {recommendation.DurationMinutes} minutes. " +
+                        $"While not the most environmentally friendly choice, it offers the most convenience and direct route.",
 
-                        User Preferences:
-                        {JsonSerializer.Serialize(query.Preferences, new JsonSerializerOptions { WriteIndented = true })}
+                    TransportMode.Train => $"Taking the train from {query.Origin} to {query.Destination} is comfortable " +
+                        $"for this {recommendation.DistanceKm:F1} km journey. It will take approximately {recommendation.DurationMinutes} minutes. " +
+                        $"The train offers a good balance of comfort, environmental friendliness, and the ability to use your time productively.",
 
-                        Generate a detailed explanation for why this travel mode is recommended.
-                    ")
+                    TransportMode.Plane => $"Flying from {query.Origin} to {query.Destination} is the fastest option " +
+                        $"for this long-distance journey of {recommendation.DistanceKm:F1} km. The flight itself will take about " +
+                        $"{recommendation.DurationMinutes - 120} minutes, with additional time for airport procedures. " +
+                        $"While not the most environmentally friendly option, it saves significant time over other modes.",
+
+                    _ => $"The recommended mode of transport from {query.Origin} to {query.Destination} " +
+                        $"will take approximately {recommendation.DurationMinutes} minutes for the {recommendation.DistanceKm:F1} km journey."
                 };
 
-                // Get response from AI
-                var response = await _chatClient.GetResponseAsync(history, new ChatOptions { Temperature = 0.7f });
-
-                return ChatMessageContentBuilder.GetContentFromResponse(response) ??
-                       "I'm sorry, I couldn't generate a detailed explanation for this recommendation.";
+                return Task.FromResult(explanation);
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error generating explanation");
-                return "I'm sorry, I couldn't generate a detailed explanation for this recommendation.";
+                _logger.LogError(ex, "Error generating explanation with mock service");
+                return Task.FromResult("I'm sorry, I couldn't generate a detailed explanation for this recommendation.");
             }
         }
 
         /// <inheritdoc />
-        public async Task<string> AnswerFollowUpQuestionAsync(
+        public Task<string> AnswerFollowUpQuestionAsync(
             string question,
             TravelRecommendation recommendation,
             TravelQuery query)
         {
             try
             {
-                // Create message history for answering the follow-up question
-                var history = new List<ChatMessage>
+                _logger.LogInformation("Answering follow-up question with mock service: {Question}", question);
+
+                // Generate responses based on keywords in the question
+                if (question.Contains("time", StringComparison.OrdinalIgnoreCase) || 
+                    question.Contains("long", StringComparison.OrdinalIgnoreCase) ||
+                    question.Contains("duration", StringComparison.OrdinalIgnoreCase))
                 {
-                    new ChatMessage(ChatRole.System, @"
-                        You are a travel advisor assistant. Answer the user's follow-up question about the recommended travel mode.
-                        Provide a helpful, accurate, and concise answer to the user's question.
-                        If you don't have specific information to answer the question, acknowledge that and suggest what information might be helpful.
-                    "),
-                    new ChatMessage(ChatRole.User, $@"
-                        Original Query:
-                        Origin: {query.Origin}
-                        Destination: {query.Destination}
-
-                        Recommended Mode: {recommendation.Mode}
-                        Travel Distance: {recommendation.DistanceKm:F1} km
-                        Travel Duration: {recommendation.DurationMinutes} minutes
-                        Estimated Cost: {(recommendation.EstimatedCost.HasValue ? $"${recommendation.EstimatedCost.Value:F2}" : "Unavailable")}
-
-                        Details:
-                        Environmental Score: {recommendation.EnvironmentalScore}/100
-                        Convenience Score: {recommendation.ConvenienceScore}/100
-                        Preference Match Score: {recommendation.PreferenceMatchScore}/100
-                        Overall Score: {recommendation.OverallScore}/100
-
-                        Pros:
-                        {string.Join("\n", recommendation.Pros.Select(p => $"- {p}"))}
-
-                        Cons:
-                        {string.Join("\n", recommendation.Cons.Select(c => $"- {c}"))}
-
-                        Steps:
-                        {string.Join("\n", recommendation.Steps.Select(step => $"- {step.Description} ({step.DistanceKm:F1} km, {step.DurationMinutes} mins)"))}
-
-                        User's Follow-up Question: {question}
-                    ")
-                };
-
-                // Get response from AI
-                var response = await _chatClient.GetResponseAsync(history, new ChatOptions { Temperature = 0.7f });
-
-                return ChatMessageContentBuilder.GetContentFromResponse(response) ??
-                       "I'm sorry, I couldn't answer your follow-up question. Could you try rephrasing it?";
+                    return Task.FromResult($"The journey from {query.Origin} to {query.Destination} by {recommendation.Mode} will take approximately {recommendation.DurationMinutes} minutes.");
+                }
+                else if (question.Contains("cost", StringComparison.OrdinalIgnoreCase) || 
+                         question.Contains("price", StringComparison.OrdinalIgnoreCase) ||
+                         question.Contains("expensive", StringComparison.OrdinalIgnoreCase))
+                {
+                    string response = recommendation.EstimatedCost.HasValue
+                        ? $"The estimated cost for traveling from {query.Origin} to {query.Destination} by {recommendation.Mode} is approximately ${recommendation.EstimatedCost.Value:F2}."
+                        : $"I don't have exact cost information for traveling from {query.Origin} to {query.Destination} by {recommendation.Mode}, as it can vary based on factors like fuel prices, transit fares, and other variables.";
+                    return Task.FromResult(response);
+                }
+                else if (question.Contains("distance", StringComparison.OrdinalIgnoreCase) || 
+                         question.Contains("far", StringComparison.OrdinalIgnoreCase) ||
+                         question.Contains("miles", StringComparison.OrdinalIgnoreCase) ||
+                         question.Contains("kilometers", StringComparison.OrdinalIgnoreCase))
+                {
+                    return Task.FromResult($"The distance from {query.Origin} to {query.Destination} is approximately {recommendation.DistanceKm:F1} kilometers.");
+                }
+                else if (question.Contains("route", StringComparison.OrdinalIgnoreCase) || 
+                         question.Contains("path", StringComparison.OrdinalIgnoreCase) ||
+                         question.Contains("directions", StringComparison.OrdinalIgnoreCase) ||
+                         question.Contains("steps", StringComparison.OrdinalIgnoreCase))
+                {
+                    var stepsDescription = string.Join("\n", recommendation.Steps.Select(step => 
+                        $"- {step.Description} ({step.DistanceKm:F1} km, {step.DurationMinutes} mins)"));
+                    
+                    return Task.FromResult($"Here's the route from {query.Origin} to {query.Destination} by {recommendation.Mode}:\n{stepsDescription}");
+                }
+                else if (question.Contains("environment", StringComparison.OrdinalIgnoreCase) || 
+                         question.Contains("eco", StringComparison.OrdinalIgnoreCase) ||
+                         question.Contains("green", StringComparison.OrdinalIgnoreCase))
+                {
+                    var environmentalRating = recommendation.EnvironmentalScore switch
+                    {
+                        >= 90 => "extremely environmentally friendly",
+                        >= 70 => "very environmentally friendly",
+                        >= 50 => "moderately environmentally friendly",
+                        >= 30 => "not very environmentally friendly",
+                        _ => "one of the least environmentally friendly options"
+                    };
+                    
+                    return Task.FromResult($"Traveling by {recommendation.Mode} from {query.Origin} to {query.Destination} is {environmentalRating}. It has an environmental score of {recommendation.EnvironmentalScore}/100.");
+                }
+                else
+                {
+                    return Task.FromResult($"I don't have specific information to answer that question about traveling from {query.Origin} to {query.Destination} by {recommendation.Mode}. Please ask about travel time, cost, distance, route directions, or environmental impact.");
+                }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error answering follow-up question");
-                return "I'm sorry, I couldn't answer your follow-up question. Could you try rephrasing it?";
+                _logger.LogError(ex, "Error answering follow-up question with mock service");
+                return Task.FromResult("I'm sorry, I couldn't answer your follow-up question. Could you try rephrasing it?");
             }
         }
 
         #region Helper Methods
-
-        /// <summary>
-        /// Cleans up a JSON response by removing any non-JSON text before or after the JSON object
-        /// </summary>
-        private string CleanJsonResponse(string response)
-        {
-            try
-            {
-                // Try to find a JSON object in the response
-                int startIndex = response.IndexOf('{');
-                int endIndex = response.LastIndexOf('}');
-
-                if (startIndex >= 0 && endIndex > startIndex)
-                {
-                    return response.Substring(startIndex, endIndex - startIndex + 1);
-                }
-
-                return response;
-            }
-            catch
-            {
-                // If any error occurs during cleaning, return the original response
-                return response;
-            }
-        }
 
         /// <summary>
         /// Attempts to extract origin and destination directly from the text query
@@ -419,9 +332,9 @@ namespace TravelAdvisor.Infrastructure.Services
 
                 // Simple pattern matching for common travel query formats
                 // Look for "from X to Y" pattern
-                var fromToMatch = System.Text.RegularExpressions.Regex.Match(query,
+                var fromToMatch = Regex.Match(query,
                     @"from\s+([^,\.;]+(?:,[^,\.;]+)*)\s+to\s+([^,\.;]+(?:,[^,\.;]+)*)",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    RegexOptions.IgnoreCase);
 
                 if (fromToMatch.Success)
                 {
@@ -432,9 +345,9 @@ namespace TravelAdvisor.Infrastructure.Services
                 // If not found, look for "between X and Y" pattern
                 if (origin == "Unknown" || destination == "Unknown")
                 {
-                    var betweenMatch = System.Text.RegularExpressions.Regex.Match(query,
+                    var betweenMatch = Regex.Match(query,
                         @"between\s+([^,\.;]+(?:,[^,\.;]+)*)\s+and\s+([^,\.;]+(?:,[^,\.;]+)*)",
-                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                        RegexOptions.IgnoreCase);
 
                     if (betweenMatch.Success)
                     {

@@ -32,14 +32,34 @@ namespace TravelAdvisor.Infrastructure
             // Configure HTTP client
             services.AddHttpClient();
 
-            // Register the Google Maps service
-            services.AddSingleton<IMapService, GoogleMapsService>();
+            // Check if mock data is enabled
+            bool useMockData = false;
+            bool.TryParse(Environment.GetEnvironmentVariable("USE_MOCK_DATA"), out useMockData);
+
+            // Register the Maps services
+            if (useMockData)
+            {
+                services.AddSingleton<IGoogleMapsService, MockGoogleMapsService>();
+                services.AddSingleton<IMapService>(sp => sp.GetRequiredService<IGoogleMapsService>());
+            }
+            else
+            {
+                services.AddSingleton<IGoogleMapsService, GoogleMapsService>();
+                services.AddSingleton<IMapService>(sp => sp.GetRequiredService<IGoogleMapsService>());
+            }
 
             // Add AI services
             AddAIServices(services, configuration);
 
-            // Register the Travel Advisor service
-            services.AddSingleton<ITravelAdvisorService, TravelAdvisorService>();
+            // Register the Travel Advisor services
+            if (useMockData)
+            {
+                services.AddSingleton<ITravelAdvisorService, MockTravelAdvisorService>();
+            }
+            else
+            {
+                services.AddSingleton<ITravelAdvisorService, TravelAdvisorService>();
+            }
 
             return services;
         }

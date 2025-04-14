@@ -28,10 +28,10 @@ cd tanzu-genai-showcase/dotnet-extensions-ai
 
 ### 2. Configure Environment Variables
 
-Create a `.env` file in the `src` directory:
+Create a `.env` file in the `src/TravelAdvisor.Web` directory:
 
 ```bash
-cp src/.env.example src/.env
+cp src/TravelAdvisor.Web/.env.example src/TravelAdvisor.Web/.env
 ```
 
 Edit the `.env` file to include:
