@@ -2,7 +2,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 :root {
-    --primary: #4F46E5;
+    --primary: #5D50E8; /* Slightly lighter purple for better readability */
     --primary-dark: #4338CA;
     --primary-light: #818CF8;
     --secondary: #0EA5E9;
@@ -57,7 +57,7 @@ a, .btn-link {
 
 a:hover, .btn-link:hover {
     color: var(--primary-dark);
-    text-decoration: none;
+    text-decoration: none; /* Changed from underline to none */
 }
 
 .btn {
@@ -244,6 +244,26 @@ a:hover, .btn-link:hover {
     box-shadow: var(--shadow);
 }
 
+/* Improved sidebar styling for better contrast */
+.sidebar a, .sidebar .nav-link, .sidebar span, nav a, nav span, [class*="indigo"] {
+    color: white !important; /* Force white text for all sidebar links */
+    font-weight: 500; /* Medium font weight for better readability */
+    transition: all 0.2s ease;
+}
+
+.sidebar a:hover, .sidebar .nav-link:hover, nav a:hover, .hover\:bg-indigo-700:hover {
+    background-color: rgba(255, 255, 255, 0.2) !important; /* Semi-transparent white background */
+    color: white !important;
+    text-decoration: none;
+}
+
+/* Active state for sidebar links */
+.sidebar a.active, .sidebar .nav-link.active {
+    background-color: rgba(255, 255, 255, 0.3) !important; /* Slightly more visible background */
+    color: white !important;
+    font-weight: 600; /* Slightly bolder */
+}
+
 .top-row {
     background-color: white;
     border-bottom: 1px solid var(--gray-200);
@@ -263,11 +283,25 @@ a:hover, .btn-link:hover {
 
 .top-row ::deep a:hover, .top-row ::deep .btn-link:hover {
     color: var(--primary);
+    text-decoration: none; /* Changed from underline to none */
 }
 
 .top-row ::deep a:first-child {
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+/* Hide the About link in the top-right corner only */
+header a[href="/about"],
+header a[href="about"],
+.top-row a[href="/about"],
+.top-row a[href="about"] {
+    display: none !important;
+}
+
+/* Specifically target the header about link from the screenshot */
+.flex.items-center.justify-end a[href="/about"] {
+    display: none !important;
 }
 
 @media (max-width: 640.98px) {
@@ -311,5 +345,263 @@ a:hover, .btn-link:hover {
     .top-row, article {
         padding-left: 2rem !important;
         padding-right: 1.5rem !important;
+    }
+}
+
+/* Ensure that all text in sidebar items is visible with proper contrast */
+.flex.items-center.space-x-3.p-2 {
+    color: white !important;
+}
+
+/* Fix for SVG icons in the sidebar */
+.sidebar svg, nav svg {
+    color: white !important;
+    fill: currentColor;
+}
+
+/* Ensure button text is readable on purple background */
+.btn, button {
+    position: relative;
+    z-index: 1; /* Ensure the button text is above any background */
+}
+
+/* New styling for buttons to match the Advisor page */
+.btn-primary, 
+a.btn-primary,
+.btn-lg,
+button[class*="bg-primary"],
+a[href*="journey"], 
+button[href*="journey"],
+a[href*="planning"], 
+button[href*="planning"],
+.d-grid .btn {
+    padding: 0.5rem 1rem !important;
+    border-radius: 0.375rem !important; /* Matches rounded-md in Tailwind */
+    font-weight: 500 !important;
+    font-size: 0.875rem !important;
+    background-color: var(--primary) !important;
+    color: white !important;
+    border: none !important;
+    transition: all 0.2s ease !important;
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05) !important;
+    text-decoration: none !important;
+    display: inline-block !important;
+    text-align: center !important;
+    line-height: 1.5 !important;
+}
+
+/* Hover state for buttons */
+.btn-primary:hover, 
+a.btn-primary:hover,
+.btn-lg:hover,
+button[class*="bg-primary"]:hover,
+a[href*="journey"]:hover, 
+button[href*="journey"]:hover,
+a[href*="planning"]:hover, 
+button[href*="planning"]:hover,
+.d-grid .btn:hover {
+    background-color: var(--primary-dark) !important;
+    text-decoration: none !important;
+    transform: translateY(0) !important; /* Remove the raise effect */
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1) !important; /* Lighter shadow */
+}
+
+/* Active state for buttons */
+.btn-primary:active, 
+a.btn-primary:active,
+.btn-lg:active,
+button[class*="bg-primary"]:active,
+a[href*="journey"]:active, 
+button[href*="journey"]:active,
+a[href*="planning"]:active, 
+button[href*="planning"]:active,
+.d-grid .btn:active {
+    background-color: var(--primary-dark) !important;
+    transform: translateY(1px) !important; /* Slight press effect */
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1) !important; /* Even lighter shadow when pressed */
+}
+
+/* Focus state for buttons */
+.btn-primary:focus, 
+a.btn-primary:focus,
+.btn-lg:focus,
+button[class*="bg-primary"]:focus,
+a[href*="journey"]:focus, 
+button[href*="journey"]:focus,
+a[href*="planning"]:focus, 
+button[href*="planning"]:focus,
+.d-grid .btn:focus {
+    outline: none !important;
+    box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.3) !important; /* Focus ring */
+}
+
+/* Fix for the Powered By section */
+[class*="powered-by"], [class*="poweredby"], footer img, footer svg {
+    position: relative;
+    z-index: 10; /* Ensure logo is above any backgrounds */
+    max-width: 150px; /* Limit logo size */
+    background-color: white; /* Add white background to logo */
+    padding: 10px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    margin: 20px auto; /* Center the logo */
+    display: block; /* Make it a block element */
+}
+
+/* Clear any background elements that might be covering content */
+[class*="powered"], [class*="powered"] + div, footer div {
+    position: relative;
+    background: transparent !important; /* Remove any backgrounds */
+    color: var(--gray-900) !important; /* Ensure text is dark and readable */
+    text-align: center;
+    font-weight: 500;
+    z-index: 5;
+}
+
+/* Target the purple blobs/logos that might be hiding text */
+img[src*="logo"], svg[class*="logo"], [class*="logo"], [class*="blob"], 
+footer img, footer svg, footer [class*="logo"] {
+    max-width: 120px !important;
+    max-height: 60px !important;
+    opacity: 0.9 !important; /* Make slightly transparent */
+    background-color: white !important; /* Add white background */
+    padding: 8px !important;
+    border-radius: 8px !important;
+    margin: 0 auto 10px auto !important; /* Center and add margin below */
+    display: block !important;
+}
+
+/* Ensure text below logos is visible */
+footer p, footer div p, [class*="powered"] p {
+    margin-top: 10px !important;
+    color: var(--gray-900) !important;
+    font-weight: 500 !important;
+    text-shadow: 0 0 5px white, 0 0 10px white !important; /* Add white glow behind text */
+    background-color: rgba(255, 255, 255, 0.7) !important; /* Semi-transparent white background */
+    padding: 5px 10px !important;
+    border-radius: 4px !important;
+    display: inline-block !important;
+    position: relative !important;
+    z-index: 10 !important;
+}
+
+/* Remove the purple bars above headings on the About page */
+.rounded-circle.bg-primary.bg-opacity-10.p-2.me-3 {
+    display: none !important; /* Hide the purple circular icons completely */
+}
+
+/* Adjust the spacing for headings since the icons are now gone */
+.d-flex.align-items-center.mb-3 {
+    margin-bottom: 1rem !important;
+}
+
+/* Make heading text slightly larger to compensate for the missing icons */
+.card-body .h4 {
+    font-size: 1.25rem !important;
+    margin-bottom: 0.75rem !important;
+}
+
+/* Restyle the heading section for a cleaner look without the icons */
+.card-body .d-flex.align-items-center.mb-3 {
+    border-bottom: 2px solid var(--gray-200) !important;
+    padding-bottom: 0.75rem !important;
+}
+
+/* HOMEPAGE SPECIFIC STYLES - Make it consistent with the About page */
+
+/* Restyle the step indicator cards on the homepage */
+.card .rounded-circle.bg-primary.bg-opacity-10 {
+    background-color: white !important; /* Change from purple to white */
+    border: 2px solid var(--primary) !important; /* Add border instead */
+    width: 50px !important;
+    height: 50px !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    margin: 0 auto !important;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Ensure the step numbers are clearly visible */
+.card .rounded-circle.bg-primary.bg-opacity-10 .h3.text-primary {
+    color: var(--primary) !important;
+    font-weight: 700 !important;
+    font-size: 1.5rem !important;
+    margin-top: 3px !important; /* Slight adjustment for vertical centering */
+}
+
+/* Make the step titles stand out more */
+.card-body .h5 {
+    color: var(--primary-dark) !important;
+    font-weight: 600 !important;
+    margin-top: 1rem !important;
+    font-size: 1.1rem !important;
+    text-align: center !important;
+}
+
+/* Ensure step description text is readable */
+.card-body .text-muted {
+    color: var(--gray-700) !important;
+    font-weight: 500 !important;
+    text-align: center !important;
+}
+
+/* Add a border to the step cards for more definition */
+.card.border-0.shadow-sm.h-100.mb-3 {
+    border: 1px solid var(--gray-200) !important;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05) !important;
+    transition: all 0.2s ease !important;
+}
+
+/* Add a hover effect to the step cards */
+.card.border-0.shadow-sm.h-100.mb-3:hover {
+    transform: translateY(-3px) !important;
+    box-shadow: 0 8px 15px rgba(0, 0, 0, 0.1) !important;
+}
+
+/* Style the "Powered by" badges */
+.badge.bg-primary.bg-opacity-10.text-primary {
+    background-color: white !important;
+    color: var(--primary) !important;
+    font-weight: 500 !important;
+    border: 1px solid var(--primary) !important;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05) !important;
+    margin: 0 5px !important; /* Add horizontal spacing between badges */
+    display: inline-block !important; /* Make badges display inline */
+}
+
+/* Style the "Powered by" heading */
+.h4.mb-4 {
+    color: var(--gray-800) !important;
+    text-align: center !important;
+    font-weight: 600 !important;
+    margin-bottom: 1.5rem !important;
+}
+
+/* Make the powered by badge container horizontal */
+.d-flex.justify-content-center.align-items-center.flex-wrap.gap-3 {
+    display: flex !important;
+    flex-direction: row !important;
+    flex-wrap: wrap !important;
+    justify-content: center !important;
+    align-items: center !important;
+    gap: 10px !important; /* Reduced gap for tighter horizontal layout */
+}
+
+/* Ensure each badge container takes minimal width */
+.d-flex.justify-content-center.align-items-center.flex-wrap.gap-3 > div {
+    margin: 0 5px !important;
+    display: inline-block !important;
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-width: 768px) {
+    .d-flex.justify-content-center.align-items-center.flex-wrap.gap-3 {
+        justify-content: center !important;
+    }
+    
+    .badge.bg-primary.bg-opacity-10.text-primary {
+        margin: 3px !important;
+        font-size: 0.85rem !important; /* Slightly smaller font on mobile */
     }
 }
