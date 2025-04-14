@@ -1,4 +1,4 @@
-# Environment Variables in TravelAdvisor
+# Environment Variables in Travel Advisor
 
 This document provides information on using environment variables with the TravelAdvisor application.
 

@@ -1,4 +1,6 @@
-# Travel Advisor - Tanzu GenAI Showcase
+# Travel Advisor
+
+![Status](https://img.shields.io/badge/status-ready-darkgreen) ![Github Action CI Workflow Status](https://github.com/cf-toolsuite/tanzu-genai-showcase/actions/workflows/dotnet-extensions-ai.yml/badge.svg)
 
 A .NET 9 Blazor application showcasing the integration of LLMs with the Tanzu Platform for Cloud Foundry. This application recommends transportation options based on origin, destination, and user preferences.
 

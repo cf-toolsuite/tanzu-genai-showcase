@@ -1,4 +1,4 @@
-# Extension Guide: Adding Custom Features
+# Travel Advisor Extension Guide: Adding Custom Features
 
 This guide explains how to extend the Transportation Recommendation Bot with custom features, alternative transportation providers, and additional AI capabilities.
 

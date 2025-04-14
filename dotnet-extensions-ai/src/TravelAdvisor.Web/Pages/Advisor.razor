@@ -7,14 +7,14 @@
 
 <div class="container mx-auto py-6">
     <h1 class="text-3xl font-bold mb-6 text-gray-800">Transportation Mode Recommendation Bot</h1>
-    
+
     @if (!string.IsNullOrEmpty(ErrorMessage))
     {
         <div class="bg-red-50 border-l-4 border-red-500 p-4 mb-6" role="alert">
             <p class="text-red-700">@ErrorMessage</p>
         </div>
     }
-    
+
     <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
         <!-- Input Form Column -->
         <div class="md:col-span-5">
@@ -25,12 +25,12 @@
                 <div class="p-4">
                     <div class="mb-4">
                         <label for="queryInput" class="block text-sm font-medium text-gray-700 mb-2">Ask a question or describe your journey</label>
-                        <textarea id="queryInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent" 
+                        <textarea id="queryInput" class="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                                  rows="3" placeholder="E.g., What's the best way to get from Boston to New York? I prefer faster options and am willing to spend more for convenience."
                                  @bind="QueryText" @bind:event="oninput"></textarea>
                     </div>
-                    
-                    <button class="w-full py-2 px-4 rounded-md bg-primary text-white font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors" 
+
+                    <button class="w-full py-2 px-4 rounded-md bg-primary text-white font-medium hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary transition-colors"
                             @onclick="ProcessQueryAsync" disabled="@IsProcessing">
                         @if (IsProcessing)
                         {
@@ -47,7 +47,7 @@
                             <span>Get Recommendations</span>
                         }
                     </button>
-                    
+
                     @if (CurrentQuery != null)
                     {
                         <div class="mt-6">
@@ -67,7 +67,7 @@
                             </div>
                         </div>
                     }
-                    
+
                     @if (Recommendations != null && Recommendations.Count > 0)
                     {
                     <div class="mt-6">
@@ -75,8 +75,8 @@
                     <div class="space-y-2">
                     @foreach (var recommendation in Recommendations)
                     {
-                    <button type="button" 
-                    class="w-full text-left rounded-md p-3 transition-colors @(recommendation.IsRecommended ? "bg-primary/10 border-primary text-primary border" : "bg-white hover:bg-gray-50 border border-gray-200")" 
+                    <button type="button"
+                    class="w-full text-left rounded-md p-3 transition-colors @(recommendation.IsRecommended ? "bg-primary/10 border-primary text-primary border" : "bg-white hover:bg-gray-50 border border-gray-200")"
                     @onclick="() => SelectRecommendation(recommendation)">
                     <div class="flex justify-between items-center">
                     <h4 class="font-semibold text-sm">@recommendation.Mode</h4>
@@ -89,7 +89,7 @@
                     </div>
                     </div>
                     }
-                    
+
                     @if (Recommendations != null && Recommendations.Count == 0)
                     {
                         <div class="mt-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
@@ -107,7 +107,7 @@
                     }
                 </div>
             </div>
-            
+
             @if (SelectedRecommendation != null)
             {
                 <div class="bg-white rounded-lg shadow-md overflow-hidden mt-6">
@@ -141,7 +141,7 @@
                 </div>
             }
         </div>
-        
+
         <!-- Results Column -->
         <div class="md:col-span-7">
             @if (SelectedRecommendation != null)
@@ -190,7 +190,7 @@
                                 </div>
                             </div>
                         </div>
-                        
+
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                             <div>
                                 <h3 class="text-sm font-medium text-gray-700 mb-3">Pros</h3>
@@ -215,7 +215,7 @@
                                 </ul>
                             </div>
                         </div>
-                        
+
                         @if (!string.IsNullOrEmpty(Explanation))
                         {
                             <div class="bg-blue-50 rounded-lg p-4 mb-6">
@@ -223,7 +223,7 @@
                                 <p class="text-sm text-blue-700">@Explanation</p>
                             </div>
                         }
-                        
+
                         @if (SelectedRecommendation.Steps.Count > 0)
                         {
                             <div class="mb-6">
@@ -241,7 +241,7 @@
                                 </ul>
                             </div>
                         }
-                        
+
                         @if (!string.IsNullOrEmpty(FollowUpAnswer))
                         {
                             <div class="bg-gray-50 rounded-lg p-4">
@@ -293,14 +293,14 @@
     private string FollowUpAnswer { get; set; } = string.Empty;
     private string Explanation { get; set; } = string.Empty;
     private string ErrorMessage { get; set; } = string.Empty;
-    
+
     private bool IsProcessing { get; set; } = false;
     private bool IsProcessingFollowUp { get; set; } = false;
-    
+
     private TravelQuery? CurrentQuery { get; set; }
     private List<TravelRecommendation>? Recommendations { get; set; }
     private TravelRecommendation? SelectedRecommendation { get; set; }
-    
+
     private async Task ProcessQueryAsync()
     {
         try
@@ -311,20 +311,20 @@
             FollowUpQuestion = string.Empty;
             FollowUpAnswer = string.Empty;
             SelectedRecommendation = null;
-            
+
             // Validate query
             if (string.IsNullOrWhiteSpace(QueryText))
             {
                 ErrorMessage = "Please enter a query describing your journey.";
                 return;
             }
-            
+
             // Start processing
             IsProcessing = true;
-            
+
             // Process the natural language query
             CurrentQuery = await TravelAdvisorService.ProcessNaturalLanguageQueryAsync(QueryText);
-            
+
             // Check if the query processing returned an error
             if (CurrentQuery.HasError)
             {
@@ -332,10 +332,10 @@
                 Recommendations = new List<TravelRecommendation>(); // Empty list for error cases
                 return;
             }
-            
+
             // Generate recommendations
             Recommendations = await TravelAdvisorService.GenerateRecommendationsAsync(CurrentQuery);
-            
+
             // Select the recommended option
             if (Recommendations != null && Recommendations.Count > 0)
             {
@@ -353,17 +353,17 @@
             IsProcessing = false;
         }
     }
-    
+
     private async Task SelectRecommendation(TravelRecommendation recommendation)
     {
         try
         {
             SelectedRecommendation = recommendation;
-            
+
             // Clear previous follow-up data
             FollowUpQuestion = string.Empty;
             FollowUpAnswer = string.Empty;
-            
+
             // Generate explanation for the recommendation
             if (CurrentQuery != null)
             {
@@ -375,7 +375,7 @@
             ErrorMessage = $"An error occurred: {ex.Message}";
         }
     }
-    
+
     private async Task AskFollowUpAsync()
     {
         try
@@ -385,10 +385,10 @@
             {
                 return;
             }
-            
+
             // Start processing
             IsProcessingFollowUp = true;
-            
+
             // Get answer to follow-up question
             FollowUpAnswer = await TravelAdvisorService.AnswerFollowUpQuestionAsync(
                 FollowUpQuestion, SelectedRecommendation, CurrentQuery);
