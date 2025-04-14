@@ -23,6 +23,6 @@ namespace TravelAdvisor.Infrastructure.Options
         /// <summary>
         /// Service name in Cloud Foundry
         /// </summary>
-        public string ServiceName { get; set; } = "my-genai-service";
+        public string ServiceName { get; set; } = "travel-advisor-llm";
     }
 }

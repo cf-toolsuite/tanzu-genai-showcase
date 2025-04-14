@@ -45,13 +45,20 @@ namespace TravelAdvisor.Infrastructure.Services
                 var history = new List<ChatMessage>
                 {
                     new ChatMessage(ChatRole.System, @"
-                        You are a travel advisor assistant. Extract the relevant information from the user's query and format it as JSON.
+                        You are a travel advisor assistant. Your primary task is to CAREFULLY extract the origin and destination locations from the user's query.
+
+                        IMPORTANT: Your most critical task is to identify the specific origin and destination locations mentioned in the query.
+                        - Look for locations that follow phrases like 'from', 'starting at', 'in', 'near', etc. for the origin.
+                        - Look for locations that follow phrases like 'to', 'heading to', 'going to', 'destination', etc. for the destination.
+                        - Always include the full location name, including city, state, and country if provided.
+                        - Never leave Origin or Destination empty or as 'Unknown' if they are mentioned in the query.
+
                         Extract origin, destination, travel time information, and any preferences mentioned.
 
                         Return a JSON object with the following structure:
                         {
-                            ""Origin"": ""extracted origin"",
-                            ""Destination"": ""extracted destination"",
+                            ""Origin"": ""extracted origin location with full details"",
+                            ""Destination"": ""extracted destination location with full details"",
                             ""TravelTime"": {
                                 ""DepartureTime"": ""extracted departure time or null"",
                                 ""ArrivalTime"": ""extracted arrival time or null"",
@@ -74,13 +81,19 @@ namespace TravelAdvisor.Infrastructure.Services
                         }
 
                         Always use true for transportation modes unless the user specifically rules them out.
+
+                        IMPORTANT: Your response must ONLY contain valid JSON - no explanations, no prefixes, no additional text.
+
+                        Examples:
+                        1. For 'What's the best way to get from Seattle to Portland?', you should extract 'Seattle' as Origin and 'Portland' as Destination.
+                        2. For 'How can I travel cheaply from Mill Creek, WA to Lynnwood, WA?', you should extract 'Mill Creek, WA' as Origin and 'Lynnwood, WA' as Destination.
                     "),
                     new ChatMessage(ChatRole.User, query)
                 };
 
                 // Get response from AI
                 var response = await _chatClient.GetResponseAsync(history, new ChatOptions { Temperature = 0 });
-                
+
                 // Check if the response contains an error (e.g., service unavailable)
                 var errorProperty = response.GetType().GetProperty("Error");
                 if (errorProperty != null)
@@ -92,16 +105,17 @@ namespace TravelAdvisor.Infrastructure.Services
                         return CreateDefaultQuery(query, true, "Service temporarily unavailable. Please try again later.");
                     }
                 }
-                
+
                 var jsonResponse = ChatMessageContentBuilder.GetContentFromResponse(response);
 
                 // Parse the JSON response
                 if (string.IsNullOrEmpty(jsonResponse))
                 {
                     _logger.LogWarning("Empty response received from chat client");
-                    return CreateDefaultQuery(query);
+                    // Try parsing directly from the query instead of using default values
+                    return ExtractQueryFromText(query) ?? CreateDefaultQuery(query);
                 }
-                
+
                 // Check if the response is an error message (from MockChatClient)
                 if (jsonResponse.Contains("Service temporarily unavailable"))
                 {
@@ -111,13 +125,32 @@ namespace TravelAdvisor.Infrastructure.Services
 
                 try
                 {
+                    // Attempt to clean the response in case it has extra text before or after the JSON
+                    jsonResponse = CleanJsonResponse(jsonResponse);
+
                     var travelQuery = JsonSerializer.Deserialize<TravelQuery>(jsonResponse,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
                     if (travelQuery == null)
                     {
                         _logger.LogWarning("Failed to parse travel query from response: {Response}", jsonResponse);
-                        return CreateDefaultQuery(query);
+                        return ExtractQueryFromText(query) ?? CreateDefaultQuery(query);
+                    }
+
+                    // Validate the extracted origin and destination - if they're empty or "Unknown", try a fallback extraction
+                    if (string.IsNullOrWhiteSpace(travelQuery.Origin) || travelQuery.Origin == "Unknown" ||
+                        string.IsNullOrWhiteSpace(travelQuery.Destination) || travelQuery.Destination == "Unknown")
+                    {
+                        _logger.LogWarning("Origin or destination missing in parsed response. Attempting fallback extraction.");
+                        var fallbackQuery = ExtractQueryFromText(query);
+                        if (fallbackQuery != null)
+                        {
+                            // Keep any valid data from the original parsed query
+                            if (string.IsNullOrWhiteSpace(travelQuery.Origin) || travelQuery.Origin == "Unknown")
+                                travelQuery.Origin = fallbackQuery.Origin;
+                            if (string.IsNullOrWhiteSpace(travelQuery.Destination) || travelQuery.Destination == "Unknown")
+                                travelQuery.Destination = fallbackQuery.Destination;
+                        }
                     }
 
                     return travelQuery;
@@ -125,7 +158,7 @@ namespace TravelAdvisor.Infrastructure.Services
                 catch (JsonException ex)
                 {
                     _logger.LogError(ex, "Error parsing JSON response: {Response}", jsonResponse);
-                    return CreateDefaultQuery(query);
+                    return ExtractQueryFromText(query) ?? CreateDefaultQuery(query);
                 }
             }
             catch (Exception ex)
@@ -252,7 +285,7 @@ namespace TravelAdvisor.Infrastructure.Services
                         2. How it aligns with the user's preferences
                         3. Trade-offs between time, cost, convenience, and environmental impact
                         4. Any special considerations for this journey
-                        
+
                         Keep the explanation conversational and friendly. Avoid using technical jargon.
                     "),
                     new ChatMessage(ChatRole.User, $@"
@@ -278,8 +311,8 @@ namespace TravelAdvisor.Infrastructure.Services
 
                 // Get response from AI
                 var response = await _chatClient.GetResponseAsync(history, new ChatOptions { Temperature = 0.7f });
-                
-                return ChatMessageContentBuilder.GetContentFromResponse(response) ?? 
+
+                return ChatMessageContentBuilder.GetContentFromResponse(response) ??
                        "I'm sorry, I couldn't generate a detailed explanation for this recommendation.";
             }
             catch (Exception ex)
@@ -337,7 +370,7 @@ namespace TravelAdvisor.Infrastructure.Services
                 // Get response from AI
                 var response = await _chatClient.GetResponseAsync(history, new ChatOptions { Temperature = 0.7f });
 
-                return ChatMessageContentBuilder.GetContentFromResponse(response) ?? 
+                return ChatMessageContentBuilder.GetContentFromResponse(response) ??
                        "I'm sorry, I couldn't answer your follow-up question. Could you try rephrasing it?";
             }
             catch (Exception ex)
@@ -349,6 +382,120 @@ namespace TravelAdvisor.Infrastructure.Services
 
         #region Helper Methods
 
+        /// <summary>
+        /// Cleans up a JSON response by removing any non-JSON text before or after the JSON object
+        /// </summary>
+        private string CleanJsonResponse(string response)
+        {
+            try
+            {
+                // Try to find a JSON object in the response
+                int startIndex = response.IndexOf('{');
+                int endIndex = response.LastIndexOf('}');
+
+                if (startIndex >= 0 && endIndex > startIndex)
+                {
+                    return response.Substring(startIndex, endIndex - startIndex + 1);
+                }
+
+                return response;
+            }
+            catch
+            {
+                // If any error occurs during cleaning, return the original response
+                return response;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to extract origin and destination directly from the text query
+        /// This is a fallback method when the LLM fails to extract properly
+        /// </summary>
+        private TravelQuery? ExtractQueryFromText(string query)
+        {
+            try
+            {
+                string origin = "Unknown";
+                string destination = "Unknown";
+                string priority = string.Empty;
+
+                // Simple pattern matching for common travel query formats
+                // Look for "from X to Y" pattern
+                var fromToMatch = System.Text.RegularExpressions.Regex.Match(query,
+                    @"from\s+([^,\.;]+(?:,[^,\.;]+)*)\s+to\s+([^,\.;]+(?:,[^,\.;]+)*)",
+                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                if (fromToMatch.Success)
+                {
+                    origin = fromToMatch.Groups[1].Value.Trim();
+                    destination = fromToMatch.Groups[2].Value.Trim();
+                }
+
+                // If not found, look for "between X and Y" pattern
+                if (origin == "Unknown" || destination == "Unknown")
+                {
+                    var betweenMatch = System.Text.RegularExpressions.Regex.Match(query,
+                        @"between\s+([^,\.;]+(?:,[^,\.;]+)*)\s+and\s+([^,\.;]+(?:,[^,\.;]+)*)",
+                        System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+
+                    if (betweenMatch.Success)
+                    {
+                        origin = betweenMatch.Groups[1].Value.Trim();
+                        destination = betweenMatch.Groups[2].Value.Trim();
+                    }
+                }
+
+                // Check for priority keywords
+                if (query.Contains("fast", StringComparison.OrdinalIgnoreCase) ||
+                    query.Contains("quick", StringComparison.OrdinalIgnoreCase) ||
+                    query.Contains("speed", StringComparison.OrdinalIgnoreCase))
+                {
+                    priority = "faster";
+                }
+                else if (query.Contains("cheap", StringComparison.OrdinalIgnoreCase) ||
+                         query.Contains("inexpensive", StringComparison.OrdinalIgnoreCase) ||
+                         query.Contains("economical", StringComparison.OrdinalIgnoreCase) ||
+                         query.Contains("save money", StringComparison.OrdinalIgnoreCase))
+                {
+                    priority = "cheaper";
+                }
+                else if (query.Contains("eco", StringComparison.OrdinalIgnoreCase) ||
+                         query.Contains("environment", StringComparison.OrdinalIgnoreCase) ||
+                         query.Contains("green", StringComparison.OrdinalIgnoreCase))
+                {
+                    priority = "environmental";
+                }
+
+                // Only return a query if we successfully extracted both origin and destination
+                if (origin != "Unknown" && destination != "Unknown")
+                {
+                    _logger.LogInformation("Extracted query directly from text: From {Origin} to {Destination}",
+                        origin, destination);
+
+                    var travelQuery = new TravelQuery
+                    {
+                        Origin = origin,
+                        Destination = destination,
+                        AdditionalContext = query
+                    };
+
+                    if (!string.IsNullOrEmpty(priority))
+                    {
+                        travelQuery.Preferences.Priority = priority;
+                    }
+
+                    return travelQuery;
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in fallback extraction from text");
+                return null;
+            }
+        }
+
         private TravelQuery CreateDefaultQuery(string originalQuery, bool isError = false, string errorMessage = "")
         {
             var query = new TravelQuery
@@ -359,7 +506,7 @@ namespace TravelAdvisor.Infrastructure.Services
                 HasError = isError,
                 ErrorMessage = errorMessage
             };
-            
+
             return query;
         }
 

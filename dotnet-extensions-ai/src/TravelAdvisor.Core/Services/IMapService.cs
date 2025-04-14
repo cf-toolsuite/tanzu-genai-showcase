@@ -16,10 +16,10 @@ namespace TravelAdvisor.Core.Services
         /// <param name="mode">Transportation mode</param>
         /// <returns>Distance in kilometers and duration in minutes</returns>
         Task<(double distanceKm, int durationMinutes)> CalculateDistanceAndDurationAsync(
-            string origin, 
-            string destination, 
+            string origin,
+            string destination,
             TransportMode mode);
-        
+
         /// <summary>
         /// Get detailed travel steps between two locations for a specific transportation mode
         /// </summary>
@@ -28,10 +28,10 @@ namespace TravelAdvisor.Core.Services
         /// <param name="mode">Transportation mode</param>
         /// <returns>List of travel steps</returns>
         Task<List<TravelStep>> GetTravelStepsAsync(
-            string origin, 
-            string destination, 
+            string origin,
+            string destination,
             TransportMode mode);
-        
+
         /// <summary>
         /// Determine if a transportation mode is feasible for a given distance
         /// </summary>

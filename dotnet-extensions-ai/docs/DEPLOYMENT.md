@@ -11,23 +11,6 @@ This document provides detailed instructions for deploying the Travel Advisor ap
 - Access to the GenAI tile in your Tanzu Platform environment
 - Google Maps API key
 
-## Pre-deployment Configuration
-
-1. Set up your `.env` file in the `src` directory:
-
-```bash
-cp src/.env.example src/.env
-```
-
-2. Edit the `.env` file to include:
-
-```
-GENAI__APIKEY=your_llm_api_key
-GENAI__APIURL=your_llm_api_url
-GENAI__MODEL=your_llm_model_name
-GOOGLEMAPS__APIKEY=your_google_maps_api_key
-```
-
 ## Building for Deployment
 
 1. Build the application in Release mode:
@@ -47,22 +30,42 @@ cf login -a <API_ENDPOINT> -u <USERNAME> -p <PASSWORD> -o <ORG> -s <SPACE>
 2. Create a service instance for the LLM from the GenAI tile:
 
 ```bash
-cf create-service genai standard travel-advisor-llm -c '{"model": "your_llm_model_name"}'
+# List GenAI tile service offering plans
+cf marketplace -e genai
+
+# Create a service instance from one of the available plans
+cf create-service genai PLAN_NAME travel-advisor-llm
 ```
+
+> [!IMPORTANT]
+> Replace `PLAN_NAME` above with an available plan from the GenAI tile service offering
 
 ## Deployment Steps
 
 1. Push the application to Cloud Foundry:
 
 ```bash
-cf push
+cf push --no-start
 ```
 
-2. If you need to set environment variables for the Google Maps API key (if not provided through service binding):
+2. Bind the application to the service instance:
+
+```bash
+cf bind-service travel-advisor travel-advisor-llm
+```
+
+3. You'll need to set an environment variable for the Google Maps API key:
 
 ```bash
 cf set-env travel-advisor GOOGLEMAPS__APIKEY your_google_maps_api_key
-cf restage travel-advisor
+```
+> [!IMPORTANT]
+> Replace `your_google_maps_api_key` above with a valid Google Maps API key with appropriate permissions.
+
+4. Start the application:
+
+```bash
+cf start travel-advisor
 ```
 
 ## Verifying Deployment

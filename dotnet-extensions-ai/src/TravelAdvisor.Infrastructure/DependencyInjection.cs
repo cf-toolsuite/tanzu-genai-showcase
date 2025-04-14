@@ -103,8 +103,15 @@ namespace TravelAdvisor.Infrastructure
                     var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
                     var logger = loggerFactory.CreateLogger<MockChatClient>();
 
-                    // Check if mock data is enabled using centralized environment utility
-                    bool useMockData = EnvironmentVariables.GetBool("USE_MOCK_DATA", false);
+                    // Force a direct environment variable check to bypass any caching
+                    string useMockDataStr = Environment.GetEnvironmentVariable("USE_MOCK_DATA") ?? "false";
+                    bool useMockData = useMockDataStr.ToLowerInvariant() == "true" || useMockDataStr == "1";
+
+                    // Also check through the utility to maintain logging and for debugging
+                    bool useMockDataFromUtils = EnvironmentVariables.GetBool("USE_MOCK_DATA", false);
+
+                    logger.LogInformation($"Raw environment variable USE_MOCK_DATA = '{useMockDataStr}', parsed as {useMockData}");
+                    logger.LogInformation($"EnvironmentVariables.GetBool(\"USE_MOCK_DATA\") = {useMockDataFromUtils}");
 
                     if (useMockData)
                     {
@@ -129,7 +136,7 @@ namespace TravelAdvisor.Infrastructure
         private static IChatClient CreateAzureOpenAIChatClient(string apiKey, string endpoint, string deploymentName)
         {
             // Try to find the Azure OpenAI client type using reflection with different possible namespaces and assemblies
-            var azureOpenAIClientType = 
+            var azureOpenAIClientType =
                 Type.GetType("Microsoft.Extensions.AI.AzureOpenAIChatClient, Microsoft.Extensions.AI") ??
                 Type.GetType("Microsoft.Extensions.AI.AzureOpenAIChatClient, Microsoft.Extensions.AI.Abstractions") ??
                 Type.GetType("Microsoft.Extensions.AI.OpenAI.AzureOpenAIChatClient, Microsoft.Extensions.AI.OpenAI");
@@ -142,9 +149,9 @@ namespace TravelAdvisor.Infrastructure
                     try
                     {
                         // Try to find any class that ends with "AzureOpenAIChatClient"
-                        var types = assembly.GetTypes().Where(t => t.Name.EndsWith("AzureOpenAIChatClient") && 
+                        var types = assembly.GetTypes().Where(t => t.Name.EndsWith("AzureOpenAIChatClient") &&
                                                                   t.Namespace?.StartsWith("Microsoft.Extensions.AI") == true);
-                        
+
                         foreach (var type in types)
                         {
                             Console.WriteLine($"Found potential AzureOpenAIChatClient: {type.FullName} in {assembly.FullName}");
@@ -157,7 +164,7 @@ namespace TravelAdvisor.Infrastructure
                         // If we can't load types from an assembly (e.g., due to missing dependencies), just skip it
                         Console.WriteLine($"Skipping assembly {assembly.FullName}: {ex.Message}");
                     }
-                    
+
                     if (azureOpenAIClientType != null) break;
                 }
             }
@@ -184,17 +191,17 @@ namespace TravelAdvisor.Infrastructure
                 if (constructor != null)
                 {
                     var client = (IChatClient)constructor.Invoke(new object[] { apiKey, endpoint });
-                    
+
                     // Try to set the deployment name via a property
                     var deploymentProperty = azureOpenAIClientType.GetProperty("DeploymentName");
                     if (deploymentProperty != null && deploymentProperty.CanWrite)
                     {
                         deploymentProperty.SetValue(client, deploymentName);
                     }
-                    
+
                     return client;
                 }
-                
+
                 // If we can't create the client, fall back to mock
                 return new MockChatClient(null, true);
             }
@@ -211,7 +218,7 @@ namespace TravelAdvisor.Infrastructure
         private static IChatClient CreateOpenAIChatClient(string apiKey, string modelId)
         {
             // Try to find the OpenAI client type using reflection with different possible namespaces and assemblies
-            var openAIClientType = 
+            var openAIClientType =
                 Type.GetType("Microsoft.Extensions.AI.OpenAIChatClient, Microsoft.Extensions.AI") ??
                 Type.GetType("Microsoft.Extensions.AI.OpenAIChatClient, Microsoft.Extensions.AI.Abstractions") ??
                 Type.GetType("Microsoft.Extensions.AI.OpenAI.OpenAIChatClient, Microsoft.Extensions.AI.OpenAI");
@@ -224,9 +231,9 @@ namespace TravelAdvisor.Infrastructure
                     try
                     {
                         // Try to find any class that ends with "OpenAIChatClient"
-                        var types = assembly.GetTypes().Where(t => t.Name.EndsWith("OpenAIChatClient") && 
+                        var types = assembly.GetTypes().Where(t => t.Name.EndsWith("OpenAIChatClient") &&
                                                                   t.Namespace?.StartsWith("Microsoft.Extensions.AI") == true);
-                        
+
                         foreach (var type in types)
                         {
                             Console.WriteLine($"Found potential OpenAIChatClient: {type.FullName} in {assembly.FullName}");
@@ -239,7 +246,7 @@ namespace TravelAdvisor.Infrastructure
                         // If we can't load types from an assembly (e.g., due to missing dependencies), just skip it
                         Console.WriteLine($"Skipping assembly {assembly.FullName}: {ex.Message}");
                     }
-                    
+
                     if (openAIClientType != null) break;
                 }
             }
@@ -260,23 +267,23 @@ namespace TravelAdvisor.Infrastructure
                 {
                     return (IChatClient)constructor.Invoke(new object[] { apiKey, modelId });
                 }
-                
+
                 // Try with just the API key
                 constructor = openAIClientType.GetConstructor(new[] { typeof(string) });
                 if (constructor != null)
                 {
                     var client = (IChatClient)constructor.Invoke(new object[] { apiKey });
-                    
+
                     // Try to set the model via a property or method
                     var modelProperty = openAIClientType.GetProperty("Model");
                     if (modelProperty != null && modelProperty.CanWrite)
                     {
                         modelProperty.SetValue(client, modelId);
                     }
-                    
+
                     return client;
                 }
-                
+
                 // If we can't create the client, fall back to mock
                 return new MockChatClient(null, true);
             }
@@ -305,6 +312,7 @@ namespace TravelAdvisor.Infrastructure
         {
             _logger = logger;
             _useMockData = useMockData;
+            _logger?.LogInformation($"MockChatClient initialized with useMockData={useMockData}");
         }
 
         public Task<ChatResponse> GetResponseAsync(IEnumerable<ChatMessage> messages, ChatOptions? options = null, CancellationToken cancellationToken = default)
@@ -315,12 +323,12 @@ namespace TravelAdvisor.Infrastructure
             if (!_useMockData)
             {
                 _logger?.LogError("Mock data is disabled (USE_MOCK_DATA=false). Service temporarily unavailable.");
-                
+
                 // Return a standard error message instead of mock data
                 chatResponse.AddProperty("content", "Service temporarily unavailable. Please try again later.");
                 chatResponse.AddProperty("role", ChatRole.Assistant.ToString());
                 chatResponse.AddProperty("error", "SERVICE_UNAVAILABLE");
-                
+
                 return Task.FromResult(chatResponse);
             }
 
@@ -364,8 +372,8 @@ namespace TravelAdvisor.Infrastructure
             if (!_useMockData)
             {
                 _logger?.LogError("Mock data is disabled (USE_MOCK_DATA=false). Service temporarily unavailable.");
-                
-                // In streaming mode, we can't really send an error message 
+
+                // In streaming mode, we can't really send an error message
                 // so we just return an empty stream
             }
             else

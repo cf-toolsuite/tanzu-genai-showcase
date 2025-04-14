@@ -22,7 +22,7 @@ The Travel Advisor application follows a clean architecture pattern with three m
 ### 1. Clone the Repository
 
 ```bash
-git clone <repository-url>
+git clone https://github.com/cf-toolsuite/tanzu-genai-showcase
 cd tanzu-genai-showcase/dotnet-extensions-ai
 ```
 
@@ -55,8 +55,7 @@ dotnet restore
 dotnet build
 
 # Run the web project
-cd src/TravelAdvisor.Web
-dotnet run
+dotnet run --project src/TravelAdvisor.Web
 ```
 
 #### Using Visual Studio
