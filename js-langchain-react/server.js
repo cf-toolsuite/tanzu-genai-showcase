@@ -9,6 +9,7 @@ process.on('warning', (warning) => {
 
 require('dotenv').config();
 const express = require('express');
+const rateLimit = require('express-rate-limit');
 const cors = require('cors');
 const path = require('path');
 const { ChatOpenAI } = require('@langchain/openai');
@@ -22,6 +23,7 @@ const PORT = process.env.PORT || 3001;
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'build')));
+
 
 // Get LLM credentials from Cloud Foundry VCAP_SERVICES or environment variables
 function getLLMConfig() {
