@@ -21,6 +21,7 @@ except (ImportError, AttributeError) as e:
             return func
 
 from .mcp.client import MCPAirbnbClient
+from .mcp.clients import MCPAirbnbClientBase
 
 log = logging.getLogger(__name__)
 
@@ -34,7 +35,7 @@ class AirbnbTools(Toolkit):
         Initialize the Airbnb toolkit
 
         Args:
-            mcp_client: MCPAirbnbClient instance (optional)
+            mcp_client: MCPAirbnbClient or MCPAirbnbClientBase instance (optional)
         """
         super().__init__(name="airbnb_tools")
 

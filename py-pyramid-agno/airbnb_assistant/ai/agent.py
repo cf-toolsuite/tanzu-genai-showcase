@@ -4,6 +4,7 @@ AI agent implementation using Agno for the Airbnb Assistant
 import logging
 import os
 import shutil
+import uuid
 from typing import Dict, Any, Optional, List, Union
 from urllib.parse import urlparse
 
@@ -21,7 +22,7 @@ except (ImportError, AttributeError) as e:
 
 from .tools import AirbnbTools
 from .mcp.client import MCPAirbnbClient
-from .mcp.stdio_client import MCPAirbnbStdioClient
+from .mcp.clients import create_mcp_client
 
 log = logging.getLogger(__name__)
 
@@ -36,7 +37,7 @@ class AirbnbAssistantAgent:
 
     def __init__(self,
                 api_key: str,
-                model: str = "gpt-4",
+                model: str = "gpt-4o-mini",
                 api_url: str = "https://api.openai.com/v1",
                 mcp_url: Optional[str] = None,
                 mcp_use_stdio: bool = False,
@@ -62,6 +63,9 @@ class AirbnbAssistantAgent:
         self.mcp_args = mcp_args
         self.agent = None
         self.mcp_client = None
+
+        # Session management
+        self.sessions = {}
 
         # If Agno is imported, create a real agent, otherwise use mock implementation
         if AGNO_IMPORTED:
@@ -167,6 +171,82 @@ class AirbnbAssistantAgent:
             urls[placeholder] = (url, url)
             text = text.replace(url, placeholder)
 
+        # Auto-format responses with listing data that isn't already well-formatted
+        # If USE_MOCK_DATA is true and the AI response doesn't have good formatting,
+        # we can enhance it with structured mock data
+        use_mock = os.environ.get('USE_MOCK_DATA', 'false').lower() == 'true'
+        if use_mock and not any(listing_marker in text.lower() for listing_marker in ["### 1.", "### 2.", "# airbnb", "property details"]):
+            # If we have a generic response that doesn't contain specific listing information,
+            # let's check if there are any commands about finding places
+            find_phrases = ["find", "looking for", "search", "stay", "book", "accommodations", "listing", "place"]
+            location_phrases = ["san francisco", "near", "downtown", "waterfront", "location", "in the", "area"]
+
+            # If this looks like a location request but doesn't have proper listing data
+            if (any(phrase in text.lower() for phrase in find_phrases) and
+                any(phrase in text.lower() for phrase in location_phrases)):
+
+                # Let's assume the response should be a listing but isn't formatted correctly
+                if "one moment" in text.lower() or "looking" in text.lower():
+                    # Generate a nicely formatted mock response with listings
+                    location = "San Francisco"
+                    for loc in ["san francisco", "new york", "chicago", "miami", "los angeles", "boston"]:
+                        if loc in text.lower():
+                            location = loc.title()
+                            break
+
+                    # Extract location details if possible
+                    location_detail = "downtown"
+                    if "waterfront" in text.lower():
+                        location_detail = "waterfront"
+                    elif "downtown" in text.lower():
+                        location_detail = "downtown"
+                    elif "near" in text.lower():
+                        parts = text.lower().split("near")
+                        if len(parts) > 1:
+                            location_detail = parts[1].split(".")[0].strip()
+
+                    # Create a mock response with nicely formatted listings
+                    mock_response = f"# Airbnb Listings Search Results\n\nHere are some great places to stay in {location} near the {location_detail} area:\n\n"
+
+                    mock_response += "### 1. **Luxury Waterfront Apartment**\n\n"
+                    mock_response += "* **Location:** {location} - {location_detail} area, walking distance to attractions\n"
+                    mock_response += "* **Price:** $235 per night\n"
+                    mock_response += "* **Rating:** 4.92 (125 reviews)\n"
+                    mock_response += "* **Bedrooms:** 2\n"
+                    mock_response += "* **Bathrooms:** 2\n"
+                    mock_response += "* **Guests:** Up to 4\n"
+                    mock_response += "* **Amenities:** WiFi, Full kitchen, Washer/dryer, Air conditioning, Dedicated workspace, Free parking\n"
+                    mock_response += "* **Listing URL:** [View on Airbnb](https://www.airbnb.com/rooms/123456)\n\n"
+                    mock_response += "![Luxury Apartment](https://a0.muscache.com/im/pictures/miso/Hosting-51809333/original/0da70267-d9da-4efb-9123-2714b651c9cd.jpeg)\n\n"
+
+                    mock_response += "### 2. **Modern Downtown Loft**\n\n"
+                    mock_response += "* **Location:** {location} - Central downtown location\n"
+                    mock_response += "* **Price:** $189 per night\n"
+                    mock_response += "* **Rating:** 4.87 (94 reviews)\n"
+                    mock_response += "* **Bedrooms:** 1\n"
+                    mock_response += "* **Bathrooms:** 1\n"
+                    mock_response += "* **Guests:** Up to 3\n"
+                    mock_response += "* **Amenities:** WiFi, Kitchen, Gym access, Smart TV, Washing machine\n"
+                    mock_response += "* **Listing URL:** [View on Airbnb](https://www.airbnb.com/rooms/234567)\n\n"
+                    mock_response += "![Downtown Loft](https://a0.muscache.com/im/pictures/miso/Hosting-717134404264905813/original/dfe9c1ff-b70c-4566-a1ef-5bc733dbb705.jpeg)\n\n"
+
+                    mock_response += "### 3. **Charming {location_detail} Condo**\n\n"
+                    mock_response += "* **Location:** {location} - {location_detail} neighborhood\n"
+                    mock_response += "* **Price:** $165 per night\n"
+                    mock_response += "* **Rating:** 4.79 (108 reviews)\n"
+                    mock_response += "* **Bedrooms:** 1\n"
+                    mock_response += "* **Bathrooms:** 1\n"
+                    mock_response += "* **Guests:** Up to 2\n"
+                    mock_response += "* **Amenities:** WiFi, Kitchen, Patio, Cable TV, Air conditioning\n"
+                    mock_response += "* **Listing URL:** [View on Airbnb](https://www.airbnb.com/rooms/345678)\n\n"
+                    mock_response += "![Charming Condo](https://a0.muscache.com/im/pictures/miso/Hosting-807995199727408777/original/9225d584-7aa4-4990-af06-339bd1339686.jpeg)\n\n"
+
+                    mock_response = mock_response.replace("{location}", location)
+                    mock_response = mock_response.replace("{location_detail}", location_detail.title())
+
+                    # Replace the original text with our nicely formatted mock response
+                    text = mock_response
+
         # Fix general markdown formatting issues
         text = re.sub(r'(^|\n)(\d+\.)(\s*\w)', r'\1\2 \3', text)  # Numbered lists
         text = re.sub(r'(^|\n)(\*)(\s*\w)', r'\1\2 \3', text)      # Bullet points
@@ -246,15 +326,38 @@ class AirbnbAssistantAgent:
                 model = OpenAIChat(**client_params)
 
             # Create the appropriate MCP client based on configuration
-            if self.mcp_use_stdio and self.mcp_command:
+            # We should only create one client based on the configuration
+            use_mock = os.environ.get('USE_MOCK_DATA', 'false').lower() == 'true'
+            if use_mock:
+                log.info("Using mock MCP client as configured by USE_MOCK_DATA")
+                self.mcp_client = create_mcp_client(
+                    use_mock=True,
+                    use_stdio=False,
+                    mcp_url=None,
+                    mcp_command=None,
+                    mcp_args=None
+                )
+            elif self.mcp_use_stdio and self.mcp_command:
                 log.info(f"Using stdio MCP client with command: {self.mcp_command}")
-                self.mcp_client = MCPAirbnbStdioClient(
+                self.mcp_client = create_mcp_client(
+                    use_mock=False,
+                    use_stdio=True,
+                    mcp_url=None,
                     mcp_command=self.mcp_command,
-                    mcp_args=self.mcp_args or []
+                    mcp_args=self.mcp_args
                 )
             else:
                 log.info(f"Using HTTP MCP client with URL: {self.mcp_url}")
-                self.mcp_client = MCPAirbnbClient(mcp_url=self.mcp_url)
+                self.mcp_client = create_mcp_client(
+                    use_mock=False,
+                    use_stdio=False,
+                    mcp_url=self.mcp_url,
+                    mcp_command=None,
+                    mcp_args=None
+                )
+
+            client_type = type(self.mcp_client).__name__
+            log.info(f"Created MCP client of type: {client_type}")
 
             # Create the toolkit with the selected MCP client
             airbnb_toolkit = AirbnbTools(mcp_client=self.mcp_client)
@@ -298,19 +401,46 @@ class AirbnbAssistantAgent:
         try:
             log.info(f"Processing query: {message}")
 
-            # If no valid agent is available or no API key, return mock response
-            if self.agent is None or not self.api_key or self.api_key == "your_api_key_here":
-                log.warning("Using mock response as no valid agent is available")
-                mock_response = self._generate_mock_response(message)
-                return {
-                    "response": mock_response,
-                    "context": {"mock": True}
+            # Create a new session ID if none was provided
+            if not session_id:
+                session_id = str(uuid.uuid4())
+
+            # Initialize session if it doesn't exist
+            if session_id not in self.sessions:
+                self.sessions[session_id] = {
+                    "messages": []
                 }
+
+            # Add user message to session history
+            self.sessions[session_id]["messages"].append({"role": "user", "content": message})
+
+            # If no valid agent is available or no API key, return error
+            if self.agent is None or not self.api_key or self.api_key == "your_api_key_here":
+                log.warning("No valid agent is available - missing API key or agent initialization failed")
+                error_msg = "I'm sorry, but I'm not properly configured. Please check that you have set a valid API key."
+                raise RuntimeError(error_msg)
 
             # Run the agent to get a response using the proper Agno agent.run() method
             try:
                 # Use the agent.run method
-                response = self.agent.run(message)
+                # Get the session history
+                session_messages = self.sessions[session_id].get("messages", [])
+
+                # If this is the first message, we just run the agent with the message
+                if len(session_messages) <= 1:
+                    response = self.agent.run(message)
+                else:
+                    # For subsequent messages, we need to pass the whole history
+                    # Convert to the format Agno expects for history
+                    formatted_history = [
+                        msg for msg in session_messages[:-1]  # All messages except the current one
+                    ]
+
+                    # Run the agent with history and current message
+                    response = self.agent.run(
+                        message,
+                        history=formatted_history
+                    )
                 log.info(f"Agent generated a response of type: {type(response)}")
 
                 # Get the response content - RunResponse object or string
@@ -331,10 +461,22 @@ class AirbnbAssistantAgent:
                 # Extract any context or metadata
                 context = {}
 
-                # For now, we'll use a simple detection of listing data
-                if formatted_text and isinstance(formatted_text, str) and "listing" in formatted_text.lower():
-                    context["type"] = "listing"
-                    log.info("Detected listing data in response")
+                # Improved detection of listing data with multiple patterns
+                if formatted_text and isinstance(formatted_text, str):
+                    listing_markers = [
+                        "listing", "accommodations", "property", "airbnb", "stay", "found",
+                        "results", "### 1.", "### 2.", "* **Location", "* **Price", "* **Rating",
+                        "* **Bedrooms", "search results"
+                    ]
+
+                    if any(marker in formatted_text.lower() for marker in listing_markers):
+                        context["type"] = "listing"
+                        log.info("Detected listing data in response")
+
+                        # Check if the response has the necessary formatting
+                        if not ("###" in formatted_text or "##" in formatted_text):
+                            log.info("Response doesn't have proper heading formatting, applying additional formatting")
+                            formatted_text = self._format_response_as_markdown(formatted_text)
 
                 # Make sure we have a string response for the frontend
                 if not isinstance(formatted_text, str):
@@ -352,6 +494,9 @@ class AirbnbAssistantAgent:
                         formatted_text = str(formatted_text)
                         log.info("Used str() to convert response after error")
 
+                # Add the assistant's response to the session history
+                self.sessions[session_id]["messages"].append({"role": "assistant", "content": formatted_text})
+
                 return {
                     "response": formatted_text,
                     "context": context
@@ -366,95 +511,34 @@ class AirbnbAssistantAgent:
                     if self.provider:
                         expected_env = f"GENAI_API_KEY or {self.provider.upper()}_API_KEY"
                         log.error(f"For {self.provider} provider, ensure {expected_env} is set correctly.")
+                    error_msg = "API key validation failed. Please check your API key configuration."
 
-                # Fall back to mock response
-                log.info("Falling back to mock response due to agent error")
-                mock_response = self._generate_mock_response(message)
-                return {
-                    "response": mock_response,
-                    "context": {"mock": True, "error": error_msg}
-                }
+                # Raise the error so it can be handled by the view
+                raise RuntimeError(error_msg)
 
         except Exception as e:
             log.error(f"Error processing query: {e}")
-            # Provide a user-friendly error message
-            error_response = "I apologize, but I encountered an error while processing your request. Please try again later."
-            return {
-                "response": error_response,
-                "context": {"error": str(e)}
-            }
 
-    def _generate_mock_response(self, message: str) -> str:
-        """
-        Generate a mock response for demonstration purposes
+            # Check if it's a RuntimeError we've already created
+            if isinstance(e, RuntimeError):
+                # Just re-raise the RuntimeError
+                raise
 
-        Args:
-            message (str): User's message
+            # For other exceptions, create a new RuntimeError with a friendly message
+            error_msg = "I apologize, but I encountered an error while processing your request."
+            raise RuntimeError(error_msg)
 
-        Returns:
-            str: Mock response with formatted listings
-        """
-        # Simple logic to detect search queries
-        if any(keyword in message.lower() for keyword in ["find", "search", "looking for", "place", "stay", "accommodation"]):
-            # Extract location from message
-            location = "San Francisco"  # Default
-            for city in ["san francisco", "new york", "miami", "los angeles", "chicago", "boston"]:
-                if city in message.lower():
-                    location = city.title()
-                    break
 
-            return f"""Sure! I can help with that. Could you please provide me with the following details?
 
-1. Check-in Date
-2. Check-out Date
-3. Number of Guests
-4. Any specific preferences or requirements (e.g., number of bedrooms, amenities, budget)?
-
-Once I have this information, I'll search for suitable accommodations in {location}!"""
-
-        # If it's a request for more details
-        elif any(keyword in message.lower() for keyword in ["more", "detail", "tell me about", "listing"]):
-            listing_id = "1001"  # Default
-            for id_pattern in ["1001", "1002", "1003"]:
-                if id_pattern in message:
-                    listing_id = id_pattern
-                    break
-
-            return f"""Here are some great listings in San Francisco:
-
-**Luxury Ocean View Condo**
-• 2 bedrooms, 2 bathrooms
-• $250 per night
-• Accommodates up to 4 guests
-• Amenities: WiFi, Pool, Kitchen, Gym, Air conditioning
-• Superhost with 4.9 rating (85 reviews)
-• Located in a beachfront property with direct beach access
-
-**Cozy Downtown Apartment**
-• 1 bedroom, 1 bathroom
-• $120 per night
-• Accommodates up to 2 guests
-• Amenities: WiFi, Kitchen, Air conditioning
-• 4.8 rating (120 reviews)
-• Located in downtown area
-
-Would you like more information about a specific listing?"""
-
-        # Default response
-        else:
-            return """I'm your Airbnb search assistant. I can help you find accommodations and provide details about listings.
-
-Try asking me something like:
-• "Find me a place to stay in San Francisco"
-• "I need a 2-bedroom apartment in New York for next week"
-• "Tell me more about listing 1001"
-
-How can I help you today?"""
+    def cleanup(self):
+        """Clean up resources when the agent is finished"""
+        if hasattr(self, 'mcp_client') and self.mcp_client:
+            try:
+                if hasattr(self.mcp_client, 'cleanup'):
+                    self.mcp_client.cleanup()
+            except Exception as e:
+                log.error(f"Error cleaning up MCP client in agent: {e}")
 
     def __del__(self):
         """Clean up resources when the agent is destroyed"""
-        if hasattr(self, 'mcp_client') and self.mcp_client and hasattr(self.mcp_client, 'stop_server'):
-            try:
-                self.mcp_client.stop_server()
-            except:
-                pass
+        self.cleanup()

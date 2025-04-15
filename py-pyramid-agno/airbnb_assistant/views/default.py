@@ -13,9 +13,62 @@ from pyramid.httpexceptions import HTTPFound, HTTPBadRequest
 
 from ..models import DBSession, User, ChatSession, ChatMessage
 from ..ai.mcp.client import MCPAirbnbClient
+from ..ai.mcp.clients import create_mcp_client
 from ..ai.agent import AirbnbAssistantAgent
 
 log = logging.getLogger(__name__)
+
+
+def create_mcp_client_from_config(request):
+    """
+    Create an MCP client based on request configuration and environment variables
+
+    This function is deprecated and will be removed in a future version.
+    Use AirbnbAssistantAgent to manage the MCP client instead.
+
+    Args:
+        request: The pyramid request object containing registry settings
+
+    Returns:
+        An appropriate MCP client instance
+    """
+    log.warning("create_mcp_client_from_config is deprecated - use AirbnbAssistantAgent instead")
+    # Get MCP configuration from settings and environment
+    mcp_url = request.registry.settings.get('mcp.airbnb_url')
+    use_mock = os.environ.get('USE_MOCK_DATA', 'false').lower() == 'true'
+    use_stdio = os.environ.get('MCP_USE_STDIO', 'false').lower() == 'true'
+    mcp_server_path = os.environ.get('MCP_SERVER_PATH')
+
+    # Determine command and args for stdio client
+    mcp_command = None
+    mcp_args = None
+
+    if use_stdio and mcp_server_path:
+        # Determine the command and args based on file extension
+        if mcp_server_path.endswith('.js'):
+            mcp_command = 'node'
+            mcp_args = [mcp_server_path]
+        elif mcp_server_path.endswith('.py'):
+            mcp_command = 'python'
+            mcp_args = [mcp_server_path]
+        else:
+            # Default to just executing the file directly
+            mcp_command = mcp_server_path
+            mcp_args = []
+
+    # Create the client using the factory
+    client = create_mcp_client(
+        use_mock=use_mock,
+        use_stdio=use_stdio,
+        mcp_url=mcp_url,
+        mcp_command=mcp_command,
+        mcp_args=mcp_args
+    )
+
+    client_type = type(client).__name__
+    log.info(f"Created MCP client of type: {client_type}")
+
+    return client
 
 
 @view_config(route_name='home', renderer='home.mako')
@@ -65,20 +118,21 @@ def chat_view(request):
         # Create a new session if one doesn't exist
         if not session_id:
             session_id = str(uuid.uuid4())
+            log.info(f"Created new session with ID: {session_id}")
+        else:
+            log.info(f"Using existing session with ID: {session_id}")
 
         # Get the AI agent configuration
         genai_config = request.registry.settings.get('genai', {})
         mcp_url = request.registry.settings.get('mcp.airbnb_url')
-        
-        # Get the MCP server configuration
-        mcp_server_path = os.environ.get('MCP_SERVER_PATH')
         mcp_use_stdio = os.environ.get('MCP_USE_STDIO', 'false').lower() == 'true'
-        
-        # Create the AI agent with appropriate MCP configuration
+        mcp_server_path = os.environ.get('MCP_SERVER_PATH')
+
+        # Determine command and args for stdio client
+        mcp_command = None
+        mcp_args = None
+
         if mcp_use_stdio and mcp_server_path:
-            # Use stdio transport with the server path
-            log.info(f"Using stdio transport for MCP with server at: {mcp_server_path}")
-            
             # Determine the command and args based on file extension
             if mcp_server_path.endswith('.js'):
                 mcp_command = 'node'
@@ -87,51 +141,78 @@ def chat_view(request):
                 mcp_command = 'python'
                 mcp_args = [mcp_server_path]
             else:
-                # Default to just executing the file directly (assuming it's executable)
+                # Default to just executing the file directly
                 mcp_command = mcp_server_path
                 mcp_args = []
-            
-            agent = AirbnbAssistantAgent(
-                api_key=os.environ.get('OPENAI_API_KEY', genai_config.get('api_key')),
-                model=genai_config.get('model', 'gpt-4'),
-                mcp_use_stdio=True,
-                mcp_command=mcp_command,
-                mcp_args=mcp_args
-            )
-        else:
-            # Use HTTP transport with the MCP URL
-            log.info(f"Using HTTP transport for MCP with URL: {mcp_url}")
-            agent = AirbnbAssistantAgent(
-                api_key=os.environ.get('OPENAI_API_KEY', genai_config.get('api_key')),
-                model=genai_config.get('model', 'gpt-4'),
-                mcp_url=mcp_url
-            )
+
+        # Create the AI agent directly (will create its own MCP client)
+        agent = AirbnbAssistantAgent(
+            api_key=os.environ.get('OPENAI_API_KEY', genai_config.get('api_key')),
+            model=genai_config.get('model', 'gpt-4'),
+            mcp_url=mcp_url,
+            mcp_use_stdio=mcp_use_stdio,
+            mcp_command=mcp_command,
+            mcp_args=mcp_args
+        )
 
         # Get the response from the agent
-        result = agent.process_query(message, session_id)
+        try:
+            try:
+                result = agent.process_query(message, session_id)
 
-        # Clean up the response
-        response_text = result.get('response', 'I could not generate a response.')
+                # Clean up the response
+                response_text = result.get('response', 'I could not generate a response.')
 
-        # Additional cleaning for any control characters
-        response_text = clean_response_text(response_text)
+                # Additional cleaning for any control characters
+                response_text = clean_response_text(response_text)
 
-        response_data = {
-            'session_id': session_id,
-            'response': response_text,
-            'context': result.get('context', {})
-        }
+                response_data = {
+                    'session_id': session_id,
+                    'response': response_text,
+                    'context': result.get('context', {}),
+                    'success': True
+                }
 
-        # Return a proper JSON response
-        return Response(
-            json_body=response_data,
-            content_type='application/json'
-        )
+                # Return a proper JSON response
+                return Response(
+                    json_body=response_data,
+                    content_type='application/json'
+                )
+            except RuntimeError as e:
+                # Handle MCP client errors specifically
+                log.error(f"MCP client error in agent: {e}")
+
+                # Return a properly formatted error message
+                error_message = f"I'm sorry, but I encountered an error while searching for Airbnb listings: {str(e)}"
+
+                # Return a proper JSON response with the error
+                return Response(
+                    json_body={
+                        'session_id': session_id,
+                        'response': error_message,
+                        'context': {'error': str(e)},
+                        'success': False
+                    },
+                    content_type='application/json'
+                )
+        finally:
+            # Clean up agent resources
+            if hasattr(agent, 'cleanup'):
+                try:
+                    agent.cleanup()
+                except Exception as e:
+                    log.error(f"Error cleaning up agent resources: {e}")
     except Exception as e:
         log.error(f"Error in chat endpoint: {e}")
         # Make sure to use json_body instead of json.dumps
+        error_message = "I'm sorry, but I encountered an unexpected error. Please try again later."
         return Response(
-            json_body={'error': str(e)},
+            json_body={
+                'session_id': session_id if 'session_id' in locals() else str(uuid.uuid4()),
+                'response': error_message,
+                'context': {'error': str(e)},
+                'success': False
+            },
             content_type='application/json',
             status=500
         )
@@ -226,34 +307,95 @@ def search_view(request):
                 status=400
             )
 
-        # Get MCP client
+        # Get MCP configuration
+        genai_config = request.registry.settings.get('genai', {})
         mcp_url = request.registry.settings.get('mcp.airbnb_url')
-        mcp_client = MCPAirbnbClient(mcp_url=mcp_url)
+        mcp_use_stdio = os.environ.get('MCP_USE_STDIO', 'false').lower() == 'true'
+        mcp_server_path = os.environ.get('MCP_SERVER_PATH')
 
-        # Search for listings
-        listings = mcp_client.search_listings(
-            location=query,
-            check_in=check_in,
-            check_out=check_out,
-            guests=guests,
-            limit=limit
+        # Determine command and args for stdio client
+        mcp_command = None
+        mcp_args = None
+
+        if mcp_use_stdio and mcp_server_path:
+            # Determine the command and args based on file extension
+            if mcp_server_path.endswith('.js'):
+                mcp_command = 'node'
+                mcp_args = [mcp_server_path]
+            elif mcp_server_path.endswith('.py'):
+                mcp_command = 'python'
+                mcp_args = [mcp_server_path]
+            else:
+                # Default to just executing the file directly
+                mcp_command = mcp_server_path
+                mcp_args = []
+
+        # Create the AI agent to get its MCP client
+        agent = AirbnbAssistantAgent(
+            api_key=os.environ.get('OPENAI_API_KEY', genai_config.get('api_key')),
+            model=genai_config.get('model', 'gpt-4'),
+            mcp_url=mcp_url,
+            mcp_use_stdio=mcp_use_stdio,
+            mcp_command=mcp_command,
+            mcp_args=mcp_args
         )
 
-        response_data = {
-            'results': listings
-        }
+        # Use the agent's MCP client
+        mcp_client = agent.mcp_client
+        log.info(f"Using MCP client from agent for search endpoint")
 
-        return Response(
-            json_body=response_data,
-            content_type='application/json'
-        )
+        try:
+            try:
+                # Search for listings
+                listings = mcp_client.search_listings(
+                    location=query,
+                    check_in=check_in,
+                    check_out=check_out,
+                    guests=guests,
+                    limit=limit
+                )
+
+                response_data = {
+                    'results': listings,
+                    'success': True
+                }
+
+                return Response(
+                    json_body=response_data,
+                    content_type='application/json'
+                )
+            except RuntimeError as e:
+                # Handle MCP client errors specifically
+                log.error(f"MCP client error: {e}")
+
+                # Return a proper error response to the client
+                return Response(
+                    json_body={
+                        'results': [],
+                        'success': False,
+                        'error': f"Error communicating with MCP server: {str(e)}"
+                    },
+                    content_type='application/json'
+                )
+        finally:
+            # Make sure to clean up the agent (which will clean up its mcp_client)
+            if hasattr(agent, 'cleanup'):
+                try:
+                    agent.cleanup()
+                except Exception as e:
+                    log.error(f"Error cleaning up agent resources: {e}")
     except Exception as e:
         log.error(f"Error in search endpoint: {e}")
         return Response(
-            json_body={'error': str(e)},
+            json_body={
+                'results': [],
+                'success': False,
+                'error': f"An unexpected error occurred: {str(e)}"
+            },
             content_type='application/json',
             status=500
         )
+
 
 @view_config(route_name='toggle_theme')
 def toggle_theme_view(request):

@@ -4,7 +4,7 @@
 
 This application implements an Airbnb search assistant chatbot interface that uses Agno for AI capabilities and the Model Context Protocol (MCP) for external data integration.
 
-![Airbnb Assistant Screenshot](https://example.com/screenshot.png)
+![Airbnb Assistant Screenshot]()
 
 ## Features
 
@@ -28,6 +28,9 @@ cd tanzu-genai-showcase/py-pyramid-agno
 # Run the setup script
 ./setup_env.sh
 
+# Activate the virtual environment
+source venv/bin/activate
+
 # Start the application
 pserve development.ini --reload
 ```
@@ -38,6 +41,9 @@ pserve development.ini --reload
 # Clone the repository
 git clone https://github.com/cf-toolsuite/tanzu-genai-showcase
 cd tanzu-genai-showcase/py-pyramid-agno
+
+# Activate the virtual environment
+.\venv\Scripts\Activate.ps1
 
 # Run the setup script
 .\setup_env.ps1
@@ -60,6 +66,7 @@ If you prefer a manual setup, here are the minimal steps required:
    - LLM API key (e.g., OpenAI API key)
 
 2. **Setup:**
+
    ```bash
    # Create a virtual environment and install dependencies
    python -m venv venv
@@ -75,9 +82,11 @@ If you prefer a manual setup, here are the minimal steps required:
    ```
 
 3. **Run:**
+
    ```bash
    pserve development.ini --reload
    ```
+
 > [!NOTE]
 > For detailed setup instructions, including Cloud Foundry deployment, consult the [deployment guide](DEPLOY.md)
 
