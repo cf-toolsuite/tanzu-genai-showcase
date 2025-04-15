@@ -5,8 +5,13 @@ import logging
 import os
 import shutil
 import uuid
+import json
+import re
 from typing import Dict, Any, Optional, List, Union
 from urllib.parse import urlparse
+
+from airbnb_assistant.dto.airbnb import AirbnbListing
+from airbnb_assistant.dto.templates import AirbnbListingTemplate
 
 # Import Agno components with error handling
 try:
@@ -25,6 +30,54 @@ from .mcp.client import MCPAirbnbClient
 from .mcp.clients import create_mcp_client
 
 log = logging.getLogger(__name__)
+
+# System prompt for the Airbnb Assistant
+SYSTEM_PROMPT = """
+You are an Airbnb search assistant that helps users find accommodations.
+Always follow these guidelines:
+
+1. Return a MAXIMUM of 5 listings unless the user explicitly asks for more.
+
+2. For each listing, provide as much of the following information as is available:
+   - A descriptive title that highlights key features
+   - Pricing information with total and per-night cost
+   - Rating information with review count
+   - Bed/room configuration
+   - Host information if available (this may be limited for some listings)
+   - Basic amenities (note: these may be general assumptions for some listings)
+   - Brief description (may be generated based on available data)
+   - A WORKING LINK to the listing on Airbnb
+
+3. Format listings consistently using this template:
+   ### [NUMBER]. [PROPERTY_TYPE] in [LOCATION]
+   - **Price:** $X total ($Y per night)
+   - **Rating:** [RATING]/5 ([NUM] reviews)
+   - **Beds:** [DETAILS]
+   - **Host:** [HOST_NAME] - [SUPERHOST_STATUS]
+   - **Amenities:** [TOP_5_AMENITIES]
+   - **Description:** [BRIEF_DESCRIPTION]
+   - **[View on Airbnb](https://www.airbnb.com/rooms/[LISTING_ID])**
+
+4. IMPORTANT: Always use the search_listings tool with fetch_details=true parameter to get comprehensive listing information. The fetch_details parameter ensures that the system will try to enhance basic listings with additional details when possible.
+
+5. Present information clearly and concisely without empty headings or sections.
+
+6. If the user asks for additional listings beyond the initial 5, provide them in the same format.
+
+7. When formatting search results, make each listing detailed and informative:
+   - Highlight unique features of each property
+   - Emphasize amenities that match the user's preferences if mentioned
+   - Call attention to Superhosts when available
+   - Note any special deals or discounts in pricing
+
+8. When NO VALID LISTINGS are found, provide helpful alternatives:
+   - Suggest trying a different date range
+   - Recommend nearby neighborhoods or areas
+   - Offer to search with different criteria
+   - Provide the general Airbnb search URL for manual searching
+
+9. IMPORTANT: Some listings might have limited information available. In those cases, focus on presenting the information that is available rather than skipping the listing entirely.
+"""
 
 class AirbnbAssistantAgent:
     """
@@ -75,12 +128,130 @@ class AirbnbAssistantAgent:
                 log.error(f"Failed to create Agno agent: {e}")
                 self.agent = None
 
-    def _format_response_as_markdown(self, text: str) -> str:
+    def _format_template_listing(self, listing, index):
+        """
+        Format a listing using a consistent template
+
+        Args:
+            listing: AirbnbListing object
+            index: Index number to display (1-based)
+
+        Returns:
+            Formatted markdown string or None if URL is invalid
+        """
+        # Get basic info
+        title = listing.get_best_title()
+        price = listing.get_price_details()
+        bed_type = listing.get_bed_type()
+        rating = listing.get_rating()
+        url = listing.create_valid_url()
+        host_info = listing.get_host_info()
+        location_info = listing.get_location_text()
+
+        # Skip listings with invalid URLs
+        if url == "https://www.airbnb.com":
+            return None
+
+        # Create consistent template
+        markdown = f"### {index}. **{title}**\n"
+        markdown += f"- **Price:** {price}\n"
+        markdown += f"- **Bed Type:** {bed_type}\n"
+        markdown += f"- **Rating:** {rating}\n"
+
+        # Add host info if available
+        if host_info and host_info != "Host information not available":
+            markdown += f"- **Host:** {host_info}\n"
+
+        # Add location info if available
+        if location_info and location_info != "Location information not available":
+            markdown += f"- **Location:** {location_info}\n"
+
+        # Create appropriate link text based on URL type
+        if "/rooms?photos=" in url:
+            # This is a photo ID link
+            markdown += f"- [View Listing on Airbnb]({url})\n\n"
+        elif "/s/homes?category_tag_id=" in url:
+            # This is a category tag link
+            markdown += f"- [View Property on Airbnb]({url})\n\n"
+        elif "/s/" in url:
+            # This is a search URL
+            markdown += f"- [Browse Airbnb Listings]({url})\n\n"
+        else:
+            # This is a standard listing URL
+            markdown += f"- [View on Airbnb]({url})\n\n"
+
+        return markdown
+
+    def _extract_listings_from_response(self, text):
+        """
+        Extract listings from JSON in response text
+
+        Args:
+            text: Response text that may contain JSON
+
+        Returns:
+            List of AirbnbListing objects
+        """
+        listings = []
+
+        # Try to find JSON in the response with multiple patterns
+        try:
+            # Pattern 1: Look for standard JSON results pattern
+            json_matches = re.findall(r'\{\s*"results"\s*:\s*\[.*?\]\s*\}', text, re.DOTALL)
+
+            # Pattern 2: Look for searchResults pattern (from MCP response)
+            if not json_matches:
+                json_matches = re.findall(r'\{\s*"searchResults"\s*:\s*\[.*?\]\s*\}', text, re.DOTALL)
+
+            # Pattern 3: Look for any array of listings
+            if not json_matches:
+                json_matches = re.findall(r'\[\s*\{.*?"url".*?\}\s*\]', text, re.DOTALL)
+
+            # Process the matches if found
+            if json_matches:
+                for match in json_matches:
+                    try:
+                        # Pattern 1 & 2: Parse with appropriate key
+                        if '"results"' in match or '"searchResults"' in match:
+                            json_data = json.loads(match)
+                            # Use the appropriate key based on what we found
+                            results_key = 'results' if 'results' in json_data else 'searchResults'
+                            if results_key in json_data and isinstance(json_data[results_key], list):
+                                for item in json_data[results_key]:
+                                    try:
+                                        listing = AirbnbListing.from_dict(item)
+                                        listings.append(listing)
+                                    except Exception as e:
+                                        log.warning(f"Error creating listing from JSON: {e}")
+                        # Pattern 3: Parse direct array
+                        else:
+                            items = json.loads(match)
+                            if isinstance(items, list):
+                                for item in items:
+                                    try:
+                                        listing = AirbnbListing.from_dict(item)
+                                        listings.append(listing)
+                                    except Exception as e:
+                                        log.warning(f"Error creating listing from array JSON: {e}")
+                    except json.JSONDecodeError as je:
+                        log.warning(f"Failed to parse JSON match: {je}")
+                        continue
+        except Exception as e:
+            log.warning(f"Error extracting listings from response: {e}")
+
+        # If we found listings, log how many
+        if listings:
+            log.info(f"Extracted {len(listings)} listings from response text")
+
+        return listings
+
+    def _format_response_as_markdown(self, text: str, max_listings=5) -> str:
         """
         Format the response text as proper markdown to improve readability
 
         Args:
             text: Raw response text from the LLM
+            max_listings: Maximum number of listings to show (default: 5)
 
         Returns:
             Formatted text with proper markdown
@@ -88,8 +259,63 @@ class AirbnbAssistantAgent:
         if not text:
             return ""
 
+        # Check if the response text might contain JSON for listing data
+        listings = self._extract_listings_from_response(text)
+
+        if listings:
+            # Log how many listings we found
+            log.info(f"Found {len(listings)} listings in response text to format as markdown")
+
+            # Limit to max_listings unless explicitly requested more
+            # (We'll handle this based on the text content)
+            show_more = "more" in text.lower() or "additional" in text.lower()
+            actual_listings = listings if show_more else listings[:max_listings]
+
+            # Format the listings as markdown
+            formatted_text = "# Airbnb Listings Search Results\n\n"
+
+            # Add each listing using the template
+            valid_listings = 0
+            for i, listing in enumerate(actual_listings):
+                try:
+                    # Convert to template for consistent formatting
+                    template = listing.to_template()
+                    listing_markdown = template.to_markdown(valid_listings + 1)
+
+                    # If template formatting fails, try direct formatting
+                    if not listing_markdown:
+                        listing_markdown = self._format_template_listing(listing, valid_listings + 1)
+
+                    if listing_markdown:
+                        formatted_text += listing_markdown
+                        valid_listings += 1
+                except Exception as e:
+                    log.warning(f"Error formatting listing {i}: {e}")
+                    # Try alternate formatting method as fallback
+                    try:
+                        listing_markdown = self._format_template_listing(listing, valid_listings + 1)
+                        if listing_markdown:
+                            formatted_text += listing_markdown
+                            valid_listings += 1
+                    except Exception as e2:
+                        log.error(f"Fallback formatting also failed: {e2}")
+
+            # Add more info if available
+            if len(listings) > max_listings and not show_more:
+                formatted_text += "\n### Additional Options\n\n"
+                formatted_text += f"There are {len(listings) - max_listings} more listings available. Would you like to see more options?\n"
+
+            # If we didn't successfully format any listings, provide a helpful message
+            if valid_listings == 0:
+                formatted_text = "# Airbnb Listings Search Results\n\n"
+                formatted_text += "I found several listings matching your search criteria, but I'm having trouble displaying them properly.\n\n"
+                formatted_text += "You can visit [Airbnb directly](https://www.airbnb.com) to search for listings in your desired location.\n\n"
+                formatted_text += "Alternatively, please try your search again with more specific details like neighborhood, dates, or number of guests."
+
+            return formatted_text
+
+        # If we didn't find listings JSON or couldn't format it, use general formatting
         import re
-        import json
 
         # Check if the response contains structured listings data (either directly or in mentions)
         # and format it in a more readable way
@@ -171,82 +397,6 @@ class AirbnbAssistantAgent:
             urls[placeholder] = (url, url)
             text = text.replace(url, placeholder)
 
-        # Auto-format responses with listing data that isn't already well-formatted
-        # If USE_MOCK_DATA is true and the AI response doesn't have good formatting,
-        # we can enhance it with structured mock data
-        use_mock = os.environ.get('USE_MOCK_DATA', 'false').lower() == 'true'
-        if use_mock and not any(listing_marker in text.lower() for listing_marker in ["### 1.", "### 2.", "# airbnb", "property details"]):
-            # If we have a generic response that doesn't contain specific listing information,
-            # let's check if there are any commands about finding places
-            find_phrases = ["find", "looking for", "search", "stay", "book", "accommodations", "listing", "place"]
-            location_phrases = ["san francisco", "near", "downtown", "waterfront", "location", "in the", "area"]
-
-            # If this looks like a location request but doesn't have proper listing data
-            if (any(phrase in text.lower() for phrase in find_phrases) and
-                any(phrase in text.lower() for phrase in location_phrases)):
-
-                # Let's assume the response should be a listing but isn't formatted correctly
-                if "one moment" in text.lower() or "looking" in text.lower():
-                    # Generate a nicely formatted mock response with listings
-                    location = "San Francisco"
-                    for loc in ["san francisco", "new york", "chicago", "miami", "los angeles", "boston"]:
-                        if loc in text.lower():
-                            location = loc.title()
-                            break
-
-                    # Extract location details if possible
-                    location_detail = "downtown"
-                    if "waterfront" in text.lower():
-                        location_detail = "waterfront"
-                    elif "downtown" in text.lower():
-                        location_detail = "downtown"
-                    elif "near" in text.lower():
-                        parts = text.lower().split("near")
-                        if len(parts) > 1:
-                            location_detail = parts[1].split(".")[0].strip()
-
-                    # Create a mock response with nicely formatted listings
-                    mock_response = f"# Airbnb Listings Search Results\n\nHere are some great places to stay in {location} near the {location_detail} area:\n\n"
-
-                    mock_response += "### 1. **Luxury Waterfront Apartment**\n\n"
-                    mock_response += "* **Location:** {location} - {location_detail} area, walking distance to attractions\n"
-                    mock_response += "* **Price:** $235 per night\n"
-                    mock_response += "* **Rating:** 4.92 (125 reviews)\n"
-                    mock_response += "* **Bedrooms:** 2\n"
-                    mock_response += "* **Bathrooms:** 2\n"
-                    mock_response += "* **Guests:** Up to 4\n"
-                    mock_response += "* **Amenities:** WiFi, Full kitchen, Washer/dryer, Air conditioning, Dedicated workspace, Free parking\n"
-                    mock_response += "* **Listing URL:** [View on Airbnb](https://www.airbnb.com/rooms/123456)\n\n"
-                    mock_response += "![Luxury Apartment](https://a0.muscache.com/im/pictures/miso/Hosting-51809333/original/0da70267-d9da-4efb-9123-2714b651c9cd.jpeg)\n\n"
-
-                    mock_response += "### 2. **Modern Downtown Loft**\n\n"
-                    mock_response += "* **Location:** {location} - Central downtown location\n"
-                    mock_response += "* **Price:** $189 per night\n"
-                    mock_response += "* **Rating:** 4.87 (94 reviews)\n"
-                    mock_response += "* **Bedrooms:** 1\n"
-                    mock_response += "* **Bathrooms:** 1\n"
-                    mock_response += "* **Guests:** Up to 3\n"
-                    mock_response += "* **Amenities:** WiFi, Kitchen, Gym access, Smart TV, Washing machine\n"
-                    mock_response += "* **Listing URL:** [View on Airbnb](https://www.airbnb.com/rooms/234567)\n\n"
-                    mock_response += "![Downtown Loft](https://a0.muscache.com/im/pictures/miso/Hosting-717134404264905813/original/dfe9c1ff-b70c-4566-a1ef-5bc733dbb705.jpeg)\n\n"
-
-                    mock_response += "### 3. **Charming {location_detail} Condo**\n\n"
-                    mock_response += "* **Location:** {location} - {location_detail} neighborhood\n"
-                    mock_response += "* **Price:** $165 per night\n"
-                    mock_response += "* **Rating:** 4.79 (108 reviews)\n"
-                    mock_response += "* **Bedrooms:** 1\n"
-                    mock_response += "* **Bathrooms:** 1\n"
-                    mock_response += "* **Guests:** Up to 2\n"
-                    mock_response += "* **Amenities:** WiFi, Kitchen, Patio, Cable TV, Air conditioning\n"
-                    mock_response += "* **Listing URL:** [View on Airbnb](https://www.airbnb.com/rooms/345678)\n\n"
-                    mock_response += "![Charming Condo](https://a0.muscache.com/im/pictures/miso/Hosting-807995199727408777/original/9225d584-7aa4-4990-af06-339bd1339686.jpeg)\n\n"
-
-                    mock_response = mock_response.replace("{location}", location)
-                    mock_response = mock_response.replace("{location_detail}", location_detail.title())
-
-                    # Replace the original text with our nicely formatted mock response
-                    text = mock_response
-
         # Fix general markdown formatting issues
         text = re.sub(r'(^|\n)(\d+\.)(\s*\w)', r'\1\2 \3', text)  # Numbered lists
         text = re.sub(r'(^|\n)(\*)(\s*\w)', r'\1\2 \3', text)      # Bullet points
@@ -263,6 +413,11 @@ class AirbnbAssistantAgent:
 
         # Final cleanup - fix any duplicate blank lines
         text = re.sub(r'\n{3,}', '\n\n', text)
+
+        # Replace any "undefined" URLs with a general Airbnb link
+        text = re.sub(r'https://www\.airbnb\.com/rooms/undefined', 'https://www.airbnb.com', text)
+        # Fix any URLs with photo IDs to use proper format
+        text = re.sub(r'\[([^\]]+)\]\(https://www\.airbnb\.com/rooms\?photos=([0-9]+)\)', r'[View Listing with Photos](https://www.airbnb.com/rooms?photos=\2)', text)
 
         # Log the formatted text for debugging
         log.debug(f"Formatted response text:\n{text}")
@@ -362,21 +517,26 @@ class AirbnbAssistantAgent:
             # Create the toolkit with the selected MCP client
             airbnb_toolkit = AirbnbTools(mcp_client=self.mcp_client)
 
-            # Configure the agent with tools
+            # Create the agent with tools
             agent = Agent(
                 model=model,
                 description="""
                 You are an Airbnb search assistant that helps users find accommodations.
                 You can search for listings and provide detailed information about them.
                 Be friendly, helpful, and concise in your responses.
+                Always provide detailed listing information including amenities, host details, and descriptions when available.
                 """,
                 instructions=[
                     "Always ask for all the information you need before making a search, such as location, dates, and number of guests.",
-                    "When displaying listing results, format them in a clear, organized way.",
-                    "When showing listing details, highlight the key information like price, amenities, and host details.",
-                    "Use headings to organize your responses.",
-                    "Be concise and focused on relevant information.",
-                    "Always use proper markdown formatting for listings and organize information in a clean, readable way."
+                    "When displaying listing results, format them in a clear, organized way with detailed information.",
+                    "When showing listing details, highlight the key information like price, amenities, host details, and property features.",
+                    "Use headings to organize your responses and put the important information first.",
+                    "Be concise and focused on the most relevant information for the user's needs.",
+                    "Always use proper markdown formatting for listings and organize information in a clean, readable way.",
+                    "Only return a maximum of 5 listings unless explicitly asked for more.",
+                    "Always present whatever listing information is available even if some details are missing. It's better to show partial listings than no listings at all.",
+                    "Always provide context about the neighborhood or area when recommending listings.",
+                    "Always use the search_listings tool with fetch_details=true parameter. The fetch_details parameter is essential for retrieving complete listing details including amenities and host information."
                 ],
                 tools=[airbnb_toolkit],
                 show_tool_calls=True,
@@ -527,8 +687,6 @@ class AirbnbAssistantAgent:
             # For other exceptions, create a new RuntimeError with a friendly message
             error_msg = "I apologize, but I encountered an error while processing your request."
             raise RuntimeError(error_msg)
-
-
 
     def cleanup(self):
         """Clean up resources when the agent is finished"""

@@ -35,7 +35,7 @@ class MCPAirbnbStdioClient(MCPAirbnbClientBase):
         """
         self.mcp_command = mcp_command
         self.mcp_args = mcp_args or []
-        
+
         # Always add the --ignore-robots-txt flag to bypass robots.txt restrictions
         if '--ignore-robots-txt' not in self.mcp_args:
             self.mcp_args.append('--ignore-robots-txt')
@@ -193,14 +193,14 @@ class MCPAirbnbStdioClient(MCPAirbnbClientBase):
             actual_method = "tools/list"
         else:
             actual_method = method
-            
+
         request = {
             "jsonrpc": "2.0",
             "id": request_id,
             "method": actual_method,
             "params": params or {}
         }
-            
+
         # For tool call methods, ensure the request has the proper format
         if method.lower() == "calltool":
             # The MCP server expects params to be { name: string, arguments: object }
@@ -350,7 +350,11 @@ class MCPAirbnbStdioClient(MCPAirbnbClientBase):
 
                                     # Log the entire response for debugging
                                     log.info(f"Response structure keys: {list(result_data.keys()) if isinstance(result_data, dict) else 'Not a dict'}")
-                                    
+
+                                    # Log a sample search result for debugging
+                                    if isinstance(result_data, dict) and "searchResults" in result_data and result_data["searchResults"]:
+                                        log.info(f"Sample search result format: {json.dumps(result_data['searchResults'][0], indent=2)[:1000]}...")
+
                                     # The MCP Server returns a specific format with the search URL and searchResults fields
                                     # We need to extract the searchResults from this structure
                                     if isinstance(result_data, dict):
@@ -358,18 +362,104 @@ class MCPAirbnbStdioClient(MCPAirbnbClientBase):
                                         if "searchResults" in result_data:
                                             results = result_data["searchResults"]
                                             log.info(f"Found {len(results)} search results")
-                                            return results
-                                        
+
+                                            # Fix undefined URLs
+                                            fixed_results = []
+                                            for result in results:
+                                                if "url" in result and "/undefined" in result["url"]:
+                                                    # Try to extract a listing ID from other data
+                                                    listing_id = None
+                                                    try:
+                                                        if "listing" in result and "id" in result["listing"]:
+                                                            listing_id = result["listing"]["id"]
+                                                    except (KeyError, TypeError):
+                                                        pass
+
+                                                    if listing_id:
+                                                        # Replace undefined with the actual ID
+                                                        result["url"] = f"https://www.airbnb.com/rooms/{listing_id}"
+
+                                                fixed_results.append(result)
+
+                                            return fixed_results
+
                                         # Format with a URL included
                                         if "searchUrl" in result_data and "searchResults" in result_data:
                                             results = result_data["searchResults"]
                                             log.info(f"Found {len(results)} search results with URL")
-                                            return results
-                                        
+
+                                            # Fix undefined URLs
+                                            fixed_results = []
+                                            search_url = result_data.get("searchUrl", "https://www.airbnb.com")
+                                            for result in results:
+                                                # Ensure url exists
+                                                if "url" not in result:
+                                                    result["url"] = "https://www.airbnb.com/rooms/undefined"
+
+                                                # Fix undefined URLs
+                                                if "url" in result and "/undefined" in result["url"]:
+                                                    # Try multiple ways to extract a listing ID
+                                                    listing_id = None
+                                                    photo_id = None
+                                                    category_tag = None
+
+                                                    # Method 1: Check listing.id
+                                                    try:
+                                                        if "listing" in result and isinstance(result["listing"], dict) and "id" in result["listing"]:
+                                                            listing_id = result["listing"]["id"]
+                                                    except (KeyError, TypeError):
+                                                        pass
+
+                                                    # Method 2: Check listingParamOverrides for photoId
+                                                    if not listing_id and "listingParamOverrides" in result and isinstance(result["listingParamOverrides"], dict):
+                                                        if "photoId" in result["listingParamOverrides"]:
+                                                            photo_id = result["listingParamOverrides"]["photoId"]
+                                                        if "categoryTag" in result["listingParamOverrides"]:
+                                                            category_tag = result["listingParamOverrides"]["categoryTag"]
+
+                                                    # Apply the best ID we found to create a valid URL
+                                                    if listing_id:
+                                                        result["url"] = f"https://www.airbnb.com/rooms/{listing_id}"
+                                                    elif photo_id and photo_id != "undefined":
+                                                        result["url"] = f"https://www.airbnb.com/rooms?photos={photo_id}"
+                                                    elif category_tag and category_tag.startswith("Tag:"):
+                                                        tag_id = category_tag.split(":")[1]
+                                                        result["url"] = f"https://www.airbnb.com/s/homes?category_tag_id={tag_id}"
+                                                    else:
+                                                        # If all else fails, use the search URL
+                                                        result["url"] = search_url
+
+                                                # Ensure we have listing object
+                                                if "listing" not in result:
+                                                    result["listing"] = {}
+
+                                                # Add structured content if missing
+                                                if "structuredContent" not in result["listing"]:
+                                                    result["listing"]["structuredContent"] = {}
+
+                                                # Add primary line if missing (bed type)
+                                                if "primaryLine" not in result["listing"]["structuredContent"]:
+                                                    # Look for bed info in structuredDisplayPrice
+                                                    bed_info = "Comfortable Room"
+                                                    if "avgRatingA11yLabel" in result and "bed" in result["avgRatingA11yLabel"].lower():
+                                                        bed_info = result["avgRatingA11yLabel"]
+                                                    result["listing"]["structuredContent"]["primaryLine"] = bed_info
+
+                                                # Ensure we have structured price data
+                                                if "structuredDisplayPrice" not in result:
+                                                    result["structuredDisplayPrice"] = {
+                                                        "primaryLine": {"accessibilityLabel": "Price not available"},
+                                                        "secondaryLine": {"accessibilityLabel": "Total price not available"}
+                                                    }
+
+                                                fixed_results.append(result)
+
+                                            return fixed_results
+
                                         # Log whatever we did receive for debugging
                                         log.warning(f"Unexpected response format. Keys received: {list(result_data.keys())}")
                                         log.debug(f"Full response data: {json.dumps(result_data, indent=2)[:1000]}...")
-                                        
+
                                         # Return an empty list if we don't have results
                                         # This is better than raising an error as the agent can still function
                                         return []
@@ -438,7 +528,7 @@ class MCPAirbnbStdioClient(MCPAirbnbClientBase):
 
                                     # Log the entire response for debugging
                                     log.info(f"Response structure keys: {list(result_data.keys()) if isinstance(result_data, dict) else 'Not a dict'}")
-                                    
+
                                     # The MCP Server returns a specific format with the listingUrl and details fields
                                     # We need to extract the details from this structure
                                     if isinstance(result_data, dict):
@@ -447,17 +537,17 @@ class MCPAirbnbStdioClient(MCPAirbnbClientBase):
                                             details = result_data["details"]
                                             log.info(f"Found listing details")
                                             return details
-                                        
+
                                         # Format with a URL included
                                         if "listingUrl" in result_data and "details" in result_data:
                                             details = result_data["details"]
                                             log.info(f"Found listing details with URL")
                                             return details
-                                        
+
                                         # Log whatever we did receive for debugging
                                         log.warning(f"Unexpected response format. Keys received: {list(result_data.keys())}")
                                         log.debug(f"Full response data: {json.dumps(result_data, indent=2)[:1000]}...")
-                                        
+
                                         # Return an empty list if we don't have details
                                         # This is better than raising an error as the agent can still function
                                         return []

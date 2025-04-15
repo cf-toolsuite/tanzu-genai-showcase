@@ -7,6 +7,8 @@ import os
 import requests
 from typing import Dict, List, Any, Optional
 
+from airbnb_assistant.dto.airbnb import AirbnbListing
+
 from .base import MCPAirbnbClientBase
 from .mock_client import MCPAirbnbMockClient
 
@@ -120,12 +122,84 @@ class MCPAirbnbHTTPClient(MCPAirbnbClientBase):
 
                                 # Look for search results in different possible locations
                                 if "searchResults" in result_data:
-                                    log.info(f"Found {len(result_data['searchResults'])} search results")
-                                    return result_data["searchResults"]
+                                    search_results = result_data["searchResults"]
+                                    log.info(f"Found {len(search_results)} search results")
+                                    
+                                    # Process results using the DTO model
+                                    processed_results = []
+                                    for result in search_results:
+                                        try:
+                                            # Skip listings that don't have necessary data
+                                            if not result:
+                                                continue
+                                                
+                                            # Create AirbnbListing object
+                                            listing = AirbnbListing.from_dict(result)
+                                            
+                                            # Fix URL if undefined
+                                            if "url" in result and "undefined" in result["url"]:
+                                                # Try to extract listing ID
+                                                listing_id = None
+                                                if "listing" in result and "id" in result["listing"]:
+                                                    listing_id = result["listing"]["id"]
+                                                    # Fix the URL with the real ID
+                                                    if listing_id:
+                                                        result["url"] = f"https://www.airbnb.com/rooms/{listing_id}"
+                                                else:
+                                                    # Skip listings with undefined URLs if we can't fix them
+                                                    continue
+                                            
+                                            # Enhance with valid URL
+                                            valid_url = listing.create_valid_url()
+                                            if valid_url != "https://www.airbnb.com":
+                                                # Only add listings with valid URLs
+                                                result["url"] = valid_url
+                                                processed_results.append(result)
+                                        except Exception as e:
+                                            log.warning(f"Error processing listing: {e}")
+                                    
+                                    # Only return valid listings
+                                    return processed_results
 
                                 if "searchUrl" in result_data and "searchResults" in result_data:
-                                    log.info(f"Found {len(result_data['searchResults'])} search results with URL")
-                                    return result_data["searchResults"]
+                                    search_results = result_data["searchResults"]
+                                    log.info(f"Found {len(search_results)} search results with URL")
+                                    
+                                    # Process results using the DTO model
+                                    processed_results = []
+                                    for result in search_results:
+                                        try:
+                                            # Skip listings that don't have necessary data
+                                            if not result:
+                                                continue
+                                                
+                                            # Create AirbnbListing object
+                                            listing = AirbnbListing.from_dict(result)
+                                            
+                                            # Fix URL if undefined
+                                            if "url" in result and "undefined" in result["url"]:
+                                                # Try to extract listing ID
+                                                listing_id = None
+                                                if "listing" in result and "id" in result["listing"]:
+                                                    listing_id = result["listing"]["id"]
+                                                    # Fix the URL with the real ID
+                                                    if listing_id:
+                                                        result["url"] = f"https://www.airbnb.com/rooms/{listing_id}"
+                                                else:
+                                                    # Skip listings with undefined URLs if we can't fix them
+                                                    continue
+                                            
+                                            # Enhance with valid URL
+                                            valid_url = listing.create_valid_url()
+                                            if valid_url != "https://www.airbnb.com":
+                                                # Only add listings with valid URLs
+                                                result["url"] = valid_url
+                                                processed_results.append(result)
+                                        except Exception as e:
+                                            log.warning(f"Error processing listing: {e}")
+                                    
+                                    # Only return valid listings
+                                    return processed_results
                             except json.JSONDecodeError as e:
                                 log.warning(f"Failed to parse response as JSON: {e}")
 
