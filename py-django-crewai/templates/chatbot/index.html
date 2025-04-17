@@ -43,12 +43,6 @@
                     </li>
                 </ul>
             </div>
-            <div class="col-md-4 text-end">
-                <div class="input-group location-input-group">
-                    <span class="input-group-text"><i class="bi bi-geo-alt-fill"></i></span>
-                    <input type="text" id="locationInput" class="form-control" placeholder="Your location (e.g., New York, Chicago)" autocomplete="off">
-                </div>
-            </div>
         </div>
 
         <div class="tab-content" id="myTabContent">
@@ -56,6 +50,8 @@
             <div class="tab-pane fade show active" id="first-run" role="tabpanel" aria-labelledby="first-run-tab">
                 <div class="row">
                     <div class="col-lg-8">
+                <!-- Location input removed from here -->
+
                 <div class="chat-container" id="chatContainer">
                     {% for message in first_run_messages %}
                         <div class="message {% if message.sender == 'user' %}user-message{% else %}bot-message{% endif %}">
@@ -88,13 +84,26 @@
                             </button>
                         </div>
 
-                        <div class="mt-3">
-                            <button class="btn btn-sample" onclick="sendSampleQuestion('Show me action movies playing this weekend')">Action</button>
-                            <button class="btn btn-sample" onclick="sendSampleQuestion('What is a good comedy for a group night out this weekend')">Comedy</button>
-                            <button class="btn btn-sample" onclick="sendSampleQuestion('What thought-provoking documentary should I not miss this weekend?')">Documentary</button>
-                            <button class="btn btn-sample" onclick="sendSampleQuestion('I want to see a family movie with my kids')">Family</button>
-                            <button class="btn btn-sample" onclick="sendSampleQuestion('I love time travel - any sci-fi movies with that playing now?')">Science Fiction</button>
+                        <div class="mt-3 d-flex justify-content-between align-items-center">
+                            <div class="sample-buttons">
+                                <button class="btn btn-sample" onclick="sendSampleQuestion('Show me action movies playing this weekend')">Action</button>
+                                <button class="btn btn-sample" onclick="sendSampleQuestion('What is a good comedy for a group night out this weekend')">Comedy</button>
+                                <button class="btn btn-sample" onclick="sendSampleQuestion('What thought-provoking documentary should I not miss this weekend?')">Documentary</button>
+                                <button class="btn btn-sample d-none d-md-inline-block" onclick="sendSampleQuestion('I want to see a family movie with my kids')">Family</button>
+                                <button class="btn btn-sample d-none d-lg-inline-block" onclick="sendSampleQuestion('I love time travel - any sci-fi movies with that playing now?')">Science Fiction</button>
+                            </div>
+                            <div class="location-container">
+                                <div class="input-group location-input-group">
+                                    <span class="input-group-text"><i class="bi bi-geo-alt-fill"></i></span>
+                                    <input type="text" id="locationInput" class="form-control" placeholder="Location..." autocomplete="off">
+                                </div>
+                            </div>
                         </div>
+
+            <!-- Location field moved out of header section -->
+            <div class="col-md-4 text-end">
+            </div>
+
                     </div>
 
                     <div class="col-lg-4 mt-4 mt-lg-0">

@@ -9,6 +9,8 @@ from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
 from typing import Dict, List, Tuple, Optional, Any
 
+from .api_utils import APIRequestHandler
+
 # Configure logger
 logger = logging.getLogger('chatbot.location_service')
 
@@ -40,8 +42,11 @@ class LocationService:
             # Clean up the location string
             location_str = location_str.strip()
 
-            # Geocode the location
-            location = self.geolocator.geocode(location_str, exactly_one=True)
+            # Geocode the location with retry mechanism
+            def make_geocode_request():
+                return self.geolocator.geocode(location_str, exactly_one=True)
+                
+            location = APIRequestHandler.make_request(make_geocode_request)
 
             if location:
                 return {
@@ -72,11 +77,14 @@ class LocationService:
                 logger.info(f"Local IP detected ({ip_address}), skipping geolocation")
                 return None
 
-            # Use ipinfo.io for geolocation
-            response = requests.get(f"https://ipinfo.io/{ip_address}/json")
-
-            if response.status_code == 200:
-                data = response.json()
+            # Use ipinfo.io for geolocation with retry mechanism
+            def make_ip_request():
+                response = requests.get(f"https://ipinfo.io/{ip_address}/json")
+                response.raise_for_status()
+                return response.json()
+                
+            try:
+                data = APIRequestHandler.make_request(make_ip_request)
 
                 # Check if we got location data
                 if 'loc' in data and data['loc']:
@@ -102,8 +110,11 @@ class LocationService:
                         "longitude": float(lon),
                         "display_name": display_name
                     }
-
-            logger.warning(f"Could not get location from IP: {ip_address}")
+                else:
+                    logger.warning(f"Location data not found in IP info response for: {ip_address}")
+            except Exception as e:
+                logger.warning(f"Could not get location from IP: {ip_address}, error: {str(e)}")
+            
             return None
 
         except Exception as e:
@@ -138,9 +149,17 @@ class LocationService:
             out center;
             """
 
-            # Execute query
-            response = requests.post(overpass_url, data=overpass_query)
-            data = response.json()
+            # Execute query with retry mechanism
+            def make_overpass_request():
+                response = requests.post(overpass_url, data=overpass_query)
+                response.raise_for_status()
+                return response.json()
+                
+            try:
+                data = APIRequestHandler.make_request(make_overpass_request)
+            except Exception as e:
+                logger.error(f"Error querying Overpass API: {str(e)}")
+                return []
 
             theaters = []
             for element in data.get('elements', []):

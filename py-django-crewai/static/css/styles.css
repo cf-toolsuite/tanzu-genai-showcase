@@ -111,7 +111,6 @@ body {
     display: block;
 }
 
-/* Input styling */
 .input-group .form-control {
     background-color: var(--netflix-gray);
     border: 1px solid var(--netflix-light-gray);
@@ -266,12 +265,16 @@ body {
 
 /* Theater and showtime styling */
 #theatersContainer {
-    max-height: calc(100vh - 400px); /* Calculate height to leave space for the input at bottom */
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    max-height: calc(100vh - 200px); /* Taller container to show more content */
     overflow-y: auto;
     scrollbar-width: thin;
     scrollbar-color: var(--netflix-light-gray) var(--netflix-dark);
     padding-right: 5px; /* Add padding for scrollbar */
-    margin-bottom: 1.5rem;
+    margin-bottom: 0; /* Remove bottom margin to align with chat input */
+    scroll-behavior: smooth; /* Smooth scrolling */
 }
 
 #theatersContainer::-webkit-scrollbar {
@@ -321,6 +324,18 @@ body {
     }
 }
 
+/* Add a specific rule for the theater container to automatically scroll to bottom */
+#theatersContainer {
+    display: flex;
+    flex-direction: column-reverse; /* Reverse the display order to show newest at bottom */
+    justify-content: flex-end; /* Align content to the bottom */
+}
+
+/* Adjust the theater sections to maintain normal flow */
+.theater-section {
+    order: 1; /* Ensure proper ordering within flex container */
+}
+
 .showtime-badge {
     background-color: var(--netflix-dark);
     border: 1px solid var(--netflix-light-gray);
@@ -365,7 +380,11 @@ body {
     color: var(--netflix-text);
     font-size: 0.85rem;
     margin-right: 0.5rem;
-    margin-bottom: 0.5rem;
+    margin-bottom: 0;
+    height: 38px;
+    vertical-align: middle;
+    padding: 6px 12px;
+    line-height: 1;
 }
 
 .btn-sample:hover {
@@ -390,8 +409,8 @@ body {
 }
 
 .date-tab {
-    flex: 1 1 19%; /* Distribute space to fit 5 days (with a little buffer) */
-    padding: 0.5rem 0.5rem; /* Reduced padding */
+    flex: 1 1 24%; /* Distribute space to fit exactly 4 days */
+    padding: 0.5rem 0.75rem; /* Slightly increased padding */
     margin-right: 0.25rem; /* Reduced margin */
     background-color: var(--netflix-gray);
     color: var(--netflix-text);
@@ -417,11 +436,34 @@ body {
     }
 }
 
-/* Location input in header area */
+/* Sample buttons and location input layout */
+.sample-buttons {
+    flex: 1;
+    overflow-x: auto;
+    white-space: nowrap;
+    padding-right: 10px;
+    scrollbar-width: none; /* Hide scrollbar in Firefox */
+    display: flex;
+    align-items: center; /* Vertically center the buttons */
+    height: 40px; /* Fixed height to match location field */
+}
+
+.sample-buttons::-webkit-scrollbar {
+    display: none; /* Hide scrollbar in Chrome/Safari/Edge */
+}
+
+.location-container {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    height: 40px;
+}
+
+/* Location input styling */
 .location-input-group {
-    margin-top: 0.5rem;
-    max-width: 280px;
-    float: right;
+    width: 350px;
+    margin-bottom: 0;
+    height: 40px;
 }
 
 .location-input-group .input-group-text {

@@ -5,9 +5,12 @@ This module provides integration with SerpAPI for fetching real movie showtimes.
 
 import logging
 import json
+import functools
 from typing import List, Dict, Any, Optional
 from serpapi import GoogleSearch
 from datetime import datetime, timedelta
+
+from .api_utils import APIRequestHandler
 
 # Configure logger
 logger = logging.getLogger('chatbot.serp_service')
@@ -46,9 +49,13 @@ class SerpShowtimeService:
                 "api_key": self.api_key
             }
 
-            # Execute the search
+            # Create the GoogleSearch object
             search = GoogleSearch(params)
-            results = search.get_dict()
+            
+            # Execute the search with retry mechanism
+            results = APIRequestHandler.make_request(
+                search.get_dict
+            )
 
             # Process and format the results
             movies = []
@@ -118,9 +125,13 @@ class SerpShowtimeService:
                 "api_key": self.api_key
             }
 
-            # Execute the search
+            # Create the GoogleSearch object
             search = GoogleSearch(params)
-            results = search.get_dict()
+            
+            # Execute the search with retry mechanism
+            results = APIRequestHandler.make_request(
+                search.get_dict
+            )
 
             # Log complete error message if available
             if 'error' in results:

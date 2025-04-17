@@ -289,12 +289,12 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
 
-        // Generate date tabs for the next 7 days
+        // Generate date tabs for current day + 3 more days (4 total)
         dateTabsContainer.innerHTML = '';
         const dates = [];
         const today = new Date();
 
-        for (let i = 0; i < 7; i++) {
+        for (let i = 0; i < 4; i++) {
             const date = new Date(today);
             date.setDate(today.getDate() + i);
             dates.push(date);

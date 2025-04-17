@@ -61,13 +61,18 @@ The application consists of:
    LLM_BASE_URL=optional_custom_endpoint
    LLM_MODEL=gpt-4o-mini
    TMDB_API_KEY=your_movie_db_api_key_here
-   
+
    # Optional configuration parameters
    MOVIE_RESULTS_LIMIT=5            # Number of movie results to return from search
    MAX_RECOMMENDATIONS=3            # Maximum number of recommended movies to show
    THEATER_SEARCH_RADIUS_MILES=25   # Radius in miles to search for theaters
    DEFAULT_SEARCH_START_YEAR=1900   # Default start year for historical movie searches
    MAX_SHOWTIMES_PER_THEATER=3      # Maximum number of showtimes to display per theater
+
+   # Optional API request configuration
+   API_REQUEST_TIMEOUT_SECONDS=10   # Maximum seconds to wait for API responses
+   API_MAX_RETRIES=3                # Maximum number of retry attempts for failed API requests
+   API_RETRY_BACKOFF_FACTOR=0.5     # Exponential backoff factor between retries (in seconds)
    ```
 
 5. Run migrations:

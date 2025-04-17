@@ -161,6 +161,14 @@ DEFAULT_SEARCH_START_YEAR = int(os.getenv('DEFAULT_SEARCH_START_YEAR', '1900'))
 # Maximum number of showtimes to display per theater
 MAX_SHOWTIMES_PER_THEATER = int(os.getenv('MAX_SHOWTIMES_PER_THEATER', '3'))
 
+# API Request Configuration
+# Maximum seconds to wait for API responses
+API_REQUEST_TIMEOUT = int(os.getenv('API_REQUEST_TIMEOUT_SECONDS', '30'))
+# Maximum number of retry attempts for failed API requests
+API_MAX_RETRIES = int(os.getenv('API_MAX_RETRIES', '3'))
+# Exponential backoff factor between retries (in seconds)
+API_RETRY_BACKOFF_FACTOR = float(os.getenv('API_RETRY_BACKOFF_FACTOR', '0.5'))
+
 # Enhanced Logging Configuration
 LOGGING = {
     'version': 1,

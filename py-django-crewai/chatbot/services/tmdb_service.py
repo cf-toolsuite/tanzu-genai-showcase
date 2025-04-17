@@ -9,6 +9,8 @@ import time
 import requests
 from urllib.parse import urljoin
 
+from .api_utils import APIRequestHandler
+
 logger = logging.getLogger('chatbot.tmdb_service')
 
 class TMDBService:
@@ -83,7 +85,7 @@ class TMDBService:
 
     def _make_request(self, endpoint: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """
-        Make a request to the TMDb API.
+        Make a request to the TMDb API with retry and timeout handling.
 
         Args:
             endpoint: API endpoint to request
@@ -93,7 +95,7 @@ class TMDBService:
             Response data as dictionary
 
         Raises:
-            Exception: If the request fails
+            Exception: If the request fails after retries
         """
         # Ensure endpoint doesn't start with a slash
         if endpoint.startswith('/'):
@@ -107,14 +109,19 @@ class TMDBService:
         if params:
             request_params.update(params)
 
-        try:
+        def make_tmdb_request():
             response = self.session.get(url, params=request_params)
             response.raise_for_status()  # Raise exception for 4XX/5XX status codes
             return response.json()
+
+        try:
+            # Use our retry mechanism to make the request
+            return APIRequestHandler.make_request(make_tmdb_request)
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error making request to TMDB API: {str(e)}")
+            logger.error(f"Error making request to TMDB API after retries: {str(e)}")
             logger.exception(e)
-            raise
+            # Return empty dict instead of raising to avoid breaking the application
+            return {}
 
     def get_movie_details(self, movie_id) -> Dict[str, Any]:
         """

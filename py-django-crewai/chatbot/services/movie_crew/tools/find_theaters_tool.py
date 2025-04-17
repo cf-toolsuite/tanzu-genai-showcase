@@ -3,6 +3,7 @@ Tool for finding theaters showing the recommended movies.
 """
 import json
 import logging
+import time
 from datetime import datetime
 from typing import List, Dict, Any, Optional
 from crewai.tools import BaseTool
@@ -11,6 +12,7 @@ from django.conf import settings
 
 from ...location_service import LocationService
 from ...serp_service import SerpShowtimeService
+from ...api_utils import APIRequestHandler
 
 # Get the logger
 logger = logging.getLogger('chatbot.movie_crew')
@@ -382,15 +384,17 @@ class FindTheatersTool(BaseTool):
                     # For each movie, search for real showtimes
                     logger.info(f"Searching for real showtimes for movie: {movie_title} within {radius_miles} miles of {search_location}")
 
-                    # Perform the search with robust error handling
+                    # Perform the search with our retry mechanism
                     try:
-                        real_theaters_with_showtimes = showtime_service.search_showtimes(
-                            movie_title=movie_title,
-                            location=search_location,
-                            radius_miles=radius_miles
+                        real_theaters_with_showtimes = APIRequestHandler.make_request(
+                            lambda: showtime_service.search_showtimes(
+                                movie_title=movie_title,
+                                location=search_location,
+                                radius_miles=radius_miles
+                            )
                         )
                     except Exception as search_error:
-                        logger.error(f"SerpAPI search_showtimes failed: {str(search_error)}")
+                        logger.error(f"SerpAPI search_showtimes failed after retries: {str(search_error)}")
                         logger.exception(search_error)  # Log full traceback
                         return []
 
