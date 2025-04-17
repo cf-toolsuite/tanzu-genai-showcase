@@ -33,6 +33,7 @@ class FindTheatersTool(BaseTool):
     args_schema: type[FindTheatersInput] = FindTheatersInput
     user_location: str = Field(default="Unknown", description="User's location for finding nearby theaters")
     user_ip: Optional[str] = None
+    timezone: Optional[str] = None
 
     def _theater_has_movie_showtimes(self, theater: Dict[str, Any], movie_title: str) -> bool:
         """
@@ -86,11 +87,11 @@ class FindTheatersTool(BaseTool):
             # Get the maximum search radius from Django settings
             try:
                 from django.conf import settings
-                max_radius_miles = getattr(settings, 'THEATER_SEARCH_RADIUS_MILES', 25)
+                max_radius_miles = getattr(settings, 'THEATER_SEARCH_RADIUS_MILES', 15)
                 logger.info(f"Using maximum theater search radius: {max_radius_miles} miles")
             except Exception as e:
                 logger.warning(f"Could not get THEATER_SEARCH_RADIUS_MILES from settings: {str(e)}")
-                max_radius_miles = 25  # Default to 25 miles
+                max_radius_miles = 15  # Default to 15 miles
 
             logger.info(f"Formatting {len(serp_theaters)} theaters with showtimes for '{movie_title}' (ID: {movie_id})")
 
@@ -196,8 +197,9 @@ class FindTheatersTool(BaseTool):
         start_time = time.time()
         logger.info(f"Starting theater search at {datetime.now().strftime('%H:%M:%S.%f')}")
 
-        # Limit processing to max 3 movies to avoid timeouts
-        MAX_MOVIES_TO_PROCESS = 3
+        # Get the max movies to process from Django settings
+        MAX_MOVIES_TO_PROCESS = getattr(settings, 'MAX_RECOMMENDATIONS', 5)
+        logger.info(f"Maximum movies to process for theaters: {MAX_MOVIES_TO_PROCESS}")
         try:
             # Default to empty list if the input is empty
             if not movie_recommendations_json:
@@ -379,18 +381,23 @@ class FindTheatersTool(BaseTool):
                     logger.info(f"Searching for showtimes in location: {search_location}")
 
                     # Get the search radius from settings or use default
-                    radius_miles = getattr(settings, 'THEATER_SEARCH_RADIUS_MILES', 25)
+                    radius_miles = getattr(settings, 'THEATER_SEARCH_RADIUS_MILES', 15)
 
                     # For each movie, search for real showtimes
                     logger.info(f"Searching for real showtimes for movie: {movie_title} within {radius_miles} miles of {search_location}")
 
+                    # Use timezone from tool (passed from manager) or extract from user coordinates if available
+                    user_timezone = self.timezone or (user_coords.get('timezone') if user_coords else None)
+                    logger.info(f"Using timezone for showtimes: {user_timezone}")
+
                     # Perform the search with our retry mechanism
                     try:
                         real_theaters_with_showtimes = APIRequestHandler.make_request(
-                            lambda: showtime_service.search_showtimes(
+                            lambda *args, **kwargs: showtime_service.search_showtimes(
                                 movie_title=movie_title,
                                 location=search_location,
-                                radius_miles=radius_miles
+                                radius_miles=radius_miles,
+                                timezone=user_timezone
                             )
                         )
                     except Exception as search_error:

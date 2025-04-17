@@ -65,9 +65,8 @@ The application consists of:
    # Optional configuration parameters
    MOVIE_RESULTS_LIMIT=5            # Number of movie results to return from search
    MAX_RECOMMENDATIONS=3            # Maximum number of recommended movies to show
-   THEATER_SEARCH_RADIUS_MILES=25   # Radius in miles to search for theaters
+   THEATER_SEARCH_RADIUS_MILES=15   # Radius in miles to search for theaters
    DEFAULT_SEARCH_START_YEAR=1900   # Default start year for historical movie searches
-   MAX_SHOWTIMES_PER_THEATER=3      # Maximum number of showtimes to display per theater
 
    # Optional API request configuration
    API_REQUEST_TIMEOUT_SECONDS=10   # Maximum seconds to wait for API responses

@@ -31,16 +31,7 @@ class ResponseFormatter:
         has_theaters = any(len(movie.get('theaters', [])) > 0 for movie in movies_with_theaters)
 
         # Intro response based on query type
-        if any(term in query.lower() for term in ['now playing', 'theaters now', 'playing now', 'showing now', 'this weekend', 'this week']):
-            response = f"Based on your interest in movies currently playing, I found {movie_count} movie{'s' if movie_count != 1 else ''} that you might enjoy.\n\n"
-        elif any(term in query.lower() for term in ['marvel', 'superhero', 'comic']):
-            response = f"I found {movie_count} Marvel/superhero movie{'s' if movie_count != 1 else ''} that match your criteria.\n\n"
-        elif any(term in query.lower() for term in ['action', 'adventure', 'thriller', 'exciting']):
-            response = f"I found {movie_count} action/thriller movie{'s' if movie_count != 1 else ''} that match your criteria.\n\n"
-        elif any(term in query.lower() for term in ['family', 'kids', 'children']):
-            response = f"I found {movie_count} family-friendly movie{'s' if movie_count != 1 else ''} that would be great to watch with kids.\n\n"
-        else:
-            response = f"Based on your interest in '{query}', I found {movie_count} movie{'s' if movie_count != 1 else ''} that you might enjoy.\n\n"
+        response = f"Based on your interest in '{query}', I found {movie_count} movie{'s' if movie_count != 1 else ''} that you might enjoy.\n\n"
 
         # Add information about each movie
         for i, movie in enumerate(movies_with_theaters, 1):
@@ -61,11 +52,9 @@ class ResponseFormatter:
                 response += f": {explanation}"
             response += "\n"
 
-            # Add brief overview if available
+            # Add full overview if available
             if overview:
-                # Truncate long overviews
-                if len(overview) > 150:
-                    overview = overview[:147] + "..."
+                # Display the complete overview without truncation
                 response += f"   {overview}\n"
 
             # Check if this is a current release (should have the flag we added)
@@ -73,7 +62,7 @@ class ResponseFormatter:
 
             # Only show theater information for current releases AND in First Run mode
             first_run_mode = any(term == "First Run" for term in query.split())  # Try to detect mode from query
-            
+
             # Get the conversation mode if it's included in the movie object
             conversation_mode = movie.get('conversation_mode', '')
             if conversation_mode and conversation_mode == 'casual':
@@ -84,36 +73,7 @@ class ResponseFormatter:
                 # Only show theater info in First Run mode and if we have theaters
                 response += f"   🎬 Available at {theater_count} theater{'s' if theater_count != 1 else ''}.\n"
 
-                # Add showtimes for the first theater if available
-                if theaters[0].get('showtimes') and len(theaters[0]['showtimes']) > 0:
-                    first_theater = theaters[0]
-                    theater_name = first_theater.get('name', 'Unknown Theater')
-                    showtimes = first_theater.get('showtimes', [])
-                    
-                    # Get maximum showtimes to display from settings
-                    max_showtimes = getattr(settings, 'MAX_SHOWTIMES_PER_THEATER', 3)
-                    
-                    # Show limited number of showtimes based on configuration
-                    showtime_strs = []
-                    for i, showtime in enumerate(showtimes[:max_showtimes]):
-                        time_str = showtime.get('start_time', '')
-                        format_str = showtime.get('format', '')
-                        # Extract just the time portion (HH:MM) if it's a full datetime
-                        if time_str and len(time_str) > 10:
-                            try:
-                                dt = datetime.fromisoformat(time_str.replace(' ', 'T').replace('Z', '+00:00'))
-                                time_only = dt.strftime("%H:%M")  # 24-hour format as requested
-                                showtime_strs.append(f"{time_only} ({format_str})" if format_str else time_only)
-                            except Exception as e:
-                                logger.warning(f"Error parsing datetime '{time_str}': {str(e)}")
-                                showtime_strs.append(time_str)
-                        else:
-                            showtime_strs.append(time_str)
-
-                    if showtime_strs:
-                        response += f"   📅 {theater_name}: {', '.join(showtime_strs)}\n"
-                    else:
-                        response += f"   📅 {theater_name}: Call theater for showtimes\n"
+                # Detailed theater and showtime info removed as requested
             elif not is_current and (first_run_mode or "casual" not in query.lower()):
                 # For older movies in First Run mode, mention they're not in theaters
                 release_date = movie.get('release_date', '')

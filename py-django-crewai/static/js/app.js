@@ -10,6 +10,20 @@ document.addEventListener('DOMContentLoaded', function() {
     const processingMessage = document.getElementById('processingMessage');
     const locationInput = document.getElementById('locationInput');
 
+    // Theater elements
+    const dateTabs = document.getElementById('dateTabs');
+    const theatersContainer = document.getElementById('theatersContainer');
+
+    // Initially hide date tabs until a movie is selected
+    if (dateTabs) {
+        dateTabs.style.display = 'none';
+    }
+
+    // Global variables
+    window.selectedMovieId = null;
+    window.selectedMovieTitle = null;
+    window.userTimezone = null; // Store user timezone
+
     // Casual viewing elements
     const casualChatContainer = document.getElementById('casualChatContainer');
     const casualUserInput = document.getElementById('casualUserInput');
@@ -128,6 +142,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add location if provided
             if (location) {
                 requestData.location = location;
+            }
+            
+            // Add timezone information if available (for showtime conversions)
+            if (window.userTimezone) {
+                requestData.timezone = window.userTimezone;
+                console.log(`Sending timezone with request: ${window.userTimezone}`);
             }
 
             // Send to server
@@ -272,6 +292,9 @@ document.addEventListener('DOMContentLoaded', function() {
             movie.theaters &&
             movie.theaters.length > 0
         );
+
+        // Store movies in global variable so they can be accessed by the handleMovieClick function
+        window.currentMovies = currentMovies;
 
         // Log information for debugging
         console.log(`Total movies: ${movies.length}`);
@@ -435,7 +458,7 @@ document.addEventListener('DOMContentLoaded', function() {
 
             // For each movie at this theater
             Object.values(theater.movies).forEach(movie => {
-                theaterBody.innerHTML += `<div class="fw-bold mb-2">${movie.title}</div>`;
+                // Remove the movie title - user already knows which movie they selected
 
                 // For each format (Standard, IMAX, etc)
                 Object.entries(movie.showtimesByFormat).forEach(([format, times]) => {
@@ -506,6 +529,79 @@ document.addEventListener('DOMContentLoaded', function() {
             `;
         }
     }
+
+    // Handle movie card clicks
+    window.handleMovieClick = function(movieId, movieTitle) {
+        console.log(`Movie clicked: ${movieTitle} (ID: ${movieId})`);
+
+        // Clear any previous selections
+        document.querySelectorAll('.movie-card').forEach(card => {
+            card.classList.remove('selected');
+        });
+
+        // Highlight the selected movie
+        document.querySelectorAll(`.movie-card[data-movie-id="${movieId}"]`).forEach(card => {
+            card.classList.add('selected');
+        });
+
+        // Store the selected movie ID
+        window.selectedMovieId = movieId;
+        window.selectedMovieTitle = movieTitle;
+
+        // Get all movies including ones without theaters
+        const allMovies = window.currentMovies || [];
+
+        // First, check if this movie has theaters
+        let selectedMovie = null;
+
+        // Look through all movies for this specific movie
+        for (const movie of allMovies) {
+            if (movie.id == movieId || movie.tmdb_id == movieId) {
+                selectedMovie = movie;
+                break;
+            }
+        }
+
+        // If movie found but has no theaters or empty theaters array, show appropriate message
+        if (!selectedMovie || !selectedMovie.theaters || selectedMovie.theaters.length === 0) {
+            // Hide date tabs since there are no showtimes to display
+            const dateTabs = document.getElementById('dateTabs');
+            if (dateTabs) {
+                dateTabs.style.display = 'none';
+            }
+
+            // Show a message that no theaters are available
+            const theatersContainer = document.getElementById('theatersContainer');
+            theatersContainer.innerHTML = `
+                <p class="text-muted">No theaters are currently showing "${movieTitle}". Please check back later or select a different movie.</p>
+            `;
+            return;
+        }
+
+        // If we get here, the movie has theaters, so show date tabs
+        const dateTabs = document.getElementById('dateTabs');
+        if (dateTabs) {
+            dateTabs.style.display = 'flex';
+
+            // Automatically select the first date tab (Today)
+            const firstDateTab = document.querySelector('.date-tab');
+            if (firstDateTab) {
+                // Remove active class from all tabs
+                document.querySelectorAll('.date-tab').forEach(btn => {
+                    btn.classList.remove('active');
+                });
+
+                // Add active class to first tab
+                firstDateTab.classList.add('active');
+            }
+        }
+
+        // Filter to just this movie for displaying showtimes
+        const filteredMovies = [selectedMovie];
+
+        // Display theaters for the selected movie and first date (Today)
+        displayShowtimesForDate(filteredMovies, 0);
+    };
 
     // Get CSRF token for AJAX request
     window.getCookie = function(name) {
@@ -611,12 +707,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Success - we have coordinates, now use ipapi.co directly
                     // Since browser geolocation succeeded, we could just use ipapi.co to get location info
                     // This is more reliable than trying to do reverse geocoding from coordinates
-                    useIpapiForLocation();
+                    gatherLocationDataFromIpApi();
                 },
                 function(error) {
                     console.error(`Geolocation error (${error.code}): ${error.message}`);
                     // Fall back to IP-based geolocation
-                    useIpapiForLocation();
+                    gatherLocationDataFromIpApi();
                 },
                 {
                     enableHighAccuracy: true, // Try for best accuracy
@@ -628,12 +724,12 @@ document.addEventListener('DOMContentLoaded', function() {
             // Browser doesn't support geolocation
             console.error("Geolocation not supported by this browser");
             // Fall back to IP-based geolocation
-            useIpapiForLocation();
+            gatherLocationDataFromIpApi();
         }
 
-        // Function to use ipapi.co to get location information
-        function useIpapiForLocation() {
-            console.log("Using ipapi.co for location detection");
+        // Function to gather location and timezone data from ipapi.co
+        function gatherLocationDataFromIpApi() {
+            console.log("Using ipapi.co for location and timezone detection");
 
             // Use ipapi.co - no API key needed
             fetch('https://ipapi.co/json/')
@@ -657,6 +753,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 const city = data.city;
                 const state = data.region;
                 const country = data.country_name;
+
+                // Capture timezone information
+                if (data.timezone) {
+                    window.userTimezone = data.timezone;
+                    console.log(`Captured user timezone: ${window.userTimezone}`);
+                } else {
+                    console.warn("No timezone information in ipapi.co response");
+                    window.userTimezone = "America/Los_Angeles";
+                }
 
                 // If we have all values, use the standard "City, State, Country" format
                 if (city && state && country) {

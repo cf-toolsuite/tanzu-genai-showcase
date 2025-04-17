@@ -2,11 +2,13 @@ from django.shortcuts import render, redirect
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.conf import settings
+from django.utils import timezone
 from .models import Conversation, Message, MovieRecommendation, Theater, Showtime
 from .services.movie_crew import MovieCrewManager
 import json
 import logging
 import traceback
+from datetime import datetime as dt
 from datetime import datetime
 
 logger = logging.getLogger('chatbot')
@@ -232,6 +234,16 @@ def send_message(request):
                 )
                 # Store location in session for future use
                 request.session['user_location'] = location
+                
+                # Extract timezone information (passed from frontend)
+                timezone_str = (
+                    data.get('timezone') or
+                    request.session.get('user_timezone') or
+                    'America/Los_Angeles'  # Default if not provided
+                )
+                # Store timezone in session for future use
+                request.session['user_timezone'] = timezone_str
+                logger.info(f"Using timezone: {timezone_str}")
 
                 # Extract first run filter preference (default to True for first run movie mode)
                 first_run_filter = data.get('first_run_filter', True)
@@ -295,7 +307,8 @@ def send_message(request):
                     model=settings.LLM_CONFIG.get('model', 'gpt-4o-mini'),
                     tmdb_api_key=settings.TMDB_API_KEY,
                     user_location=location,
-                    user_ip=client_ip  # Pass the IP directly in constructor
+                    user_ip=client_ip,  # Pass the IP directly in constructor
+                    timezone=timezone_str  # Pass the timezone string for showtime conversions
                 )
                 logger.info("Movie crew manager initialized successfully")
             except Exception as init_error:
@@ -449,23 +462,53 @@ def send_message(request):
                                 logger.debug(f"Found {len(showtime_data_list)} showtimes for theater: {theater.name}")
 
                                 for showtime_data in showtime_data_list:
-                                    # Try to parse the start time
+                                    # Try to parse the start time and add timezone info
                                     try:
                                         start_time_str = showtime_data.get('start_time', '')
-                                        if start_time_str:
-                                            start_time = datetime.fromisoformat(start_time_str.replace(' ', 'T'))
-                                        else:
+                                        if not start_time_str:
                                             continue
-                                    except (ValueError, TypeError):
+                                            
+                                        # If the time is in HH:mm AM/PM format from SerpAPI
+                                        if ':' in start_time_str and ('AM' in start_time_str or 'PM' in start_time_str):
+                                            # Convert to a datetime object with date from the selected day
+                                            
+                                            # Get the date part from the string if available
+                                            if 'T' in start_time_str:
+                                                # Already has date information
+                                                start_time = dt.fromisoformat(start_time_str.replace(' ', 'T'))
+                                            else:
+                                                # Extract time
+                                                time_format = '%I:%M %p' if ' ' in start_time_str else '%H:%M'
+                                                time_only = datetime.strptime(start_time_str, time_format).time()
+                                                
+                                                # Combine with today's date
+                                                start_time = datetime.combine(datetime.today().date(), time_only)
+                                            
+                                            # Add timezone info - use Django's timezone utilities
+                                            start_time = timezone.make_aware(start_time)
+                                        else:
+                                            # Standard ISO format processing
+                                            start_time = dt.fromisoformat(start_time_str.replace(' ', 'T'))
+                                            
+                                            # Ensure timezone is set
+                                            from django.utils import timezone as django_timezone
+                                            if django_timezone.is_naive(start_time):
+                                                start_time = django_timezone.make_aware(start_time)
+                                    except (ValueError, TypeError) as e:
+                                        logger.warning(f"Failed to parse showtime: {start_time_str} - {e}")
                                         continue
 
-                                    # Create or update showtime
-                                    Showtime.objects.create(
-                                        movie=movie,
-                                        theater=theater,
-                                        start_time=start_time,
-                                        format=showtime_data.get('format', 'Standard')
-                                    )
+                                    # Create or update showtime with timezone-aware datetime
+                                    try:
+                                        Showtime.objects.create(
+                                            movie=movie,
+                                            theater=theater,
+                                            start_time=start_time,
+                                            format=showtime_data.get('format', 'Standard')
+                                        )
+                                        logger.debug(f"Created showtime: {start_time} for '{movie.title}' at {theater.name}")
+                                    except Exception as showtime_error:
+                                        logger.error(f"Error creating showtime: {str(showtime_error)}")
                                     showtimes_count += 1
                     else:
                         if not first_run_filter:
@@ -496,7 +539,7 @@ def send_message(request):
                         logger.warning(f"Movie {rec.title} has NO showtimes in database")
 
                 # Check if this is a current year movie
-                current_year = datetime.now().year
+                current_year = dt.now().year
 
                 # Prepare recommendations data
                 recommendations_data = []

@@ -56,9 +56,14 @@ window.renderTMDBGrid = function(movies, containerId, isFirstRunMode = true) {
             posterUrl = movie.poster_url || 'https://via.placeholder.com/300x450?text=No+Poster';
         }
 
-        // Create the movie card
+        // Create the movie card with data attributes and click handler
         const movieCard = document.createElement('div');
         movieCard.className = 'movie-card';
+        movieCard.setAttribute('data-movie-id', movie.id || movie.tmdb_id || '');
+        movieCard.setAttribute('data-movie-title', movie.title || '');
+        movieCard.onclick = function() {
+            window.handleMovieClick(movie.id || movie.tmdb_id || '', movie.title || '');
+        };
         
         // Create a simple div wrapper for the poster
         const posterWrapper = document.createElement('div');
@@ -109,7 +114,7 @@ window.renderTMDBGrid = function(movies, containerId, isFirstRunMode = true) {
             infoDiv.appendChild(ratingDiv);
         }
 
-        // Add movie explanation or description with word limit
+        // Add movie explanation or description (full text, no truncation)
         if (movie.explanation || movie.overview) {
             const descDiv = document.createElement('div');
             descDiv.className = 'movie-overview';
@@ -117,12 +122,7 @@ window.renderTMDBGrid = function(movies, containerId, isFirstRunMode = true) {
             // Get the description text, preferring explanation over overview
             let descriptionText = movie.explanation || movie.overview || '';
 
-            // Limit to 30 words and add ellipsis if needed
-            const words = descriptionText.split(/\s+/);
-            if (words.length > 30) {
-                descriptionText = words.slice(0, 30).join(' ') + '...';
-            }
-
+            // Use the full description without truncation
             descDiv.textContent = descriptionText;
             infoDiv.appendChild(descDiv);
         }

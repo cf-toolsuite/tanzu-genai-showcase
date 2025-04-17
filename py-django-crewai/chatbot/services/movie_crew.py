@@ -24,7 +24,8 @@ class MovieCrewManager:
         model: str = "gpt-4o-mini",
         tmdb_api_key: Optional[str] = None,
         user_location: Optional[str] = None,
-        user_ip: Optional[str] = None
+        user_ip: Optional[str] = None,
+        timezone: Optional[str] = None
     ):
         """
         Initialize the MovieCrewManager.
@@ -36,6 +37,7 @@ class MovieCrewManager:
             tmdb_api_key: API key for The Movie Database (TMDb)
             user_location: Optional user location string
             user_ip: Optional user IP address for geolocation
+            timezone: Optional user timezone string (e.g., 'America/Los_Angeles')
         """
         logger.info("Initializing MovieCrewManager V2 wrapper")
 
@@ -46,7 +48,8 @@ class MovieCrewManager:
             model=model,
             tmdb_api_key=tmdb_api_key,
             user_location=user_location,
-            user_ip=user_ip
+            user_ip=user_ip,
+            timezone=timezone
         )
 
     def process_query(self, query: str, conversation_history: List[Dict[str, str]], first_run_mode: bool = True) -> Dict[str, Any]:

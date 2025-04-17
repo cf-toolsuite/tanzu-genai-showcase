@@ -9,6 +9,7 @@ import functools
 from typing import List, Dict, Any, Optional
 from serpapi import GoogleSearch
 from datetime import datetime, timedelta
+import zoneinfo
 
 from .api_utils import APIRequestHandler
 
@@ -51,10 +52,11 @@ class SerpShowtimeService:
 
             # Create the GoogleSearch object
             search = GoogleSearch(params)
-            
+
             # Execute the search with retry mechanism
+            # Wrap in lambda to properly handle the timeout parameter
             results = APIRequestHandler.make_request(
-                search.get_dict
+                lambda *args, **kwargs: search.get_dict()
             )
 
             # Process and format the results
@@ -91,17 +93,20 @@ class SerpShowtimeService:
             logger.error(f"Error searching for movies in theaters: {str(e)}")
             return []
 
-    def search_showtimes(self, movie_title: str, location: str, radius_miles: int = 25) -> List[Dict[str, Any]]:
+    def search_showtimes(self, movie_title: str, location: str, radius_miles: int = 25, timezone: str = None) -> List[Dict[str, Any]]:
         """Search for movie showtimes for a specific movie in a location.
 
         Args:
             movie_title: Title of the movie to search showtimes for
             location: Location to search showtimes in (city name or zip code)
             radius_miles: Search radius in miles (default: 25)
+            timezone: User's timezone string (e.g., 'America/Los_Angeles')
 
         Returns:
             List of theater dictionaries with showtimes
         """
+        # Store timezone for use in processing
+        self.user_timezone = timezone
         # Add performance measurement
         import time
         start_time = time.time()
@@ -127,10 +132,10 @@ class SerpShowtimeService:
 
             # Create the GoogleSearch object
             search = GoogleSearch(params)
-            
+
             # Execute the search with retry mechanism
             results = APIRequestHandler.make_request(
-                search.get_dict
+                lambda *args, **kwargs: search.get_dict()
             )
 
             # Log complete error message if available
@@ -182,11 +187,11 @@ class SerpShowtimeService:
             # We'll use this to filter theaters that are too far away
             try:
                 from django.conf import settings
-                max_radius_miles = getattr(settings, 'THEATER_SEARCH_RADIUS_MILES', 25)
+                max_radius_miles = getattr(settings, 'THEATER_SEARCH_RADIUS_MILES', 15)
                 logger.info(f"Using maximum theater search radius: {max_radius_miles} miles")
             except Exception as e:
                 logger.warning(f"Could not get THEATER_SEARCH_RADIUS_MILES from settings: {str(e)}")
-                max_radius_miles = 25  # Default to 25 miles
+                max_radius_miles = 15  # Default to 15 miles
 
             # Track unique theaters across all days
             theater_map = {}
@@ -245,9 +250,20 @@ class SerpShowtimeService:
                                 # Combine the date with the time
                                 start_time = datetime.combine(day_date, time_obj.time())
 
-                                # Create a standardized showtime object
+                                # If we have timezone info, make datetime timezone-aware
+                                timezone_info = getattr(self, 'user_timezone', None)
+                                if timezone_info:
+                                    try:
+                                        tz = zoneinfo.ZoneInfo(timezone_info)
+                                        start_time = start_time.replace(tzinfo=tz)
+                                        logger.info(f"Applied timezone {timezone_info} to showtime")
+                                    except Exception as tz_error:
+                                        logger.warning(f"Could not apply timezone {timezone_info}: {str(tz_error)}")
+
+                                # Create a standardized showtime object with timezone info
                                 showtime_info = {
-                                    "start_time": start_time.isoformat(),
+                                    "start_time": start_time.isoformat(),  # Will include TZ info if available
+                                    "timezone": timezone_info,  # Store timezone string for reference
                                     "format": "Standard"  # Default format since API doesn't provide format info
                                 }
                                 theater_showtimes.append(showtime_info)

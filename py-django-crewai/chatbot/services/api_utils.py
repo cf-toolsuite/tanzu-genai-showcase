@@ -4,6 +4,7 @@ Utility functions for making API requests with retries and timeouts.
 
 import time
 import logging
+import inspect
 import requests
 from typing import Dict, Any, Optional, Callable
 from django.conf import settings
@@ -44,13 +45,29 @@ class APIRequestHandler:
         timeout = timeout or getattr(settings, 'API_REQUEST_TIMEOUT', 10)
         max_retries = max_retries or getattr(settings, 'API_MAX_RETRIES', 3)
         backoff_factor = backoff_factor or getattr(settings, 'API_RETRY_BACKOFF_FACTOR', 0.5)
-        
-        # Add timeout to kwargs if not already present
-        if 'timeout' not in kwargs:
-            kwargs['timeout'] = timeout
-        
-        logger.debug(f"Making API request with timeout={timeout}s, max_retries={max_retries}")
-        
+
+        # Only add timeout parameter if it's not already present AND the function can accept it
+        # Check if the function can accept a timeout parameter (either directly or via **kwargs)
+        try:
+            sig = inspect.signature(request_func)
+            accepts_timeout = ('timeout' in sig.parameters or
+                              any(p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()))
+
+            if accepts_timeout and 'timeout' not in kwargs:
+                kwargs['timeout'] = timeout
+                logger.debug(f"Adding timeout={timeout}s to request")
+            elif not accepts_timeout and 'timeout' in kwargs:
+                # Remove timeout if function doesn't accept it but it was provided
+                logger.debug(f"Function doesn't accept timeout parameter, removing it")
+                del kwargs['timeout']
+            elif not accepts_timeout:
+                logger.debug(f"Function doesn't accept timeout parameter, not adding it")
+        except (TypeError, ValueError) as e:
+            # If we can't inspect the function, log warning and don't add timeout
+            logger.warning(f"Could not inspect request function, timeout handling may not work: {str(e)}")
+
+        logger.debug(f"Making API request with max_retries={max_retries}")
+
         last_exception = None
         for attempt in range(max_retries + 1):  # +1 because first attempt is not a retry
             try:
@@ -60,19 +77,19 @@ class APIRequestHandler:
                     backoff_time = backoff_factor * (2 ** (attempt - 1))
                     logger.info(f"Retry attempt {attempt}/{max_retries} after {backoff_time:.2f}s backoff")
                     time.sleep(backoff_time)
-                
+
                 # Make the request
                 start_time = time.time()
                 response = request_func(*args, **kwargs)
                 elapsed_time = time.time() - start_time
-                
+
                 logger.debug(f"API request completed in {elapsed_time:.2f}s")
                 return response
-                
+
             except (requests.Timeout, requests.ConnectionError) as e:
                 logger.warning(f"API request attempt {attempt+1}/{max_retries+1} failed: {str(e)}")
                 last_exception = e
-                
+
                 # If this was the last attempt, re-raise the exception
                 if attempt == max_retries:
                     logger.error(f"API request failed after {max_retries+1} attempts: {str(e)}")
@@ -81,10 +98,10 @@ class APIRequestHandler:
                 # For other exceptions, don't retry
                 logger.error(f"API request failed with unexpected error: {str(e)}")
                 raise
-        
+
         # This should not be reached due to the raise in the except block above
         if last_exception:
             raise last_exception
-        
+
         # Fallback error if we somehow exit the loop without raising or returning
         raise Exception("API request failed without a specific error")

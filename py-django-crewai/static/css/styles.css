@@ -3,7 +3,7 @@
     --netflix-dark: #141414;
     --netflix-black: #000000;
     --netflix-gray: #303030;
-    --netflix-light-gray: #6D6D6D;
+    --netflix-light-gray: #BDBDBD;
     --netflix-text: #FFFFFF;
     --netflix-highlight: #F5F5F1;
 }
@@ -189,6 +189,19 @@ body {
     z-index: 10;
 }
 
+/* Selected movie card styling */
+.movie-card.selected {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(229, 9, 20, 0.7);
+    border: 2px solid var(--netflix-red);
+    z-index: 15;
+}
+
+/* Make movie cards interactive */
+.movie-card {
+    cursor: pointer;
+}
+
 .movie-card img {
     width: 100%;
     height: 300px;
@@ -208,26 +221,14 @@ body {
     transform: translateY(100%);
     transition: transform 0.3s ease;
     max-height: 85%; /* Allow it to cover most of the card but not all */
-    overflow-y: auto; /* Make the entire info section scrollable */
+    overflow-y: hidden; /* Hide overflow but don't add scrollbar */
 }
 
 .movie-card:hover .movie-info {
     transform: translateY(0);
 }
 
-/* Add a custom scrollbar for the movie info section */
-.movie-info::-webkit-scrollbar {
-    width: 4px;
-}
-
-.movie-info::-webkit-scrollbar-track {
-    background: rgba(0, 0, 0, 0.2);
-}
-
-.movie-info::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.5);
-    border-radius: 4px;
-}
+/* No custom scrollbar needed for movie-info since we removed its scrolling */
 
 .movie-title {
     font-weight: bold;
@@ -239,10 +240,28 @@ body {
 .movie-overview {
     font-size: 0.85rem;
     line-height: 1.4;
+    max-height: 200px; /* Allow enough space for full descriptions */
     overflow-y: auto;
-    max-height: 200px; /* Give plenty of space for content */
+    overflow-x: hidden; /* Prevent horizontal scrolling */
+    white-space: normal; /* Ensure text wraps within container */
     padding-right: 6px; /* Space for scrollbar */
     text-shadow: 1px 1px 1px rgba(0, 0, 0, 0.8);
+    margin-bottom: 0.5rem;
+    word-wrap: break-word; /* Break long words if needed */
+}
+
+/* Add custom scrollbar for movie overview */
+.movie-overview::-webkit-scrollbar {
+    width: 4px;
+}
+
+.movie-overview::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.movie-overview::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.5);
+    border-radius: 4px;
 }
 
 .movie-rating {
@@ -266,15 +285,15 @@ body {
 /* Theater and showtime styling */
 #theatersContainer {
     position: relative;
-    display: flex;
-    flex-direction: column;
-    max-height: calc(100vh - 200px); /* Taller container to show more content */
-    overflow-y: auto;
+    height: 300px; /* Fixed height for scrollable area */
+    overflow-y: auto; /* Enable vertical scrolling */
     scrollbar-width: thin;
     scrollbar-color: var(--netflix-light-gray) var(--netflix-dark);
     padding-right: 5px; /* Add padding for scrollbar */
-    margin-bottom: 0; /* Remove bottom margin to align with chat input */
+    margin-bottom: 10px; /* Add small margin to separate from chat input */
     scroll-behavior: smooth; /* Smooth scrolling */
+    border: none; /* Remove border */
+    background-color: transparent; /* Remove background */
 }
 
 #theatersContainer::-webkit-scrollbar {
@@ -290,6 +309,7 @@ body {
     border-radius: 20px;
 }
 
+/* Theater sections styling */
 .theater-section {
     background-color: var(--netflix-dark);
     border: 1px solid var(--netflix-gray);
@@ -314,27 +334,24 @@ body {
 /* Calculate specific heights for different screen sizes */
 @media (max-height: 900px) {
     #theatersContainer {
-        max-height: calc(100vh - 350px);
+        height: calc(100vh - 380px);
     }
 }
 
 @media (max-height: 700px) {
     #theatersContainer {
-        max-height: calc(100vh - 300px);
+        height: calc(100vh - 360px);
     }
 }
 
-/* Add a specific rule for the theater container to automatically scroll to bottom */
-#theatersContainer {
-    display: flex;
-    flex-direction: column-reverse; /* Reverse the display order to show newest at bottom */
-    justify-content: flex-end; /* Align content to the bottom */
+/* Add additional rule for very large screens */
+@media (min-height: 1000px) {
+    #theatersContainer {
+        height: calc(100vh - 420px);
+    }
 }
 
-/* Adjust the theater sections to maintain normal flow */
-.theater-section {
-    order: 1; /* Ensure proper ordering within flex container */
-}
+/* No need for duplicate theatersContainer rule */
 
 .showtime-badge {
     background-color: var(--netflix-dark);

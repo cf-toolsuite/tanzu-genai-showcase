@@ -35,7 +35,8 @@ class MovieCrewManager:
         model: str = "gpt-4o-mini",
         tmdb_api_key: Optional[str] = None,
         user_location: Optional[str] = None,
-        user_ip: Optional[str] = None
+        user_ip: Optional[str] = None,
+        timezone: Optional[str] = None
     ):
         """
         Initialize the MovieCrewManager.
@@ -47,6 +48,7 @@ class MovieCrewManager:
             tmdb_api_key: API key for The Movie Database (TMDb)
             user_location: Optional user location string
             user_ip: Optional user IP address for geolocation
+            timezone: Optional user timezone string (e.g., 'America/Los_Angeles')
         """
         self.api_key = api_key
         self.base_url = base_url
@@ -54,6 +56,7 @@ class MovieCrewManager:
         self.tmdb_api_key = tmdb_api_key
         self.user_location = user_location
         self.user_ip = user_ip
+        self.timezone = timezone
 
         # Configure TMDb API if key is provided
         if tmdb_api_key:
@@ -132,9 +135,10 @@ class MovieCrewManager:
         search_tool.first_run_mode = first_run_mode  # Set the mode
         analyze_tool = AnalyzePreferencesTool()
 
-        # Set up the theater finder tool with location
+        # Set up the theater finder tool with location and timezone
         theater_finder_tool = FindTheatersTool(user_location=self.user_location)
         theater_finder_tool.user_ip = self.user_ip
+        theater_finder_tool.timezone = self.timezone
 
         logger.info(f"Created SearchMoviesTool with first_run_mode: {first_run_mode}")
 
@@ -151,7 +155,7 @@ class MovieCrewManager:
 
         # Get max recommendations count from settings
         max_recommendations = getattr(settings, 'MAX_RECOMMENDATIONS', 3)
-        
+
         recommend_movies_task = Task(
             description=f"Recommend the top {max_recommendations} movies from the list that best match the user's preferences",
             expected_output=f"A JSON list of the top {max_recommendations} recommended movies with explanations",
@@ -290,7 +294,7 @@ class MovieCrewManager:
                 try:
                     import time
                     enhancement_start = time.time()
-                    
+
                     # Convert recommendations to JSON string for the tool
                     recommendations_json = json.dumps(recommendations)
 
@@ -420,37 +424,37 @@ class MovieCrewManager:
 
         # Improved theater mapping - ensures each movie gets only its relevant theaters
         theaters_by_movie_id = {}
-        
+
         # Process theater data with better validation
         for theater in theaters_data:
             if not isinstance(theater, dict):
                 logger.warning(f"Skipping invalid theater entry (not a dictionary)")
                 continue
-                
+
             movie_id = theater.get("movie_id")
             if movie_id is None:
                 logger.warning(f"Theater missing movie_id: {theater.get('name', 'Unknown')}")
                 continue
-                
+
             # More validation of theater data integrity
             if not theater.get("name"):
                 logger.warning(f"Theater missing name for movie_id {movie_id}")
                 continue
-                
+
             # Ensure showtimes are valid
             if not theater.get("showtimes") or not isinstance(theater.get("showtimes"), list):
                 logger.warning(f"Theater {theater.get('name')} has no valid showtimes for movie_id {movie_id}")
                 continue
-                
+
             # Only add theaters with actual showtimes
             if len(theater.get("showtimes", [])) == 0:
                 logger.warning(f"Theater {theater.get('name')} has empty showtimes list for movie_id {movie_id}")
                 continue
-                
+
             # Initialize the list for this movie_id if needed
             if movie_id not in theaters_by_movie_id:
                 theaters_by_movie_id[movie_id] = []
-                
+
             # Add theater to the appropriate movie list
             theaters_by_movie_id[movie_id].append(theater)
             logger.info(f"Added theater '{theater.get('name')}' with {len(theater.get('showtimes', []))} showtimes to movie_id {movie_id}")
@@ -466,14 +470,14 @@ class MovieCrewManager:
             if movie_tmdb_id is None and "id" in movie:
                 movie_tmdb_id = movie.get("id")
                 logger.info(f"Using 'id' field as TMDB ID for movie '{movie.get('title')}'")
-            
+
             if movie_tmdb_id is None:
                 logger.warning(f"Movie missing TMDB ID: {movie.get('title', 'Unknown')}")
                 movie_theaters = []
             else:
                 # Get theaters for this specific movie
                 movie_theaters = theaters_by_movie_id.get(movie_tmdb_id, [])
-            
+
             # Log for debugging purposes
             if movie_theaters:
                 logger.info(f"Movie '{movie.get('title')}' has {len(movie_theaters)} theaters with showtimes")

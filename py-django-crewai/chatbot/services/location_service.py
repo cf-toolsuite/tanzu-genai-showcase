@@ -8,6 +8,7 @@ import requests
 from geopy.geocoders import Nominatim
 from geopy.distance import geodesic
 from typing import Dict, List, Tuple, Optional, Any
+from django.conf import settings
 
 from .api_utils import APIRequestHandler
 
@@ -17,13 +18,17 @@ logger = logging.getLogger('chatbot.location_service')
 class LocationService:
     """Service for geocoding and finding nearby theaters."""
 
-    def __init__(self, user_agent: str = "movie_chatbot_geocoder"):
+    def __init__(self, user_agent: str = "movie_chatbot_geocoder", timeout: int = None):
         """Initialize the location service.
 
         Args:
             user_agent: User agent string for Nominatim (required by their ToS)
+            timeout: Timeout for Nominatim requests in seconds (defaults to settings.API_REQUEST_TIMEOUT)
         """
-        self.geolocator = Nominatim(user_agent=user_agent)
+        # Use timeout from parameters or settings
+        timeout = timeout or getattr(settings, 'API_REQUEST_TIMEOUT', 30)
+        logger.info(f"Initializing LocationService with timeout={timeout}s")
+        self.geolocator = Nominatim(user_agent=user_agent, timeout=timeout)
 
     def geocode_location(self, location_str: str) -> Optional[Dict[str, Any]]:
         """Convert a location string to coordinates.
@@ -43,9 +48,9 @@ class LocationService:
             location_str = location_str.strip()
 
             # Geocode the location with retry mechanism
-            def make_geocode_request():
+            def make_geocode_request(*args, **kwargs):
                 return self.geolocator.geocode(location_str, exactly_one=True)
-                
+
             location = APIRequestHandler.make_request(make_geocode_request)
 
             if location:
@@ -78,11 +83,11 @@ class LocationService:
                 return None
 
             # Use ipinfo.io for geolocation with retry mechanism
-            def make_ip_request():
+            def make_ip_request(*args, **kwargs):
                 response = requests.get(f"https://ipinfo.io/{ip_address}/json")
                 response.raise_for_status()
                 return response.json()
-                
+
             try:
                 data = APIRequestHandler.make_request(make_ip_request)
 
@@ -105,16 +110,22 @@ class LocationService:
 
                     display_name = ', '.join(display_parts)
 
+                    # Extract timezone information if available
+                    timezone = data.get('timezone')
+                    utc_offset = data.get('utc_offset')
+
                     return {
                         "latitude": float(lat),
                         "longitude": float(lon),
-                        "display_name": display_name
+                        "display_name": display_name,
+                        "timezone": timezone,
+                        "utc_offset": utc_offset
                     }
                 else:
                     logger.warning(f"Location data not found in IP info response for: {ip_address}")
             except Exception as e:
                 logger.warning(f"Could not get location from IP: {ip_address}, error: {str(e)}")
-            
+
             return None
 
         except Exception as e:
@@ -150,11 +161,11 @@ class LocationService:
             """
 
             # Execute query with retry mechanism
-            def make_overpass_request():
+            def make_overpass_request(*args, **kwargs):
                 response = requests.post(overpass_url, data=overpass_query)
                 response.raise_for_status()
                 return response.json()
-                
+
             try:
                 data = APIRequestHandler.make_request(make_overpass_request)
             except Exception as e:
