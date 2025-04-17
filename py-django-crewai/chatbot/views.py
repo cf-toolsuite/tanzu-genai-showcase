@@ -33,7 +33,7 @@ def index(request):
     # Track conversations for both modes
     first_run_conversation_id = request.session.get('first_run_conversation_id')
     casual_conversation_id = request.session.get('casual_conversation_id')
-    
+
     # First Run mode conversation (default)
     if first_run_conversation_id:
         try:
@@ -96,7 +96,7 @@ def send_message(request):
     if request.method == 'POST':
         try:
             logger.info("=== Processing new chat message ===")
-            
+
             # Parse request data first to determine the mode
             try:
                 raw_body = request.body.decode('utf-8')
@@ -113,19 +113,19 @@ def send_message(request):
                                 'status': 'error',
                                 'message': 'Invalid request format. Could not parse message.'
                             }, status=400)
-                
+
                 # Extract first run filter preference to determine which conversation to use
                 first_run_filter = data.get('first_run_filter', True)
                 if isinstance(first_run_filter, str):
                     first_run_filter = first_run_filter.lower() == 'true'
-                
+
                 logger.info(f"Message mode: {'First Run' if first_run_filter else 'Casual Viewing'}")
             except Exception as parsing_error:
                 logger.error(f"Error parsing request: {str(parsing_error)}")
                 # Default to First Run mode if we can't determine from the request
                 first_run_filter = True
                 logger.info("Defaulting to First Run mode due to parsing error")
-            
+
             # Get the appropriate conversation based on the mode
             if first_run_filter:
                 conversation_id = request.session.get('first_run_conversation_id')
@@ -418,14 +418,23 @@ def send_message(request):
                         for theater_index, theater_data in enumerate(theaters_data):
                             logger.debug(f"Processing theater {theater_index+1}/{len(theaters_data)}: {theater_data.get('name', 'Unknown')}")
 
+                            # Get distance from theater data if available
+                            distance_miles = theater_data.get('distance_miles')
+
                             theater, created = Theater.objects.get_or_create(
                                 name=theater_data.get('name', 'Unknown Theater'),
                                 defaults={
                                     'address': theater_data.get('address', ''),
                                     'latitude': theater_data.get('latitude'),
-                                    'longitude': theater_data.get('longitude')
+                                    'longitude': theater_data.get('longitude'),
+                                    'distance_miles': distance_miles
                                 }
                             )
+
+                            # Update distance even for existing theaters (may change based on user location)
+                            if not created and distance_miles is not None:
+                                theater.distance_miles = distance_miles
+                                theater.save(update_fields=['distance_miles'])
                             theaters_count += 1
 
                             # Log whether we created a new theater or found existing
@@ -487,29 +496,71 @@ def send_message(request):
                         logger.warning(f"Movie {rec.title} has NO showtimes in database")
 
                 # Check if this is a current year movie
-                from datetime import datetime
                 current_year = datetime.now().year
 
-                recommendations_data = [{
-                    'id': rec.id,
-                    'title': rec.title,
-                    'overview': rec.overview,
-                    'poster_url': rec.poster_url,
-                    'release_date': rec.release_date.isoformat() if rec.release_date else None,
-                    'rating': float(rec.rating) if rec.rating else None,
-                    # Mark as current release if it's from current year or if it has showtimes
-                    'is_current_release': (rec.release_date and rec.release_date.year >= current_year - 1) or rec.showtimes.exists(),
-                    # Properly format theater data with all required fields
-                    'theaters': [{
-                        'name': showtime.theater.name,
-                        'address': showtime.theater.address,
-                        'distance_miles': 5.0,  # Default distance if not available
-                        'showtimes': [{
+                # Prepare recommendations data
+                recommendations_data = []
+
+                for rec in recent_recs:
+                    # Create base recommendation data
+                    movie_data = {
+                        'id': rec.id,
+                        'title': rec.title,
+                        'overview': rec.overview,
+                        'poster_url': rec.poster_url,
+                        'release_date': rec.release_date.isoformat() if rec.release_date else None,
+                        'rating': float(rec.rating) if rec.rating else None,
+                        # Mark as current release if it's from current year or if it has showtimes
+                        'is_current_release': (rec.release_date and rec.release_date.year >= current_year - 1) or rec.showtimes.exists(),
+                        # Properly format theater data with all required fields
+                        'theaters': []
+                    }
+
+                    # Add to recommendations data
+                    recommendations_data.append(movie_data)
+
+                    # Group showtimes by theater to build the correct structure
+                    theater_map = {}
+                    for showtime in rec.showtimes.all():
+                        theater_name = showtime.theater.name
+
+                        # Create theater entry if not exists
+                        if theater_name not in theater_map:
+                            # Find matching theater in the retrieved movie data
+                            matching_theater = next((theater for movie in movies if movie.get('title') == rec.title
+                                                  for theater in movie.get('theaters', [])
+                                                  if theater.get('name') == theater_name), None)
+
+                            # Get distance from the matched theater from API response
+                            distance_miles = None
+                            if matching_theater and matching_theater.get('distance_miles') is not None:
+                                distance_miles = matching_theater.get('distance_miles')
+                                logger.info(f"Found actual distance for theater {theater_name}: {distance_miles} miles")
+                            else:
+                                # Use default distance if not available
+                                distance_miles = showtime.theater.distance_miles if hasattr(showtime.theater, 'distance_miles') else None
+
+                                # If still no distance, use a single default value
+                                if distance_miles is None:
+                                    distance_miles = 10.0  # Default distance
+                                    logger.info(f"Using default distance for theater {theater_name}")
+
+                            theater_map[theater_name] = {
+                                'name': theater_name,
+                                'address': showtime.theater.address,
+                                'distance_miles': distance_miles,
+                                'showtimes': []
+                            }
+
+                        # Add showtimes to the theater
+                        theater_map[theater_name]['showtimes'].append({
                             'start_time': showtime.start_time.isoformat(),
                             'format': showtime.format
-                        }]
-                    } for showtime in rec.showtimes.all()]
-                } for rec in recent_recs]
+                        })
+
+                    # Add theaters to movie sorted by distance
+                    for _, theater in sorted(theater_map.items(), key=lambda x: x[1].get('distance_miles', float('inf'))):
+                        movie_data['theaters'].append(theater)
 
                 return JsonResponse({
                     'status': 'success',
@@ -543,10 +594,10 @@ def reset_conversation(request):
     # Reset both conversation types
     if 'first_run_conversation_id' in request.session:
         del request.session['first_run_conversation_id']
-    
+
     if 'casual_conversation_id' in request.session:
         del request.session['casual_conversation_id']
-        
+
     # For backward compatibility - also remove the old format if it exists
     if 'conversation_id' in request.session:
         del request.session['conversation_id']

@@ -39,15 +39,15 @@ class SearchMoviesTool(BaseTool):
             # Use the query parameter if provided
             search_query = query if query else ""
 
-            # Import SerperAPI service if we're in First Run mode
+            # Import SerpAPI service if we're in First Run mode
             if self.first_run_mode:
                 try:
                     # Import service without re-importing settings (already imported at module level)
                     from ...serp_service import SerpShowtimeService
 
-                    # Check if SerperAPI key is available
+                    # Check if SerpAPI key is available
                     if hasattr(settings, 'SERPAPI_API_KEY') and settings.SERPAPI_API_KEY:
-                        logger.info("Using SerperAPI to search for movies currently in theaters")
+                        logger.info("Using SerpAPI to search for movies currently in theaters")
                         serp_service = SerpShowtimeService(api_key=settings.SERPAPI_API_KEY)
 
                         # Extract genres or keywords from the query
@@ -68,20 +68,20 @@ class SearchMoviesTool(BaseTool):
                         else:
                             serp_query = "movies currently in theaters"
 
-                        logger.info(f"Searching SerperAPI with query: {serp_query}")
+                        logger.info(f"Searching SerpAPI with query: {serp_query}")
 
                         # Search for movies currently in theaters
                         now_playing_results = serp_service.search_movies_in_theaters(query=serp_query)
 
                         if now_playing_results and len(now_playing_results) > 0:
-                            logger.info(f"Found {len(now_playing_results)} movies currently in theaters via SerperAPI")
+                            logger.info(f"Found {len(now_playing_results)} movies currently in theaters via SerpAPI")
 
-                            # Process SerperAPI results
+                            # Process SerpAPI results
                             movies = []
                             # Limit to configured number of results
                             results_limit = getattr(settings, 'MOVIE_RESULTS_LIMIT', 5)
                             for movie in now_playing_results[:results_limit]:
-                                # Create a movie dictionary from SerperAPI results
+                                # Create a movie dictionary from SerpAPI results
                                 movies.append(self._create_movie_dict(
                                     title=movie.get('title', 'Unknown Title'),
                                     overview=movie.get('description', ''),
@@ -89,14 +89,14 @@ class SearchMoviesTool(BaseTool):
                                     poster_url=movie.get('thumbnail', ''),
                                     tmdb_id=movie.get('id'),  # May need to search TMDB to get this
                                     rating=movie.get('rating', 0),
-                                    is_current_release=True  # SerperAPI only returns current releases
+                                    is_current_release=True  # SerpAPI only returns current releases
                                 ))
 
-                            # If we found movies via SerperAPI, return immediately
+                            # If we found movies via SerpAPI, return immediately
                             if movies:
                                 return json.dumps(movies)
                 except Exception as serp_error:
-                    logger.error(f"Error using SerperAPI to search for movies: {str(serp_error)}")
+                    logger.error(f"Error using SerpAPI to search for movies: {str(serp_error)}")
                     # Continue with TMDB search as fallback
 
             # Check for currently playing movies in TMDB (as fallback or for casual viewing)

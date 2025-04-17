@@ -49,12 +49,18 @@ class FindTheatersTool(BaseTool):
                 logger.debug(f"Theater {theater.get('name', 'Unknown')} has no showtimes")
                 return False
 
-            # In real integration, the SerpAPI service should already filter by movie
-            # But we can do an extra validation here if needed
+            # With the SerpAPI implementation, we're querying "{movie_title} theater"
+            # The returned theaters should already be filtered for the specific movie
+            # So if there are showtimes, we can be confident they are for our movie
 
-            # For now, we'll assume the SerpAPI service has already filtered theaters correctly
-            # So we'll just check if the theater has any showtimes
-            return len(theater['showtimes']) > 0
+            # Make sure there's at least one valid showtime
+            showtime_count = len(theater['showtimes'])
+            if showtime_count > 0:
+                logger.debug(f"Theater {theater.get('name')} has {showtime_count} showtimes for {movie_title}")
+                return True
+            else:
+                logger.debug(f"Theater {theater.get('name')} has no showtimes")
+                return False
 
         except Exception as e:
             logger.error(f"Error checking movie showtimes: {str(e)}")
@@ -62,10 +68,10 @@ class FindTheatersTool(BaseTool):
 
     def _format_serpapi_showtimes(self, serp_theaters, movie_title, movie_id) -> List[Dict[str, Any]]:
         """
-        Format SerperAPI showtime results into our standardized format.
+        Format SerpAPI showtime results into our standardized format.
 
         Args:
-            serp_theaters: List of theaters from SerperAPI
+            serp_theaters: List of theaters from SerpAPI
             movie_title: Title of the movie
             movie_id: TMDB ID of the movie
 
@@ -75,37 +81,102 @@ class FindTheatersTool(BaseTool):
         formatted_theaters = []
 
         try:
+            # Get the maximum search radius from Django settings
+            try:
+                from django.conf import settings
+                max_radius_miles = getattr(settings, 'THEATER_SEARCH_RADIUS_MILES', 25)
+                logger.info(f"Using maximum theater search radius: {max_radius_miles} miles")
+            except Exception as e:
+                logger.warning(f"Could not get THEATER_SEARCH_RADIUS_MILES from settings: {str(e)}")
+                max_radius_miles = 25  # Default to 25 miles
+
+            logger.info(f"Formatting {len(serp_theaters)} theaters with showtimes for '{movie_title}' (ID: {movie_id})")
+
+            # Debug the first theater to understand structure
+            if serp_theaters and len(serp_theaters) > 0:
+                first_theater = serp_theaters[0]
+                first_theater_keys = list(first_theater.keys())
+                logger.info(f"First theater keys: {first_theater_keys}")
+
+                # Log showtimes sample
+                if 'showtimes' in first_theater:
+                    showtimes_count = len(first_theater['showtimes'])
+                    logger.info(f"First theater has {showtimes_count} showtimes")
+
+                    # Log a sample of showtimes for debugging
+                    if showtimes_count > 0:
+                        first_showtime = first_theater['showtimes'][0]
+                        logger.info(f"Sample showtime: {json.dumps(first_showtime)}")
+
             for theater in serp_theaters:
+                theater_name = theater.get('name', 'Unknown Theater')
+                logger.info(f"Processing theater: {theater_name}")
+
+                # Check if distance is within radius
+                distance_miles = theater.get('distance_miles')
+                if distance_miles is not None and distance_miles > max_radius_miles:
+                    logger.info(f"Skipping theater '{theater_name}' - distance {distance_miles} miles exceeds radius of {max_radius_miles} miles")
+                    continue
+
                 # Create the theater entry with all available information
                 theater_entry = {
                     "movie_id": movie_id,
-                    "name": theater.get('name', 'Unknown Theater'),
+                    "movie_title": movie_title,  # Include movie title for reference
+                    "name": theater_name,
                     "address": theater.get('address', ''),
-                    "latitude": theater.get('latitude'),
-                    "longitude": theater.get('longitude'),
-                    "distance_miles": theater.get('distance_miles', 0),
+                    "link": theater.get('link', ''),  # Include link if available
+                    "distance_miles": distance_miles,
                     "showtimes": []
                 }
 
-                # Extract showtimes from the SerperAPI response
+                # Copy any GPS coordinates if available
+                if 'latitude' in theater and 'longitude' in theater:
+                    theater_entry['latitude'] = theater.get('latitude')
+                    theater_entry['longitude'] = theater.get('longitude')
+
+                # Log available fields
+                fields_present = []
+                for field in ['address', 'link', 'latitude', 'longitude', 'distance_miles']:
+                    if theater.get(field) is not None:
+                        fields_present.append(field)
+                logger.info(f"Theater fields present: {', '.join(fields_present)}")
+
+                # Extract showtimes from the SerpAPI response
                 showtimes = theater.get('showtimes', [])
+                logger.info(f"Found {len(showtimes)} showtimes for {theater_name}")
+
+                valid_showtimes = 0
                 for showtime in showtimes:
                     # Ensure we have a start time
                     if 'start_time' in showtime:
+                        valid_showtimes += 1
+                        format_type = showtime.get('format', 'Standard')
+
+                        # Create standardized showtime entry
                         theater_entry['showtimes'].append({
                             "start_time": showtime['start_time'],
-                            "format": showtime.get('format', 'Standard')
+                            "format": format_type
                         })
+
+                logger.info(f"Processed {valid_showtimes} valid showtimes for {theater_name}")
 
                 # Only add theaters that have showtimes
                 if theater_entry['showtimes']:
+                    # Sort showtimes by start time for better display
+                    theater_entry['showtimes'].sort(key=lambda x: x['start_time'])
                     formatted_theaters.append(theater_entry)
+                    logger.info(f"Added theater '{theater_name}' with {len(theater_entry['showtimes'])} formatted showtimes")
+                else:
+                    logger.warning(f"Skipping theater '{theater_name}' - no valid showtimes found")
 
-            logger.info(f"Formatted {len(formatted_theaters)} theaters with showtimes for {movie_title}")
+            # Sort theaters by distance for better user experience
+            formatted_theaters.sort(key=lambda x: x.get('distance_miles', float('inf')))
+            logger.info(f"Successfully formatted {len(formatted_theaters)} theaters with showtimes for '{movie_title}'")
             return formatted_theaters
 
         except Exception as e:
-            logger.error(f"Error formatting SerperAPI showtimes: {str(e)}")
+            logger.error(f"Error formatting SerpAPI showtimes: {str(e)}")
+            logger.exception(e)  # Log the full exception traceback
             return []
 
     def _run(self, movie_recommendations_json: str = "") -> str:
@@ -150,7 +221,7 @@ class FindTheatersTool(BaseTool):
                     if 'tmdb_id' not in movie and 'id' in movie:
                         movie['tmdb_id'] = movie['id']
                         logger.info(f"Fixed missing tmdb_id for movie {movie.get('title')}")
-                    
+
                     # Only include movies with a TMDB ID
                     if movie.get('tmdb_id'):
                         current_movies.append(movie)
@@ -161,7 +232,7 @@ class FindTheatersTool(BaseTool):
             if not current_movies:
                 logger.info("No current release movies to find theaters for")
                 return json.dumps([])
-                
+
             logger.info(f"Finding theaters for {len(current_movies)} current release movies: {[m.get('title') for m in current_movies]}")
 
             # Initialize location service
@@ -189,25 +260,25 @@ class FindTheatersTool(BaseTool):
 
                 logger.info(f"Finding theaters for movie: {movie_title} (ID: {movie_id})")
 
-                # Try to get real showtimes via SerperAPI for this specific movie
+                # Try to get real showtimes via SerpAPI for this specific movie
                 movie_theaters_with_showtimes = self._get_movie_showtimes(movie_title, location, user_coords, movie_id)
 
                 # If we found real showtimes for this movie, use them
                 if movie_theaters_with_showtimes:
                     logger.info(f"Found {len(movie_theaters_with_showtimes)} theaters with real showtimes for '{movie_title}'")
-                    
+
                     # Add movie_id to each theater to ensure proper association
                     for theater in movie_theaters_with_showtimes:
                         # Explicitly set the movie_id for this theater
                         theater['movie_id'] = movie_id
                         # Add movie title for debugging purposes
                         theater['movie_title'] = movie_title
-                        
+
                         # Verify showtimes are present
                         if not theater.get('showtimes') or len(theater.get('showtimes', [])) == 0:
                             logger.warning(f"Theater {theater.get('name')} has no showtimes for '{movie_title}'")
                             continue
-                            
+
                         # Add to our results
                         theater_results.append(theater)
                         logger.info(f"Added theater '{theater.get('name')}' with {len(theater.get('showtimes', []))} showtimes for '{movie_title}'")
@@ -217,7 +288,7 @@ class FindTheatersTool(BaseTool):
 
             # Sort theaters by distance
             theater_results.sort(key=lambda x: x.get('distance_miles', float('inf')))
-            
+
             # Log final result count
             logger.info(f"Returning {len(theater_results)} theaters with showtimes across all movies")
 
@@ -271,7 +342,7 @@ class FindTheatersTool(BaseTool):
 
     def _get_movie_showtimes(self, movie_title: str, location: str, user_coords: Dict[str, Any], movie_id: Any = None) -> List[Dict[str, Any]]:
         """
-        Get real showtimes for a movie using SerperAPI.
+        Get real showtimes for a movie using SerpAPI.
 
         Args:
             movie_title: Title of the movie
@@ -290,11 +361,11 @@ class FindTheatersTool(BaseTool):
                 from django.conf import settings
                 serp_api_key = settings.SERPAPI_API_KEY
 
-                # Log if SerperAPI key is available
+                # Log if SerpAPI key is available
                 if serp_api_key:
-                    logger.info(f"SerperAPI key is configured: {serp_api_key[:4]}...{serp_api_key[-4:] if len(serp_api_key) > 8 else ''}")
+                    logger.info(f"SerpAPI key is configured: {serp_api_key[:4]}...{serp_api_key[-4:] if len(serp_api_key) > 8 else ''}")
                 else:
-                    logger.warning("No SerperAPI key found in settings - no theater data will be shown")
+                    logger.warning("No SerpAPI key found in settings - no theater data will be shown")
                     return []
 
                 if serp_api_key and serp_api_key != 'your_serpapi_key_here':
@@ -307,14 +378,21 @@ class FindTheatersTool(BaseTool):
 
                     # Get the search radius from settings or use default
                     radius_miles = getattr(settings, 'THEATER_SEARCH_RADIUS_MILES', 25)
-                    
+
                     # For each movie, search for real showtimes
                     logger.info(f"Searching for real showtimes for movie: {movie_title} within {radius_miles} miles of {search_location}")
-                    real_theaters_with_showtimes = showtime_service.search_showtimes(
-                        movie_title=movie_title,
-                        location=search_location,
-                        radius_miles=radius_miles
-                    )
+
+                    # Perform the search with robust error handling
+                    try:
+                        real_theaters_with_showtimes = showtime_service.search_showtimes(
+                            movie_title=movie_title,
+                            location=search_location,
+                            radius_miles=radius_miles
+                        )
+                    except Exception as search_error:
+                        logger.error(f"SerpAPI search_showtimes failed: {str(search_error)}")
+                        logger.exception(search_error)  # Log full traceback
+                        return []
 
                     # Validate that we have results specifically for this movie
                     valid_theaters = []

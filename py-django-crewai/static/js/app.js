@@ -71,7 +71,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const activeProcessingMessage = isFirstRun ? processingMessage : casualProcessingMessage;
 
         const message = activeInput.value.trim();
-        
+
         // Only use location for First Run mode
         const location = isFirstRun ? document.getElementById('locationInput').value.trim() : "";
 
@@ -548,6 +548,10 @@ document.addEventListener('DOMContentLoaded', function() {
         processingContainer.style.display = 'block';
         progressBar.style.width = '50%';
 
+        // Disable user input while detecting location
+        userInput.disabled = true;
+        sendButton.disabled = true;
+
         console.log("Starting location detection");
 
         // Function to hide the processing indicator
@@ -562,75 +566,57 @@ document.addEventListener('DOMContentLoaded', function() {
             }
         }
 
-        // Function to set a default location
-        function useDefaultLocation() {
-            console.log("Using default location (Seattle)");
-            locationInput.value = "Seattle, WA";
-            hideProcessing("Using default location: Seattle, WA");
+        // Function to check if a location is in the US
+        function isLocationInUS(country_code) {
+            return country_code === 'US';
         }
 
-        // Try to use the browser's geolocation API
+        // Function to enable user input once we have a valid location
+        function enableInput(hasValidLocation) {
+            if (hasValidLocation) {
+                // Enable the input field
+                userInput.disabled = false;
+                sendButton.disabled = false;
+                console.log("Chat input enabled with valid location");
+            } else {
+                // Keep input disabled until a location is entered
+                locationInput.focus();
+                locationInput.placeholder = "Enter a US city and state (e.g., Seattle, Washington, United States)";
+                console.log("Chat input remains disabled until location is set");
+            }
+        }
+
+        // Function when we detect non-US location or can't detect location
+        function handleNonUSLocation() {
+            console.log("Location not in US or couldn't be determined");
+            locationInput.value = ""; // Clear the value
+            hideProcessing("Please enter a US city and state (e.g., Seattle, Washington, United States)");
+            enableInput(false);
+        }
+
+        // Listen for changes to the location input
+        locationInput.addEventListener('input', function() {
+            // Enable the user input if location has been entered
+            if (locationInput.value.trim().length > 0) {
+                userInput.disabled = false;
+                sendButton.disabled = false;
+            }
+        });
+
+        // First try to use browser's geolocation API
         if (navigator.geolocation) {
             console.log("Geolocation API available, requesting position");
             navigator.geolocation.getCurrentPosition(
                 function(position) {
-                    // Success - we have coordinates, now reverse geocode to get address
-                    const latitude = position.coords.latitude;
-                    const longitude = position.coords.longitude;
-                    console.log(`Got coordinates: ${latitude}, ${longitude}`);
-
-                    // Use reverse geocoding to get readable location
-                    fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}&zoom=18&addressdetails=1`, {
-                        headers: {
-                            'User-Agent': 'Movie Chatbot Application'
-                        }
-                    })
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP error! status: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => {
-                        console.log("Received geocoding response:", data);
-                        
-                        // Extract a reasonable location name
-                        let locationName;
-                        if (data.display_name) {
-                            // Get first three parts of the address
-                            locationName = data.display_name.split(',').slice(0, 3).join(',');
-                        } else if (data.address) {
-                            // Try to use city, state, country
-                            const address = data.address;
-                            const city = address.city || address.town || address.village || address.hamlet;
-                            const state = address.state || address.province;
-                            const country = address.country;
-                            
-                            if (city && state) {
-                                locationName = `${city}, ${state}`;
-                            } else if (city) {
-                                locationName = city;
-                            }
-                        }
-
-                        // If we have a location name, use it
-                        if (locationName) {
-                            console.log(`Setting location to: ${locationName}`);
-                            locationInput.value = locationName;
-                            hideProcessing(`Location detected: ${locationName}`);
-                        } else {
-                            console.error("Could not parse location from response:", data);
-                            useDefaultLocation();
-                        }
-                    })
-                    .catch(error => {
-                        console.error("Error with reverse geocoding:", error);
-                        useDefaultLocation();
-                    });
+                    // Success - we have coordinates, now use ipapi.co directly
+                    // Since browser geolocation succeeded, we could just use ipapi.co to get location info
+                    // This is more reliable than trying to do reverse geocoding from coordinates
+                    useIpapiForLocation();
                 },
                 function(error) {
                     console.error(`Geolocation error (${error.code}): ${error.message}`);
-                    useDefaultLocation();
+                    // Fall back to IP-based geolocation
+                    useIpapiForLocation();
                 },
                 {
                     enableHighAccuracy: true, // Try for best accuracy
@@ -641,7 +627,55 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             // Browser doesn't support geolocation
             console.error("Geolocation not supported by this browser");
-            useDefaultLocation();
+            // Fall back to IP-based geolocation
+            useIpapiForLocation();
+        }
+
+        // Function to use ipapi.co to get location information
+        function useIpapiForLocation() {
+            console.log("Using ipapi.co for location detection");
+
+            // Use ipapi.co - no API key needed
+            fetch('https://ipapi.co/json/')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log("Received ipapi.co response:", data);
+
+                // Check if location is in the US
+                if (!isLocationInUS(data.country_code)) {
+                    console.log(`Detected non-US location: ${data.country_name || 'unknown'}`);
+                    handleNonUSLocation();
+                    return;
+                }
+
+                // Extract city and state for US locations
+                const city = data.city;
+                const state = data.region;
+                const country = data.country_name;
+
+                // If we have all values, use the standard "City, State, Country" format
+                if (city && state && country) {
+                    const locationName = `${city}, ${state}, ${country}`;
+                    console.log(`Setting location to: ${locationName}`);
+                    locationInput.value = locationName;
+                    hideProcessing(`Location detected: ${locationName}`);
+                    enableInput(true);
+                    return;
+                }
+
+                // If we couldn't extract both city and state, handle as non-US location
+                console.error("Could not parse US city/state from response:", data);
+                handleNonUSLocation();
+            })
+            .catch(error => {
+                console.error("Error with ipapi.co:", error);
+                handleNonUSLocation();
+            });
         }
     }
 

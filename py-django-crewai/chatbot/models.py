@@ -6,12 +6,12 @@ class Conversation(models.Model):
         ('first_run', 'First Run Movies'),
         ('casual', 'Casual Viewing'),
     ]
-    
+
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
-    mode = models.CharField(max_length=10, choices=MODE_CHOICES, default='first_run', 
+    mode = models.CharField(max_length=10, choices=MODE_CHOICES, default='first_run',
                            help_text="The mode this conversation belongs to (First Run or Casual Viewing)")
-    
+
     def __str__(self):
         mode_str = 'First Run' if self.mode == 'first_run' else 'Casual'
         return f"{mode_str} Conversation {self.id} ({self.created_at.strftime('%Y-%m-%d %H:%M')})"
@@ -22,15 +22,15 @@ class Message(models.Model):
         ('user', 'User'),
         ('bot', 'Bot'),
     ]
-    
+
     conversation = models.ForeignKey(Conversation, on_delete=models.CASCADE, related_name='messages')
     sender = models.CharField(max_length=10, choices=SENDER_CHOICES)
     content = models.TextField()
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     class Meta:
         ordering = ['created_at']
-    
+
     def __str__(self):
         return f"{self.sender.capitalize()}: {self.content[:50]}{'...' if len(self.content) > 50 else ''}"
 
@@ -44,7 +44,7 @@ class MovieRecommendation(models.Model):
     tmdb_id = models.IntegerField(blank=True, null=True)
     rating = models.DecimalField(max_digits=3, decimal_places=1, blank=True, null=True)
     created_at = models.DateTimeField(auto_now_add=True)
-    
+
     def __str__(self):
         return self.title
 
@@ -54,7 +54,9 @@ class Theater(models.Model):
     address = models.TextField()
     latitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
     longitude = models.DecimalField(max_digits=9, decimal_places=6, blank=True, null=True)
-    
+    distance_miles = models.DecimalField(max_digits=5, decimal_places=1, blank=True, null=True,
+                                        help_text="Distance in miles from the user's location")
+
     def __str__(self):
         return self.name
 
@@ -64,6 +66,6 @@ class Showtime(models.Model):
     theater = models.ForeignKey(Theater, on_delete=models.CASCADE, related_name='showtimes')
     start_time = models.DateTimeField()
     format = models.CharField(max_length=50, blank=True)  # e.g., "IMAX", "3D", "Standard"
-    
+
     def __str__(self):
         return f"{self.movie.title} at {self.theater.name} - {self.start_time.strftime('%Y-%m-%d %H:%M')}"
