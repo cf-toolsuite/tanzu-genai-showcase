@@ -19,6 +19,20 @@ logger = logging.getLogger('chatbot.serp_service')
 class SerpShowtimeService:
     """Service for fetching movie showtimes using SerpAPI."""
 
+    @staticmethod
+    def _sanitize_params(params: Dict[str, Any], sensitive_keys: List[str]) -> Dict[str, Any]:
+        """
+        Redact sensitive fields in a dictionary.
+
+        Args:
+            params: Dictionary containing parameters to sanitize.
+            sensitive_keys: List of keys to redact in the dictionary.
+
+        Returns:
+            A sanitized copy of the dictionary with sensitive fields redacted.
+        """
+        return {k: (v if k not in sensitive_keys else '[REDACTED]') for k, v in params.items()}
+
     def __init__(self, api_key: str):
         """Initialize the SerpAPI service.
 
@@ -143,7 +157,8 @@ class SerpShowtimeService:
                 error_message = results.get('error', 'Unknown error')
                 # Log the detailed error and complete parameters for debugging
                 logger.error(f"SerpAPI returned error: {error_message}")
-                logger.error(f"Request parameters: {json.dumps({k: (v if k != 'api_key' else '[REDACTED]') for k, v in params.items()})}")
+                sanitized_params = self._sanitize_params(params, sensitive_keys=['api_key', 'location'])
+                logger.error(f"Request parameters: {json.dumps(sanitized_params)}")
                 return []
 
             # Process and format the results
