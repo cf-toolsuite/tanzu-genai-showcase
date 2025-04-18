@@ -38,50 +38,57 @@ class TMDBService:
         tmdb.API_KEY = api_key
         self.session = requests.Session()
 
-    def enhance_movies_parallel(self, movies: List[Dict[str, Any]], max_workers: int = 3) -> List[Dict[str, Any]]:
+    def enhance_movies_sequential(self, movies: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """
-        Enhance multiple movies in parallel to improve performance.
+        Enhance multiple movies sequentially to ensure consistent processing order.
 
         Args:
             movies: List of movie dictionaries to enhance
-            max_workers: Maximum number of parallel workers
 
         Returns:
             List of enhanced movie dictionaries
         """
         start_time = time.time()
-        logger.info(f"Starting parallel enhancement of {len(movies)} movies")
+        logger.info(f"Starting sequential enhancement of {len(movies)} movies")
 
         # Handle empty list case
         if not movies:
             return []
 
         # Create a copy to avoid modifying the original
-        result_movies = movies.copy()
+        result_movies = []
 
-        # Use ThreadPoolExecutor for parallel processing
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            # Create a mapping of futures to their index in the movies list
-            future_to_index = {
-                executor.submit(self.enhance_movie_data, movie): i
-                for i, movie in enumerate(movies)
-            }
-
-            # Process completed futures as they complete
-            for future in concurrent.futures.as_completed(future_to_index):
-                index = future_to_index[future]
-                try:
-                    # Get the result and update the corresponding movie
-                    enhanced_movie = future.result()
-                    result_movies[index] = enhanced_movie
-                    logger.info(f"Enhanced movie {enhanced_movie.get('title', 'Unknown')} in parallel")
-                except Exception as e:
-                    logger.error(f"Error enhancing movie at index {index}: {str(e)}")
-                    # Keep the original movie data on error (already in result_movies)
+        # Process each movie sequentially
+        for idx, movie in enumerate(movies):
+            try:
+                logger.info(f"Enhancing movie {idx+1}/{len(movies)}: {movie.get('title', 'Unknown')}")
+                enhanced_movie = self.enhance_movie_data(movie)
+                result_movies.append(enhanced_movie)
+                logger.info(f"Successfully enhanced movie {enhanced_movie.get('title', 'Unknown')}")
+            except Exception as e:
+                logger.error(f"Error enhancing movie at index {idx}: {str(e)}")
+                # Add the original movie on error
+                result_movies.append(movie)
+                logger.info(f"Added original movie data for {movie.get('title', 'Unknown')} due to enhancement error")
 
         elapsed_time = time.time() - start_time
-        logger.info(f"Parallel enhancement completed in {elapsed_time:.2f} seconds")
+        logger.info(f"Sequential enhancement completed in {elapsed_time:.2f} seconds")
         return result_movies
+    
+    # Keeping this for backward compatibility, but it redirects to sequential processing
+    def enhance_movies_parallel(self, movies: List[Dict[str, Any]], max_workers: int = 3) -> List[Dict[str, Any]]:
+        """
+        Legacy method - now redirects to sequential processing to avoid race conditions.
+        
+        Args:
+            movies: List of movie dictionaries to enhance
+            max_workers: No longer used
+
+        Returns:
+            List of enhanced movie dictionaries
+        """
+        logger.warning("enhance_movies_parallel is deprecated - using sequential processing instead")
+        return self.enhance_movies_sequential(movies)
 
     def _make_request(self, endpoint: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """

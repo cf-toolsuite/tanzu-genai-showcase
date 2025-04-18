@@ -457,6 +457,17 @@ class MovieCrewManager:
         theaters_by_movie_id = {}
         theaters_by_movie_title = {}
 
+        # Debug log the theaters data for inspection
+        theater_with_movie_ids = []
+        if theaters_data:
+            for idx, theater in enumerate(theaters_data[:3]):  # Log first 3 for brevity
+                if isinstance(theater, dict):
+                    movie_id = theater.get("movie_id")
+                    movie_title = theater.get("movie_title")
+                    theater_with_movie_ids.append(f"{theater.get('name', 'Unknown')}: movie_id={movie_id}, movie_title={movie_title}")
+            
+            logger.info(f"Theater data sample: {theater_with_movie_ids}")
+
         # First pass: Process theater data and organize by both movie ID and title
         for theater in theaters_data:
             if not isinstance(theater, dict):
@@ -489,9 +500,10 @@ class MovieCrewManager:
 
             # Add to ID-based lookup if we have a movie_id
             if movie_id is not None:
-                if movie_id not in theaters_by_movie_id:
-                    theaters_by_movie_id[movie_id] = []
-                theaters_by_movie_id[movie_id].append(theater)
+                movie_id_str = str(movie_id)  # Convert to string for consistent lookup
+                if movie_id_str not in theaters_by_movie_id:
+                    theaters_by_movie_id[movie_id_str] = []
+                theaters_by_movie_id[movie_id_str].append(theater)
                 logger.info(f"Added theater '{theater.get('name')}' with {len(theater.get('showtimes', []))} showtimes to movie_id {movie_id}")
 
             # Also add to title-based lookup for backup matching
@@ -501,6 +513,12 @@ class MovieCrewManager:
                 theaters_by_movie_title[movie_title].append(theater)
                 logger.info(f"Added theater '{theater.get('name')}' with {len(theater.get('showtimes', []))} showtimes to movie '{movie_title}'")
 
+        # Debug log all IDs in theaters data vs. recommendations
+        theater_movie_ids = set(str(t.get("movie_id")) for t in theaters_data if isinstance(t, dict) and t.get("movie_id") is not None)
+        recommendation_ids = set(str(m.get("tmdb_id") or m.get("id", "")) for m in recommendations if isinstance(m, dict))
+        logger.info(f"Theater movie IDs found: {theater_movie_ids}")
+        logger.info(f"Recommendation movie IDs: {recommendation_ids}")
+        
         # Log theater distribution for debugging
         for movie_id, theaters in theaters_by_movie_id.items():
             logger.info(f"Movie ID {movie_id} has {len(theaters)} theaters with showtimes")
@@ -525,11 +543,23 @@ class MovieCrewManager:
             movie_title = movie.get("title")
             movie_theaters = []
 
-            # First try to get theaters by movie ID
+            # First try to get theaters by movie ID (ensure string comparisons)
             if movie_tmdb_id is not None:
-                movie_theaters = theaters_by_movie_id.get(movie_tmdb_id, [])
+                movie_id_str = str(movie_tmdb_id)
+                movie_theaters = theaters_by_movie_id.get(movie_id_str, [])
                 if movie_theaters:
                     logger.info(f"Found {len(movie_theaters)} theaters for movie ID {movie_tmdb_id}")
+                else:
+                    # Try looking up by integer movie ID if string matching failed
+                    # This handles cases where IDs might be stored as integers in one place and strings in another
+                    for id_key, theaters in theaters_by_movie_id.items():
+                        try:
+                            if int(id_key) == int(movie_tmdb_id):
+                                movie_theaters = theaters
+                                logger.info(f"Found {len(theaters)} theaters for movie ID {movie_tmdb_id} using integer comparison")
+                                break
+                        except (ValueError, TypeError):
+                            continue
             
             # If no theaters found by ID, try matching by title
             if not movie_theaters and movie_title:
@@ -546,12 +576,17 @@ class MovieCrewManager:
 
             # Log theater assignment results
             if movie_theaters:
-                logger.info(f"Movie '{movie.get('title')}' assigned {len(movie_theaters)} theaters with showtimes")
+                logger.info(f"Movie '{movie.get('title')}' (ID: {movie_tmdb_id}) assigned {len(movie_theaters)} theaters with showtimes")
             else:
-                logger.info(f"Movie '{movie.get('title')}' has no theaters with showtimes")
+                logger.info(f"Movie '{movie.get('title')}' (ID: {movie_tmdb_id}) has no theaters with showtimes")
 
             # Create movie with theaters
             movie_with_theaters = {**movie, "theaters": movie_theaters}
             movies_with_theaters.append(movie_with_theaters)
+
+            # Log the number of theaters assigned to this movie for clarity
+            theater_count = len(movie_theaters)
+            if theater_count > 0:
+                logger.info(f"Successfully assigned {theater_count} theaters to movie '{movie_title}' (ID: {movie_tmdb_id})")
 
         return movies_with_theaters

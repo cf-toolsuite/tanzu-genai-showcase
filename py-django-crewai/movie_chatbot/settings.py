@@ -171,6 +171,18 @@ API_MAX_RETRIES = int(os.getenv('API_MAX_RETRIES', '3'))
 # Exponential backoff factor between retries (in seconds)
 API_RETRY_BACKOFF_FACTOR = float(os.getenv('API_RETRY_BACKOFF_FACTOR', '0.5'))
 
+# SerpAPI Request Configuration
+# Base delay between theater requests for different movies (seconds)
+SERPAPI_REQUEST_BASE_DELAY = float(os.getenv('SERPAPI_REQUEST_BASE_DELAY', '8.0'))
+# Additional delay per movie processed (seconds)
+SERPAPI_PER_MOVIE_DELAY = float(os.getenv('SERPAPI_PER_MOVIE_DELAY', '3.0'))
+# Maximum retries for SerpAPI requests
+SERPAPI_MAX_RETRIES = int(os.getenv('SERPAPI_MAX_RETRIES', '3'))
+# Base delay for exponential backoff during retries (seconds)
+SERPAPI_BASE_RETRY_DELAY = float(os.getenv('SERPAPI_BASE_RETRY_DELAY', '5.0'))
+# Multiplier for exponential backoff during retries
+SERPAPI_RETRY_MULTIPLIER = float(os.getenv('SERPAPI_RETRY_MULTIPLIER', '2.0'))
+
 # Enhanced Logging Configuration
 LOGGING = {
     'version': 1,

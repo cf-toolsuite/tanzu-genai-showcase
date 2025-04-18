@@ -278,15 +278,22 @@ class FindTheatersTool(BaseTool):
 
                 # Add a variable delay between requests to avoid rate limiting (except for first request)
                 if index > 0:
+                    # Get configurable delay values from settings with defaults
+                    base_delay = getattr(settings, 'SERPAPI_REQUEST_BASE_DELAY', 8.0)
+                    per_movie_delay = getattr(settings, 'SERPAPI_PER_MOVIE_DELAY', 3.0)
+                    
                     # Increase delay for subsequent requests to prevent rate limiting
-                    delay_seconds = 5.0 + (index * 2.0)  # 5s base delay + 2s per movie processed
+                    delay_seconds = base_delay + (index * per_movie_delay)
                     logger.info(f"Throttling API requests - waiting {delay_seconds} seconds before next request")
                     time.sleep(delay_seconds)
 
                 # Try to get real showtimes via SerpAPI for this specific movie
                 try:
-                    # Add retry logic for getting showtimes
-                    max_retries = 2  # Maximum retries per movie
+                    # Get retry configuration from settings with defaults
+                    max_retries = getattr(settings, 'SERPAPI_MAX_RETRIES', 3)
+                    base_retry_delay = getattr(settings, 'SERPAPI_BASE_RETRY_DELAY', 5.0)
+                    retry_multiplier = getattr(settings, 'SERPAPI_RETRY_MULTIPLIER', 2.0)
+                    
                     retry_count = 0
                     movie_theaters_with_showtimes = None
                     
@@ -297,17 +304,30 @@ class FindTheatersTool(BaseTool):
                             
                             # If we got empty results but haven't exhausted retries
                             if not movie_theaters_with_showtimes and retry_count < max_retries:
-                                retry_delay = 7.0 + (retry_count * 3.0)  # Increasing backoff
-                                logger.info(f"No theaters found, retrying in {retry_delay} seconds (attempt {retry_count+1}/{max_retries+1})")
+                                # True exponential backoff: base_delay * (multiplier ^ retry_count)
+                                retry_delay = base_retry_delay * (retry_multiplier ** retry_count)
+                                logger.info(f"No theaters found, retrying in {retry_delay:.1f} seconds (attempt {retry_count+1}/{max_retries+1})")
                                 time.sleep(retry_delay)
                             
                             retry_count += 1
                         except Exception as retry_error:
-                            logger.error(f"Error in attempt {retry_count+1}: {str(retry_error)}")
+                            error_message = str(retry_error).lower()
+                            logger.error(f"Error in attempt {retry_count+1}: {error_message}")
+                            
+                            # Check specifically for rate limiting errors
+                            is_rate_limit = "rate" in error_message and ("limit" in error_message or "exceed" in error_message)
+                            
                             if retry_count < max_retries:
-                                retry_delay = 7.0 + (retry_count * 3.0)  # Increasing backoff
-                                logger.info(f"Error occurred, retrying in {retry_delay} seconds (attempt {retry_count+1}/{max_retries+1})")
+                                # Use longer delays for rate limit errors
+                                if is_rate_limit:
+                                    retry_delay = base_retry_delay * (retry_multiplier ** (retry_count + 1))  # Extra multiplier for rate limits
+                                    logger.warning(f"Rate limit detected, using extended delay of {retry_delay:.1f} seconds")
+                                else:
+                                    retry_delay = base_retry_delay * (retry_multiplier ** retry_count)
+                                
+                                logger.info(f"Error occurred, retrying in {retry_delay:.1f} seconds (attempt {retry_count+1}/{max_retries+1})")
                                 time.sleep(retry_delay)
+                            
                             retry_count += 1
                     
                     # If we found real showtimes for this movie after retries, use them

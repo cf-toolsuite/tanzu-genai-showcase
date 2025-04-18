@@ -1,6 +1,9 @@
 // Main application JavaScript for Movie Chatbot
 
 document.addEventListener('DOMContentLoaded', function() {
+    // Define the API URL
+    const SEND_MESSAGE_URL = '/send-message/';
+    
     // Main chat elements (First Run)
     const chatContainer = document.getElementById('chatContainer');
     const userInput = document.getElementById('userInput');
@@ -371,108 +374,93 @@ document.addEventListener('DOMContentLoaded', function() {
         const theatersContainer = document.getElementById('theatersContainer');
         theatersContainer.innerHTML = '';
 
-        // Get all theaters across all movies
-        const allTheaters = new Map();
+        // Ensure we have a selected movie
+        if (!window.selectedMovie) {
+            theatersContainer.innerHTML = `
+                <p class="text-center text-muted mt-3"><i class="bi bi-hand-index-thumb"></i> Click on a movie above to see available theaters and showtimes</p>
+            `;
+            return;
+        }
 
-        movies.forEach(movie => {
-            if (movie.theaters) {
-                // Debug the theaters data structure
-                console.log(`Processing theaters for ${movie.title}:`, movie.theaters);
+        // Get all theaters for the selected movie only
+        const movie = window.selectedMovie;
+        
+        // Debug the selected movie data
+        console.log(`Processing theaters for selected movie: ${movie.title}`, movie);
+        
+        if (!movie.theaters || movie.theaters.length === 0) {
+            theatersContainer.innerHTML = `
+                <p class="text-muted">No theaters are currently showing "${movie.title}". Please check back later or select a different movie.</p>
+            `;
+            return;
+        }
 
-                movie.theaters.forEach(theater => {
-                    // If theater not in map yet, add it
-                    if (!allTheaters.has(theater.name)) {
-                        allTheaters.set(theater.name, {
-                            name: theater.name,
-                            address: theater.address,
-                            distance_miles: theater.distance_miles || 5.0, // Default if distance not available
-                            movies: {}
-                        });
-                    }
+        // Map to hold theaters with showtimes for the selected date
+        const theatersByName = new Map();
+        
+        // Get today's date and the selected date
+        const today = new Date();
+        const selectedDate = new Date(today);
+        selectedDate.setDate(today.getDate() + dateIndex);
+        const selectedDateStr = selectedDate.toISOString().split('T')[0];
+        
+        console.log(`Filtering showtimes for date: ${selectedDateStr}`);
 
-                    // Add movie and its showtimes to this theater
-                    const theaterEntry = allTheaters.get(theater.name);
-
-                    // Check if the theater has showtimes array (new structure) or direct showtime data (old structure)
-                    let showtimesToProcess = [];
-                    if (Array.isArray(theater.showtimes)) {
-                        showtimesToProcess = theater.showtimes;
-                    } else if (theater.start_time) {
-                        // Legacy format - single showtime directly on theater object
-                        showtimesToProcess = [{
-                            start_time: theater.start_time,
-                            format: theater.format || 'Standard'
-                        }];
-                    }
-
-                    // Only process if we have showtimes to work with
-                    if (showtimesToProcess.length > 0) {
-                        // Group showtimes by format (Standard, IMAX, 3D, etc.)
-                        const showtimesByFormat = {};
-
-                        showtimesToProcess.forEach(showtime => {
-                            const format = showtime.format || 'Standard';
-                            if (!showtimesByFormat[format]) {
-                                showtimesByFormat[format] = [];
-                            }
-
-                            // Add showtime to appropriate format
-                            if (showtime.start_time) {
-                                showtimesByFormat[format].push(showtime.start_time);
-                            }
-                        });
-
-                        // Only add to theater's movies if we have actual showtimes
-                        if (Object.keys(showtimesByFormat).length > 0) {
-                            // Add to theater's movies
-                            theaterEntry.movies[movie.title] = {
-                                id: movie.tmdb_id,
-                                title: movie.title,
-                                showtimesByFormat: showtimesByFormat
-                            };
-                        }
-                    }
+        // Process each theater for the selected movie
+        movie.theaters.forEach(theater => {
+            if (!theater.name || !theater.showtimes || !Array.isArray(theater.showtimes)) {
+                return; // Skip invalid theaters
+            }
+            
+            // Filter showtimes for the selected date
+            const showtimesForDate = theater.showtimes.filter(showtime => {
+                if (!showtime.start_time) return false;
+                const date = new Date(showtime.start_time);
+                return date.toISOString().split('T')[0] === selectedDateStr;
+            });
+            
+            if (showtimesForDate.length === 0) {
+                return; // Skip theaters with no showtimes on selected date
+            }
+            
+            // Create or get theater entry
+            if (!theatersByName.has(theater.name)) {
+                theatersByName.set(theater.name, {
+                    name: theater.name,
+                    address: theater.address || '',
+                    distance_miles: theater.distance_miles || 0,
+                    showtimesByFormat: {}
                 });
             }
-        });
-
-        // Filter and sort theaters by distance
-        const sortedTheaters = Array.from(allTheaters.values())
-            .sort((a, b) => (a.distance_miles || 0) - (b.distance_miles || 0));
-
-        // Filter theaters to only include those with showtimes for the selected date
-        const theatersWithShowtimesForDate = sortedTheaters.filter(theater => {
-            // Check if this theater has any showtimes for the selected date
-            const today = new Date();
-            const selectedDate = new Date(today);
-            selectedDate.setDate(today.getDate() + dateIndex);
-            const selectedDateStr = selectedDate.toISOString().split('T')[0];
-
-            // Look through all movies at this theater
-            for (const movie of Object.values(theater.movies)) {
-                // Look through all formats for this movie
-                for (const [format, times] of Object.entries(movie.showtimesByFormat)) {
-                    // Filter times for the selected date
-                    const timesForDate = times.filter(timeStr => {
-                        const date = new Date(timeStr);
-                        return date.toISOString().split('T')[0] === selectedDateStr;
-                    });
-
-                    // If we found any showtimes for this date, include the theater
-                    if (timesForDate.length > 0) {
-                        return true;
-                    }
+            
+            const theaterEntry = theatersByName.get(theater.name);
+            
+            // Group showtimes by format
+            showtimesForDate.forEach(showtime => {
+                const format = showtime.format || 'Standard';
+                if (!theaterEntry.showtimesByFormat[format]) {
+                    theaterEntry.showtimesByFormat[format] = [];
                 }
-            }
-
-            // No showtimes found for this date at this theater
-            return false;
+                theaterEntry.showtimesByFormat[format].push(showtime.start_time);
+            });
         });
+        
+        // Convert to array and sort by distance
+        const theatersArray = Array.from(theatersByName.values())
+            .sort((a, b) => (a.distance_miles || 0) - (b.distance_miles || 0));
+        
+        console.log(`Found ${theatersArray.length} theaters with showtimes for ${movie.title} on the selected date`);
 
-        console.log(`Found ${theatersWithShowtimesForDate.length} theaters with showtimes for selected date`);
+        // If no theaters found for the selected date
+        if (theatersArray.length === 0) {
+            theatersContainer.innerHTML = `
+                <p class="text-muted">No theaters are showing "${movie.title}" on this date.</p>
+            `;
+            return;
+        }
 
-        // Display each theater that has showtimes for the selected date
-        theatersWithShowtimesForDate.forEach(theater => {
+        // Display each theater with showtimes
+        theatersArray.forEach(theater => {
             const theaterSection = document.createElement('div');
             theaterSection.className = 'theater-section mb-3';
 
@@ -496,62 +484,40 @@ document.addEventListener('DOMContentLoaded', function() {
             const theaterBody = document.createElement('div');
             theaterBody.className = 'theater-body';
 
-            // For each movie at this theater
-            Object.values(theater.movies).forEach(movie => {
-                // Remove the movie title - user already knows which movie they selected
+            // For each format (Standard, IMAX, etc.)
+            Object.entries(theater.showtimesByFormat).forEach(([format, times]) => {
+                const formatDiv = document.createElement('div');
+                formatDiv.className = 'mb-3';
+                formatDiv.innerHTML = `<div class="small text-muted mb-1">${format}</div>`;
 
-                // For each format (Standard, IMAX, etc)
-                Object.entries(movie.showtimesByFormat).forEach(([format, times]) => {
-                    // Filter showtimes for the selected date
-                    const today = new Date();
-                    const selectedDate = new Date(today);
-                    selectedDate.setDate(today.getDate() + dateIndex);
+                const showtimesDiv = document.createElement('div');
+                showtimesDiv.className = 'showtimes-scroll-container';
 
-                    // Format date for comparison (YYYY-MM-DD)
-                    const selectedDateStr = selectedDate.toISOString().split('T')[0];
+                // Sort and format times
+                times
+                    .map(timeStr => new Date(timeStr))
+                    .sort((a, b) => a - b) // Sort chronologically
+                    .forEach(date => {
+                        // Format as 24-hour time (HH:MM)
+                        const timeStr = date.toLocaleTimeString([], {
+                            hour: '2-digit',
+                            minute: '2-digit',
+                            hour12: false
+                        });
 
-                    // Filter times for the selected date
-                    const timesForDate = times.filter(timeStr => {
-                        const date = new Date(timeStr);
-                        return date.toISOString().split('T')[0] === selectedDateStr;
+                        // Create showtime badge with appropriate class based on format
+                        const badgeClass = format.toLowerCase().includes('imax') ? 'imax' :
+                                          format.toLowerCase().includes('3d') ? 'threed' : '';
+
+                        const badge = document.createElement('span');
+                        badge.className = `showtime-badge ${badgeClass}`;
+                        badge.textContent = timeStr;
+
+                        showtimesDiv.appendChild(badge);
                     });
 
-                    // Only display if there are times for this date
-                    if (timesForDate.length > 0) {
-                        const formatDiv = document.createElement('div');
-                        formatDiv.className = 'mb-3';
-                        formatDiv.innerHTML = `<div class="small text-muted mb-1">${format}</div>`;
-
-                        const showtimesDiv = document.createElement('div');
-                        showtimesDiv.className = 'showtimes-scroll-container';
-
-                        // Sort and format times
-                        timesForDate
-                            .map(timeStr => new Date(timeStr))
-                            .sort((a, b) => a - b) // Sort chronologically
-                            .forEach(date => {
-                                // Format as 24-hour time (HH:MM)
-                                const timeStr = date.toLocaleTimeString([], {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    hour12: false
-                                });
-
-                                // Create showtime badge with appropriate class based on format
-                                const badgeClass = format.toLowerCase().includes('imax') ? 'imax' :
-                                                  format.toLowerCase().includes('3d') ? 'threed' : '';
-
-                                const badge = document.createElement('span');
-                                badge.className = `showtime-badge ${badgeClass}`;
-                                badge.textContent = timeStr;
-
-                                showtimesDiv.appendChild(badge);
-                            });
-
-                        formatDiv.appendChild(showtimesDiv);
-                        theaterBody.appendChild(formatDiv);
-                    }
-                });
+                formatDiv.appendChild(showtimesDiv);
+                theaterBody.appendChild(formatDiv);
             });
 
             // Add header and body to section
@@ -561,13 +527,6 @@ document.addEventListener('DOMContentLoaded', function() {
             // Add to container
             theatersContainer.appendChild(theaterSection);
         });
-
-        // If no theaters have showtimes for the selected date
-        if (theatersWithShowtimesForDate.length === 0) {
-            theatersContainer.innerHTML = `
-                <p class="text-muted">No theaters are showing the recommended movies on this date.</p>
-            `;
-        }
     }
 
     // Handle movie card clicks
@@ -588,61 +547,81 @@ document.addEventListener('DOMContentLoaded', function() {
         window.selectedMovieId = movieId;
         window.selectedMovieTitle = movieTitle;
 
-        // Get all movies including ones without theaters
-        const allMovies = window.currentMovies || [];
-
-        // First, check if this movie has theaters
-        let selectedMovie = null;
-
-        // Look through all movies for this specific movie
-        for (const movie of allMovies) {
-            if (movie.id == movieId || movie.tmdb_id == movieId) {
-                selectedMovie = movie;
-                // Store the complete movie object for reference in other functions
-                window.selectedMovie = movie;
-                break;
-            }
+        // Get the selected movie from the current movies
+        const selectedMovie = window.currentMovies.find(movie => movie.id == movieId || movie.tmdb_id == movieId);
+        
+        if (!selectedMovie) {
+            console.error(`Movie with ID ${movieId} not found in current movies`);
+            return;
         }
-
-        // If movie found but has no theaters or empty theaters array, show appropriate message
-        if (!selectedMovie || !selectedMovie.theaters || selectedMovie.theaters.length === 0) {
-            // Hide date tabs since there are no showtimes to display
-            const dateTabs = document.getElementById('dateTabs');
-            if (dateTabs) {
-                dateTabs.style.display = 'none';
-            }
-
-            // Show a message that no theaters are available
+        
+        // Store the selected movie
+        window.selectedMovie = selectedMovie;
+        
+        // Check if the movie has theaters
+        if (!selectedMovie.theaters || selectedMovie.theaters.length === 0) {
+            // No theaters available for this movie
             const theatersContainer = document.getElementById('theatersContainer');
             theatersContainer.innerHTML = `
                 <p class="text-muted">No theaters are currently showing "${movieTitle}". Please check back later or select a different movie.</p>
             `;
+            
+            // Hide date tabs
+            const dateTabs = document.getElementById('dateTabs');
+            if (dateTabs) {
+                dateTabs.style.display = 'none';
+            }
             return;
         }
-
-        // If we get here, the movie has theaters, so show date tabs
+        
+        // Show date tabs for the selected movie
         const dateTabs = document.getElementById('dateTabs');
         if (dateTabs) {
-            dateTabs.style.display = 'flex';
+            // Generate date tabs for current day + 3 more days (4 total)
+            dateTabs.innerHTML = '';
+            const today = new Date();
 
-            // Automatically select the first date tab (Today)
-            const firstDateTab = document.querySelector('.date-tab');
-            if (firstDateTab) {
-                // Remove active class from all tabs
-                document.querySelectorAll('.date-tab').forEach(btn => {
-                    btn.classList.remove('active');
+            for (let i = 0; i < 4; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+
+                // Format day name and date
+                const dayName = i === 0 ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' });
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+
+                // Create tab button
+                const tabButton = document.createElement('button');
+                tabButton.type = 'button';
+                tabButton.className = `date-tab ${i === 0 ? 'active' : ''}`;
+                tabButton.setAttribute('data-date-index', i);
+                tabButton.innerHTML = `
+                    <div class="small">${dayName}</div>
+                    <div>${dateStr}</div>
+                `;
+
+                // Add click handler to switch date
+                tabButton.addEventListener('click', function() {
+                    // Remove active class from all tabs
+                    document.querySelectorAll('.date-tab').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
+
+                    // Add active class to clicked tab
+                    this.classList.add('active');
+
+                    // Update showtimes display for this date
+                    displayShowtimesForDate([window.selectedMovie], parseInt(this.getAttribute('data-date-index')));
                 });
 
-                // Add active class to first tab
-                firstDateTab.classList.add('active');
+                dateTabs.appendChild(tabButton);
             }
+            
+            // Show date tabs
+            dateTabs.style.display = 'flex';
         }
-
-        // Filter to just this movie for displaying showtimes
-        const filteredMovies = [selectedMovie];
-
+        
         // Display theaters for the selected movie and first date (Today)
-        displayShowtimesForDate(filteredMovies, 0);
+        displayShowtimesForDate([selectedMovie], 0);
     };
 
     // Get CSRF token for AJAX request
