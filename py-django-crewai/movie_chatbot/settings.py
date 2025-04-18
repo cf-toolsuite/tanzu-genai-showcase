@@ -156,6 +156,10 @@ MOVIE_RESULTS_LIMIT = int(os.getenv('MOVIE_RESULTS_LIMIT', '5'))
 MAX_RECOMMENDATIONS = int(os.getenv('MAX_RECOMMENDATIONS', '3'))
 # Radius in miles to search for theaters
 THEATER_SEARCH_RADIUS_MILES = int(os.getenv('THEATER_SEARCH_RADIUS_MILES', '15'))
+# Maximum showtimes per theater to limit data size
+MAX_SHOWTIMES_PER_THEATER = int(os.getenv('MAX_SHOWTIMES_PER_THEATER', '10'))
+# Maximum theaters to return in total
+MAX_THEATERS = int(os.getenv('MAX_THEATERS', '5'))
 # Default starting year for historical movie searches ("before X" queries)
 DEFAULT_SEARCH_START_YEAR = int(os.getenv('DEFAULT_SEARCH_START_YEAR', '1900'))
 

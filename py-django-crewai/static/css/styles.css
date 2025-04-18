@@ -55,9 +55,16 @@ body {
     border-bottom-color: var(--red-carpet-red);
 }
 
+/* Content container to balance layout */
+.content-wrapper {
+    display: flex;
+    flex-direction: column;
+    min-height: 80vh;
+}
+
 /* Chatbot styling */
 .chat-container {
-    height: 60vh;
+    height: 50vh;
     overflow-y: auto;
     border: 1px solid var(--red-carpet-gray);
     border-radius: 0.5rem;
@@ -65,6 +72,7 @@ body {
     padding: 1rem;
     scrollbar-width: thin;
     scrollbar-color: var(--red-carpet-light-gray) var(--red-carpet-dark);
+    margin-bottom: 1rem;
 }
 
 .chat-container::-webkit-scrollbar {
@@ -285,15 +293,16 @@ body {
 /* Theater and showtime styling */
 #theatersContainer {
     position: relative;
-    height: 300px; /* Fixed height for scrollable area */
+    max-height: 350px; /* Set maximum height for scrollable area */
+    height: auto; /* Allow container to adjust based on content up to max-height */
     overflow-y: auto; /* Enable vertical scrolling */
     scrollbar-width: thin;
     scrollbar-color: var(--red-carpet-light-gray) var(--red-carpet-dark);
     padding-right: 5px; /* Add padding for scrollbar */
-    margin-bottom: 10px; /* Add small margin to separate from chat input */
+    margin-bottom: 15px; /* Add margin to separate from chat input */
     scroll-behavior: smooth; /* Smooth scrolling */
-    border: none; /* Remove border */
-    background-color: transparent; /* Remove background */
+    border: none; /* No border as per user request */
+    background-color: transparent; /* Transparent background as per user request */
 }
 
 #theatersContainer::-webkit-scrollbar {
@@ -331,23 +340,23 @@ body {
     padding: 1rem;
 }
 
-/* Calculate specific heights for different screen sizes */
+/* Adjust max-height for different screen sizes */
 @media (max-height: 900px) {
     #theatersContainer {
-        height: calc(100vh - 380px);
+        max-height: calc(100vh - 380px);
     }
 }
 
 @media (max-height: 700px) {
     #theatersContainer {
-        height: calc(100vh - 360px);
+        max-height: calc(100vh - 360px);
     }
 }
 
 /* Add additional rule for very large screens */
 @media (min-height: 1000px) {
     #theatersContainer {
-        height: calc(100vh - 420px);
+        max-height: calc(100vh - 420px);
     }
 }
 

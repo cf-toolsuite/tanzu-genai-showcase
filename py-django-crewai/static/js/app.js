@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     // Theater elements
     const dateTabs = document.getElementById('dateTabs');
     const theatersContainer = document.getElementById('theatersContainer');
+    const showtimesSection = document.getElementById('showtimesSection');
 
     // Initially hide date tabs until a movie is selected
     if (dateTabs) {
@@ -143,7 +144,7 @@ document.addEventListener('DOMContentLoaded', function() {
             if (location) {
                 requestData.location = location;
             }
-            
+
             // Add timezone information if available (for showtime conversions)
             if (window.userTimezone) {
                 requestData.timezone = window.userTimezone;
@@ -277,6 +278,7 @@ document.addEventListener('DOMContentLoaded', function() {
     window.updateShowtimesSection = function(movies) {
         const theatersContainer = document.getElementById('theatersContainer');
         const dateTabsContainer = document.getElementById('dateTabs');
+        const showtimesSection = document.getElementById('showtimesSection');
 
         // Count how many movies are current releases
         const currentReleaseCount = movies.filter(movie => movie.is_current_release === true).length;
@@ -301,60 +303,67 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(`Current release movies: ${currentReleaseCount}`);
         console.log(`Movies with theaters: ${moviesWithTheatersCount}`);
 
-        // If no current movies with theaters, show appropriate message
+        // Initially hide date tabs
+        dateTabsContainer.style.display = 'none';
+        
         if (currentMovies.length === 0) {
+            // If no current movies with theaters, show appropriate message
             if (currentReleaseCount === 0) {
                 theatersContainer.innerHTML = '<p class="text-muted">No current release movies found. Try searching for movies currently playing in theaters.</p>';
             } else {
                 theatersContainer.innerHTML = '<p class="text-muted">No theaters near you are currently showing the recommended movies.</p>';
             }
             dateTabsContainer.innerHTML = '';
-            return;
-        }
+        } else {
+            // Show instruction message to select a movie first
+            theatersContainer.innerHTML = '<p class="text-center text-muted mt-3"><i class="bi bi-hand-index-thumb"></i> Click on a movie above to see available theaters and showtimes</p>';
+            
+            // Generate date tabs for current day + 3 more days (4 total)
+            dateTabsContainer.innerHTML = '';
+            const dates = [];
+            const today = new Date();
 
-        // Generate date tabs for current day + 3 more days (4 total)
-        dateTabsContainer.innerHTML = '';
-        const dates = [];
-        const today = new Date();
+            for (let i = 0; i < 4; i++) {
+                const date = new Date(today);
+                date.setDate(today.getDate() + i);
+                dates.push(date);
 
-        for (let i = 0; i < 4; i++) {
-            const date = new Date(today);
-            date.setDate(today.getDate() + i);
-            dates.push(date);
+                // Format day name and date
+                const dayName = i === 0 ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' });
+                const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-            // Format day name and date
-            const dayName = i === 0 ? 'Today' : date.toLocaleDateString('en-US', { weekday: 'short' });
-            const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                // Create tab button
+                const tabButton = document.createElement('button');
+                tabButton.type = 'button';
+                tabButton.className = `date-tab ${i === 0 ? 'active' : ''}`;
+                tabButton.setAttribute('data-date-index', i);
+                tabButton.innerHTML = `
+                    <div class="small">${dayName}</div>
+                    <div>${dateStr}</div>
+                `;
 
-            // Create tab button
-            const tabButton = document.createElement('button');
-            tabButton.type = 'button';
-            tabButton.className = `date-tab ${i === 0 ? 'active' : ''}`;
-            tabButton.setAttribute('data-date-index', i);
-            tabButton.innerHTML = `
-                <div class="small">${dayName}</div>
-                <div>${dateStr}</div>
-            `;
+                // Add click handler to switch date
+                tabButton.addEventListener('click', function() {
+                    // Remove active class from all tabs
+                    document.querySelectorAll('.date-tab').forEach(btn => {
+                        btn.classList.remove('active');
+                    });
 
-            // Add click handler to switch date
-            tabButton.addEventListener('click', function() {
-                // Remove active class from all tabs
-                document.querySelectorAll('.date-tab').forEach(btn => {
-                    btn.classList.remove('active');
+                    // Add active class to clicked tab
+                    this.classList.add('active');
+
+                    // Update showtimes display for this date
+                    displayShowtimesForDate([window.selectedMovie], parseInt(this.getAttribute('data-date-index')));
                 });
 
-                // Add active class to clicked tab
-                this.classList.add('active');
-
-                // Update showtimes display for this date
-                displayShowtimesForDate(currentMovies, parseInt(this.getAttribute('data-date-index')));
-            });
-
-            dateTabsContainer.appendChild(tabButton);
+                dateTabsContainer.appendChild(tabButton);
+            }
+            
+            // Ensure we're not showing any theaters until a movie is selected
+            if (!window.selectedMovieId) {
+                theatersContainer.innerHTML = '<p class="text-center text-muted mt-3"><i class="bi bi-hand-index-thumb"></i> Click on a movie above to see available theaters and showtimes</p>';
+            }
         }
-
-        // Display showtimes for today (index 0) initially
-        displayShowtimesForDate(currentMovies, 0);
     }
 
     // Display showtimes for a specific date
@@ -438,7 +447,7 @@ document.addEventListener('DOMContentLoaded', function() {
             const selectedDate = new Date(today);
             selectedDate.setDate(today.getDate() + dateIndex);
             const selectedDateStr = selectedDate.toISOString().split('T')[0];
-            
+
             // Look through all movies at this theater
             for (const movie of Object.values(theater.movies)) {
                 // Look through all formats for this movie
@@ -448,20 +457,20 @@ document.addEventListener('DOMContentLoaded', function() {
                         const date = new Date(timeStr);
                         return date.toISOString().split('T')[0] === selectedDateStr;
                     });
-                    
+
                     // If we found any showtimes for this date, include the theater
                     if (timesForDate.length > 0) {
                         return true;
                     }
                 }
             }
-            
+
             // No showtimes found for this date at this theater
             return false;
         });
-        
+
         console.log(`Found ${theatersWithShowtimesForDate.length} theaters with showtimes for selected date`);
-        
+
         // Display each theater that has showtimes for the selected date
         theatersWithShowtimesForDate.forEach(theater => {
             const theaterSection = document.createElement('div');
@@ -575,7 +584,7 @@ document.addEventListener('DOMContentLoaded', function() {
             card.classList.add('selected');
         });
 
-        // Store the selected movie ID
+        // Store the selected movie ID and title
         window.selectedMovieId = movieId;
         window.selectedMovieTitle = movieTitle;
 
@@ -589,6 +598,8 @@ document.addEventListener('DOMContentLoaded', function() {
         for (const movie of allMovies) {
             if (movie.id == movieId || movie.tmdb_id == movieId) {
                 selectedMovie = movie;
+                // Store the complete movie object for reference in other functions
+                window.selectedMovie = movie;
                 break;
             }
         }

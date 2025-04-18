@@ -50,79 +50,78 @@
             <div class="tab-pane fade show active" id="first-run" role="tabpanel" aria-labelledby="first-run-tab">
                 <div class="row">
                     <div class="col-lg-8">
-                <!-- Location input removed from here -->
-
-                <div class="chat-container" id="chatContainer">
-                    {% for message in first_run_messages %}
-                        <div class="message {% if message.sender == 'user' %}user-message{% else %}bot-message{% endif %}">
-                            {{ message.content }}
-                        </div>
-                        <span class="message-time {% if message.sender == 'user' %}text-end{% endif %}">
-                            {{ message.created_at|date:"g:i A" }}
-                        </span>
-                    {% endfor %}
-                    <!-- This script applies formatting to initial messages for First Run tab -->
-                    <script>
-                        document.addEventListener('DOMContentLoaded', function() {
-                            // Format all bot messages already in the chat
-                            formatMessagesInContainer('chatContainer');
-                        });
-                    </script>
-                </div>
-
-                        <div class="processing-container" id="processingContainer">
-                            <div class="progress mb-2">
-                                <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                        <!-- Content wrapper for chat and input -->
+                        <div class="content-wrapper">
+                            <div class="chat-container" id="chatContainer">
+                                {% for message in first_run_messages %}
+                                    <div class="message {% if message.sender == 'user' %}user-message{% else %}bot-message{% endif %}">
+                                        {{ message.content }}
+                                    </div>
+                                    <span class="message-time {% if message.sender == 'user' %}text-end{% endif %}">
+                                        {{ message.created_at|date:"g:i A" }}
+                                    </span>
+                                {% endfor %}
+                                <!-- This script applies formatting to initial messages for First Run tab -->
+                                <script>
+                                    document.addEventListener('DOMContentLoaded', function() {
+                                        // Format all bot messages already in the chat
+                                        formatMessagesInContainer('chatContainer');
+                                    });
+                                </script>
                             </div>
-                            <div class="text-center text-muted" id="processingMessage">Processing your request...</div>
-                        </div>
 
-                        <div class="input-group">
-                            <input type="text" id="userInput" class="form-control" placeholder="Ask me about movies in theaters..." autocomplete="off">
-                            <button class="btn btn-red-carpet" id="sendButton">
-                                <i class="bi bi-send-fill"></i>
-                            </button>
-                        </div>
-
-                        <div class="mt-3 d-flex justify-content-between align-items-center">
-                            <div class="sample-buttons">
-                                <button class="btn btn-sample" onclick="sendSampleQuestion('Show me action movies playing this weekend')">Action</button>
-                                <button class="btn btn-sample" onclick="sendSampleQuestion('What is a good comedy for a group night out this weekend')">Comedy</button>
-                                <button class="btn btn-sample" onclick="sendSampleQuestion('What thought-provoking documentary should I not miss this weekend?')">Documentary</button>
-                                <button class="btn btn-sample d-none d-md-inline-block" onclick="sendSampleQuestion('I want to see a family movie with my kids')">Family</button>
-                                <button class="btn btn-sample d-none d-lg-inline-block" onclick="sendSampleQuestion('I love time travel - any sci-fi movies with that playing now?')">Science Fiction</button>
+                            <div class="processing-container" id="processingContainer">
+                                <div class="progress mb-2">
+                                    <div id="progressBar" class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+                                </div>
+                                <div class="text-center text-muted" id="processingMessage">Processing your request...</div>
                             </div>
-                            <div class="location-container">
-                                <div class="input-group location-input-group">
-                                    <span class="input-group-text"><i class="bi bi-geo-alt-fill"></i></span>
-                                    <input type="text" id="locationInput" class="form-control" placeholder="Location..." autocomplete="off">
+
+                            <div class="input-group">
+                                <input type="text" id="userInput" class="form-control" placeholder="Ask me about movies in theaters..." autocomplete="off">
+                                <button class="btn btn-red-carpet" id="sendButton">
+                                    <i class="bi bi-send-fill"></i>
+                                </button>
+                            </div>
+
+                            <div class="mt-3 d-flex justify-content-between align-items-center">
+                                <div class="sample-buttons">
+                                    <button class="btn btn-sample" onclick="sendSampleQuestion('Show me action movies playing this weekend')">Action</button>
+                                    <button class="btn btn-sample" onclick="sendSampleQuestion('What is a good comedy for a group night out this weekend')">Comedy</button>
+                                    <button class="btn btn-sample" onclick="sendSampleQuestion('What thought-provoking documentary should I not miss this weekend?')">Documentary</button>
+                                    <button class="btn btn-sample d-none d-md-inline-block" onclick="sendSampleQuestion('I want to see a family movie with my kids')">Family</button>
+                                    <button class="btn btn-sample d-none d-lg-inline-block" onclick="sendSampleQuestion('I love time travel - any sci-fi movies with that playing now?')">Science Fiction</button>
+                                </div>
+                                <div class="location-container">
+                                    <div class="input-group location-input-group">
+                                        <span class="input-group-text"><i class="bi bi-geo-alt-fill"></i></span>
+                                        <input type="text" id="locationInput" class="form-control" placeholder="Location..." autocomplete="off">
+                                    </div>
                                 </div>
                             </div>
                         </div>
-
-            <!-- Location field moved out of header section -->
-            <div class="col-md-4 text-end">
-            </div>
-
                     </div>
 
                     <div class="col-lg-4 mt-4 mt-lg-0">
-                        <h4 class="mb-3">Now Playing</h4>
+                        <!-- Content wrapper for movie selections and theaters -->
+                        <div class="content-wrapper">
+                            <h4 class="mb-3">Now Playing</h4>
 
-                        <div id="movieGridContainer" class="movie-container">
-                            <!-- Movie cards will be inserted here by JavaScript -->
-                        </div>
-
-                        <!-- Theaters and Showtimes Section -->
-                        <div id="showtimesSection" class="mt-4">
-                            <h4 class="mb-3">Nearby Theaters</h4>
-
-                            <div class="date-tabs" id="dateTabs">
-                                <!-- Date tabs will be dynamically generated -->
+                            <div id="movieGridContainer" class="movie-container">
+                                <!-- Movie cards will be inserted here by JavaScript -->
                             </div>
 
-                            <div id="theatersContainer">
-                                <!-- Theater and showtime data will be inserted here -->
+                            <!-- Theaters and Showtimes Section -->
+                            <div id="showtimesSection" class="mt-4">
+                                <h4 class="mb-3">Nearby Theaters</h4>
+
+                                <div class="date-tabs" id="dateTabs">
+                                    <!-- Date tabs will be dynamically generated -->
+                                </div>
+
+                                <div id="theatersContainer">
+                                    <!-- Theater and showtime data will be inserted here -->
+                                </div>
                             </div>
                         </div>
                     </div>

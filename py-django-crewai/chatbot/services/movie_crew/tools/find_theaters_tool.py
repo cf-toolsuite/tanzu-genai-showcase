@@ -84,14 +84,24 @@ class FindTheatersTool(BaseTool):
         formatted_theaters = []
 
         try:
-            # Get the maximum search radius from Django settings
+            # Get configuration from Django settings
             try:
                 from django.conf import settings
+                # Get maximum search radius
                 max_radius_miles = getattr(settings, 'THEATER_SEARCH_RADIUS_MILES', 15)
-                logger.info(f"Using maximum theater search radius: {max_radius_miles} miles")
+                # Get maximum showtimes per theater (to limit data size)
+                max_showtimes_per_theater = getattr(settings, 'MAX_SHOWTIMES_PER_THEATER', 20)
+                # Get maximum theaters to return
+                max_theaters = getattr(settings, 'MAX_THEATERS', 10)
+                
+                logger.info(f"Using configuration: max radius={max_radius_miles} miles, "
+                           f"max showtimes={max_showtimes_per_theater} per theater, "
+                           f"max theaters={max_theaters}")
             except Exception as e:
-                logger.warning(f"Could not get THEATER_SEARCH_RADIUS_MILES from settings: {str(e)}")
+                logger.warning(f"Could not get theater settings: {str(e)}")
                 max_radius_miles = 15  # Default to 15 miles
+                max_showtimes_per_theater = 20  # Default to 20 showtimes per theater
+                max_theaters = 10  # Default to 10 theaters
 
             logger.info(f"Formatting {len(serp_theaters)} theaters with showtimes for '{movie_title}' (ID: {movie_id})")
 
@@ -149,7 +159,8 @@ class FindTheatersTool(BaseTool):
                 logger.info(f"Found {len(showtimes)} showtimes for {theater_name}")
 
                 valid_showtimes = 0
-                for showtime in showtimes:
+                # Limit the number of showtimes per theater to reduce JSON size
+                for showtime in showtimes[:max_showtimes_per_theater]:
                     # Ensure we have a start time
                     if 'start_time' in showtime:
                         valid_showtimes += 1
@@ -161,7 +172,7 @@ class FindTheatersTool(BaseTool):
                             "format": format_type
                         })
 
-                logger.info(f"Processed {valid_showtimes} valid showtimes for {theater_name}")
+                logger.info(f"Processed {valid_showtimes} valid showtimes for {theater_name} (limited to {max_showtimes_per_theater})")
 
                 # Only add theaters that have showtimes
                 if theater_entry['showtimes']:
@@ -254,7 +265,8 @@ class FindTheatersTool(BaseTool):
                 logger.info(f"Limiting theater search to {MAX_MOVIES_TO_PROCESS} movies out of {len(current_movies)} to avoid timeouts")
 
             # Process each movie individually to ensure theaters are correctly matched
-            for movie in movies_to_process:
+            # Add throttling to avoid overwhelming SerpAPI
+            for index, movie in enumerate(movies_to_process):
                 movie_id = movie.get('tmdb_id')
                 movie_title = movie.get('title')
 
@@ -262,36 +274,80 @@ class FindTheatersTool(BaseTool):
                     logger.warning(f"Skipping theater search for movie without ID: {movie_title}")
                     continue
 
-                logger.info(f"Finding theaters for movie: {movie_title} (ID: {movie_id})")
+                logger.info(f"Finding theaters for movie: {movie_title} (ID: {movie_id}) [{index+1}/{len(movies_to_process)}]")
+
+                # Add a variable delay between requests to avoid rate limiting (except for first request)
+                if index > 0:
+                    # Increase delay for subsequent requests to prevent rate limiting
+                    delay_seconds = 5.0 + (index * 2.0)  # 5s base delay + 2s per movie processed
+                    logger.info(f"Throttling API requests - waiting {delay_seconds} seconds before next request")
+                    time.sleep(delay_seconds)
 
                 # Try to get real showtimes via SerpAPI for this specific movie
-                movie_theaters_with_showtimes = self._get_movie_showtimes(movie_title, location, user_coords, movie_id)
+                try:
+                    # Add retry logic for getting showtimes
+                    max_retries = 2  # Maximum retries per movie
+                    retry_count = 0
+                    movie_theaters_with_showtimes = None
+                    
+                    while retry_count <= max_retries and not movie_theaters_with_showtimes:
+                        try:
+                            logger.info(f"Attempt {retry_count+1}/{max_retries+1} to get showtimes for '{movie_title}'")
+                            movie_theaters_with_showtimes = self._get_movie_showtimes(movie_title, location, user_coords, movie_id)
+                            
+                            # If we got empty results but haven't exhausted retries
+                            if not movie_theaters_with_showtimes and retry_count < max_retries:
+                                retry_delay = 7.0 + (retry_count * 3.0)  # Increasing backoff
+                                logger.info(f"No theaters found, retrying in {retry_delay} seconds (attempt {retry_count+1}/{max_retries+1})")
+                                time.sleep(retry_delay)
+                            
+                            retry_count += 1
+                        except Exception as retry_error:
+                            logger.error(f"Error in attempt {retry_count+1}: {str(retry_error)}")
+                            if retry_count < max_retries:
+                                retry_delay = 7.0 + (retry_count * 3.0)  # Increasing backoff
+                                logger.info(f"Error occurred, retrying in {retry_delay} seconds (attempt {retry_count+1}/{max_retries+1})")
+                                time.sleep(retry_delay)
+                            retry_count += 1
+                    
+                    # If we found real showtimes for this movie after retries, use them
+                    if movie_theaters_with_showtimes:
+                        logger.info(f"Found {len(movie_theaters_with_showtimes)} theaters with real showtimes for '{movie_title}'")
 
-                # If we found real showtimes for this movie, use them
-                if movie_theaters_with_showtimes:
-                    logger.info(f"Found {len(movie_theaters_with_showtimes)} theaters with real showtimes for '{movie_title}'")
+                        # Add movie_id to each theater to ensure proper association
+                        for theater in movie_theaters_with_showtimes:
+                            # Explicitly set the movie_id for this theater
+                            theater['movie_id'] = movie_id
+                            # Add movie title for debugging purposes
+                            theater['movie_title'] = movie_title
 
-                    # Add movie_id to each theater to ensure proper association
-                    for theater in movie_theaters_with_showtimes:
-                        # Explicitly set the movie_id for this theater
-                        theater['movie_id'] = movie_id
-                        # Add movie title for debugging purposes
-                        theater['movie_title'] = movie_title
+                            # Verify showtimes are present
+                            if not theater.get('showtimes') or len(theater.get('showtimes', [])) == 0:
+                                logger.warning(f"Theater {theater.get('name')} has no showtimes for '{movie_title}'")
+                                continue
 
-                        # Verify showtimes are present
-                        if not theater.get('showtimes') or len(theater.get('showtimes', [])) == 0:
-                            logger.warning(f"Theater {theater.get('name')} has no showtimes for '{movie_title}'")
-                            continue
-
-                        # Add to our results
-                        theater_results.append(theater)
-                        logger.info(f"Added theater '{theater.get('name')}' with {len(theater.get('showtimes', []))} showtimes for '{movie_title}'")
-                else:
-                    # No real showtimes found for this movie
-                    logger.warning(f"No showtimes found for '{movie_title}'")
+                            # Add to our results
+                            theater_results.append(theater)
+                            logger.info(f"Added theater '{theater.get('name')}' with {len(theater.get('showtimes', []))} showtimes for '{movie_title}'")
+                    else:
+                        # No real showtimes found for this movie
+                        logger.warning(f"No showtimes found for '{movie_title}'")
+                
+                except Exception as e:
+                    logger.error(f"Error searching theaters for movie '{movie_title}': {str(e)}")
+                    logger.exception(e)
 
             # Sort theaters by distance
             theater_results.sort(key=lambda x: x.get('distance_miles', float('inf')))
+            
+            # Get maximum theaters to return from Django settings
+            try:
+                max_theaters = getattr(settings, 'MAX_THEATERS', 10)
+                if len(theater_results) > max_theaters:
+                    logger.info(f"Limiting results to {max_theaters} theaters (from {len(theater_results)} total)")
+                    theater_results = theater_results[:max_theaters]
+            except Exception as e:
+                logger.warning(f"Could not apply theater limit: {str(e)}")
 
             # Log final result count
             logger.info(f"Returning {len(theater_results)} theaters with showtimes across all movies")

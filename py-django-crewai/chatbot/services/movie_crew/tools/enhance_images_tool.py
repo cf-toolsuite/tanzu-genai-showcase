@@ -38,14 +38,14 @@ class EnhanceMovieImagesTool(BaseTool):
         # Start time for performance monitoring
         import time
         start_time = time.time()
-        
+
         try:
             # Parse input JSON
             movies = json.loads(movies_json)
             if not movies:
                 logger.warning("No movies to enhance")
                 return "[]"
-                
+
             logger.info(f"Enhancing {len(movies)} movies with parallel processing")
 
             # Ensure every movie has a tmdb_id field for proper enhancement
@@ -67,14 +67,14 @@ class EnhanceMovieImagesTool(BaseTool):
 
             # Enhance movies in parallel for better performance
             enhanced_movies = tmdb_service.enhance_movies_parallel(movies)
-            
+
             # Ensure all enhanced movies retain their TMDB ID and poster info
             for i, movie in enumerate(enhanced_movies):
                 # Triple-check that we have a tmdb_id field
                 if not movie.get('tmdb_id') and movie.get('id'):
                     movie['tmdb_id'] = movie['id']
                     logger.info(f"Post-enhancement: Fixed TMDB ID for movie {movie.get('title')}")
-                    
+
                 # Ensure we have a poster URL, even if it's a placeholder
                 if not movie.get('poster_url'):
                     logger.warning(f"Missing poster URL for {movie.get('title')} after enhancement")

@@ -204,10 +204,10 @@ class SearchMoviesTool(BaseTool):
                                 rating=movie.get('vote_average', 0),
                                 is_current_release=is_current_release
                             )
-                            
+
                             # Ensure both id and tmdb_id fields are present for compatibility
                             movie_dict['id'] = movie_id
-                            
+
                             # Add additional poster size options
                             if poster_path:
                                 movie_dict['poster_urls'] = {
@@ -216,7 +216,7 @@ class SearchMoviesTool(BaseTool):
                                     'large': f"https://image.tmdb.org/t/p/w780{poster_path}",
                                     'original': f"https://image.tmdb.org/t/p/original{poster_path}"
                                 }
-                            
+
                             movies.append(movie_dict)
                 except Exception as e:
                     logger.error(f"Error fetching now playing movies: {str(e)}")
@@ -224,7 +224,7 @@ class SearchMoviesTool(BaseTool):
             # Check for decade or year range in the query
             import re
             year_ranges = []
-            
+
             # Check for specific decades (90s, 1990s, etc.)
             decade_patterns = [
                 (r'1990s|90s|nineties', (1990, 1999)),
@@ -236,51 +236,51 @@ class SearchMoviesTool(BaseTool):
                 (r'2010s|twenty tens', (2010, 2019)),
                 (r'2020s|twenty twenties', (2020, 2029))
             ]
-            
+
             for pattern, (start_year, end_year) in decade_patterns:
                 if re.search(fr'\b{pattern}\b', search_query.lower()):
                     year_ranges.append((start_year, end_year))
                     logger.info(f"Detected decade: {start_year}-{end_year} in query: {search_query}")
-            
+
             # Check for year range patterns like "2000-2010" or "between 2000 and 2010"
             range_matches = re.findall(r'(\d{4})\s*-\s*(\d{4})', search_query)
             if range_matches:
                 for start, end in range_matches:
                     year_ranges.append((int(start), int(end)))
                     logger.info(f"Detected explicit year range: {start}-{end} in query")
-                    
+
             # Check for "between X and Y" patterns
             between_matches = re.findall(r'between\s+(\d{4})\s+and\s+(\d{4})', search_query.lower())
             if between_matches:
                 for start, end in between_matches:
                     year_ranges.append((int(start), int(end)))
                     logger.info(f"Detected 'between' year range: {start}-{end} in query")
-            
+
             # Check for from/before/after year patterns
             from_year_match = re.search(r'from\s+(\d{4})', search_query.lower())
             if from_year_match:
                 year = int(from_year_match.group(1))
                 year_ranges.append((year, datetime.now().year))
                 logger.info(f"Detected 'from year' pattern: {year}-present in query")
-                
+
             before_year_match = re.search(r'before\s+(\d{4})', search_query.lower())
             if before_year_match:
                 year = int(before_year_match.group(1))
                 default_start_year = getattr(settings, 'DEFAULT_SEARCH_START_YEAR', 1900)
                 year_ranges.append((default_start_year, year))
                 logger.info(f"Detected 'before year' pattern: {default_start_year}-{year} in query")
-                
+
             after_year_match = re.search(r'after\s+(\d{4})', search_query.lower())
             if after_year_match:
                 year = int(after_year_match.group(1))
                 year_ranges.append((year, datetime.now().year))
                 logger.info(f"Detected 'after year' pattern: {year}-present in query")
-            
+
             # If no movies found or not looking for now playing, do a regular search
             if not movies:
                 # Use title for specific searches
                 search = tmdb.Search()
-                
+
                 # Base parameters
                 search_params = {
                     "query": search_query,
@@ -288,50 +288,50 @@ class SearchMoviesTool(BaseTool):
                     "language": "en-US",
                     "page": 1
                 }
-                
+
                 # If we're in casual mode and have year ranges, try to use the discover API first
                 if not self.first_run_mode and year_ranges:
                     try:
                         # Get results limit from the settings
                         results_limit = getattr(settings, 'MOVIE_RESULTS_LIMIT', 5)
                         logger.info(f"Using discover API for year-specific search in casual mode")
-                        
+
                         # Use the discover API directly to get popular movies from the decade
                         discover = tmdb.Discover()
-                        
+
                         # Use the first detected year range
                         start_year, end_year = year_ranges[0]
-                        
+
                         # Log the exact years we're searching for
                         logger.info(f"Searching for movies released between {start_year} and {end_year}")
-                        
+
                         discover_params = {
                             "primary_release_date.gte": f"{start_year}-01-01",
                             "primary_release_date.lte": f"{end_year}-12-31",
                             "sort_by": "vote_average.desc", # Sort by highest rated first
                             "vote_count.gte": 100  # Ensure we get well-known movies with sufficient votes
                         }
-                        
+
                         # Add genres if specified
                         if genres:
                             discover_params["with_genres"] = ",".join(str(g) for g in genres)
-                        
+
                         discover_response = discover.movie(**discover_params)
-                        
+
                         if discover_response and 'results' in discover_response and discover_response['results']:
                             logger.info(f"Found {len(discover_response['results'])} movies via discover API with year range {start_year}-{end_year}")
                             results = discover_response['results']
-                            
+
                             # Process limited number of results
                             results_limit = getattr(settings, 'MOVIE_RESULTS_LIMIT', 5)
                             results = results[:results_limit]
                             year_filtered_movies = []
-                            
+
                             # Process discovered movies with the year range
                             for movie in results:
                                 # Create and append the movie dict
                                 year_filtered_movies.append(self._process_movie_result(movie, start_year, end_year))
-                            
+
                             # If we found movies with the discover API, use them and skip regular search
                             if year_filtered_movies:
                                 movies = year_filtered_movies
@@ -340,19 +340,19 @@ class SearchMoviesTool(BaseTool):
                     except Exception as discover_error:
                         logger.error(f"Error using discover API for year range: {str(discover_error)}")
                         # Fall back to regular search
-                
+
                 # Regular search if discover didn't yield results or wasn't used
                 search_response = search.movie(**search_params)
 
                 if search_response and 'results' in search_response and search_response['results']:
                     # Start with complete results
                     results = search_response['results']
-                    
+
                     # Filter by genre if specified
                     if genres:
                         results = [movie for movie in results if any(genre_id in movie.get('genre_ids', []) for genre_id in genres)]
                         logger.info(f"Filtered to {len(results)} movies by genre from search results")
-                    
+
                     # Filter by year range if specified
                     if year_ranges:
                         year_filtered_results = []
@@ -366,17 +366,17 @@ class SearchMoviesTool(BaseTool):
                                         year_filtered_results.append(movie)
                                 except ValueError:
                                     continue
-                        
+
                         if year_filtered_results:
                             logger.info(f"Filtered to {len(year_filtered_results)} movies by year range from search results")
                             results = year_filtered_results
                         else:
                             logger.warning(f"No movies found in the specified year range(s) from search results")
-                    
+
                     # Sort by release date if we have year ranges (older first for nostalgia queries)
                     if year_ranges:
                         results.sort(key=lambda m: m.get('release_date', ''), reverse=False)
-                    
+
                     # Process the first 5 results (or fewer if filtered)
                     results = results[:5]
                     for movie in results:
@@ -409,10 +409,10 @@ class SearchMoviesTool(BaseTool):
                             rating=movie.get('vote_average', 0),
                             is_current_release=is_current_release
                         )
-                        
+
                         # Ensure both id and tmdb_id fields are present for compatibility
                         movie_dict['id'] = movie_id
-                        
+
                         # Add additional poster size options
                         if poster_path:
                             movie_dict['poster_urls'] = {
@@ -421,7 +421,7 @@ class SearchMoviesTool(BaseTool):
                                 'large': f"https://image.tmdb.org/t/p/w780{poster_path}",
                                 'original': f"https://image.tmdb.org/t/p/original{poster_path}"
                             }
-                        
+
                         movies.append(movie_dict)
 
             # If still no movies and we have genres, try discover API
@@ -464,10 +464,10 @@ class SearchMoviesTool(BaseTool):
                                 rating=movie.get('vote_average', 0),
                                 is_current_release=is_current_release
                             )
-                            
+
                             # Ensure both id and tmdb_id fields are present for compatibility
                             movie_dict['id'] = movie_id
-                            
+
                             # Add additional poster size options
                             if poster_path:
                                 movie_dict['poster_urls'] = {
@@ -476,7 +476,7 @@ class SearchMoviesTool(BaseTool):
                                     'large': f"https://image.tmdb.org/t/p/w780{poster_path}",
                                     'original': f"https://image.tmdb.org/t/p/original{poster_path}"
                                 }
-                            
+
                             movies.append(movie_dict)
                 except Exception as e:
                     logger.error(f"Error with discover API: {str(e)}")
@@ -492,12 +492,12 @@ class SearchMoviesTool(BaseTool):
     def _process_movie_result(self, movie, start_year, end_year) -> Dict[str, Any]:
         """
         Process a movie result from the TMDB API with year range information.
-        
+
         Args:
             movie: Movie data from TMDB API
             start_year: Start year of the decade/range
             end_year: End year of the decade/range
-            
+
         Returns:
             Processed movie dictionary
         """
@@ -505,16 +505,16 @@ class SearchMoviesTool(BaseTool):
         movie_id = movie.get('id')
         if not movie_id:
             logger.error(f"Movie has no ID: {movie.get('title', 'Unknown')}")
-            
+
         title = movie.get('title', 'Unknown Title')
         overview = movie.get('overview', '')
         release_date = movie.get('release_date', '')
         poster_path = movie.get('poster_path', '')
         poster_url = f"https://image.tmdb.org/t/p/original{poster_path}" if poster_path else ""
-        
+
         # Add TMDB homepage for this movie
         tmdb_url = f"https://www.themoviedb.org/movie/{movie_id}"
-        
+
         # Get movie release year
         release_year = None
         if release_date and len(release_date) >= 4:
@@ -522,17 +522,17 @@ class SearchMoviesTool(BaseTool):
                 release_year = int(release_date[:4])
             except:
                 pass
-        
+
         # Check if movie is from requested time period
         is_from_requested_period = False
         if release_year and start_year <= release_year <= end_year:
             is_from_requested_period = True
             logger.info(f"Movie '{title}' from {release_year} is within requested period {start_year}-{end_year}")
-        
+
         # Current year for determining if it's a current release
         current_year = datetime.now().year
         is_current_release = release_year is not None and release_year >= (current_year - 1)
-        
+
         # Create movie dictionary
         movie_dict = self._create_movie_dict(
             title=title,
@@ -543,17 +543,17 @@ class SearchMoviesTool(BaseTool):
             rating=movie.get('vote_average', 0),
             is_current_release=is_current_release
         )
-        
+
         # Add the period information
         movie_dict['is_from_requested_period'] = is_from_requested_period
         movie_dict['decade'] = f"{start_year}s" if start_year % 10 == 0 else f"{start_year}-{end_year}"
-        
+
         # Add TMDB URL for direct linking
         movie_dict['tmdb_url'] = tmdb_url
-        
+
         # Ensure both id and tmdb_id fields are present for compatibility
         movie_dict['id'] = movie_id
-        
+
         # Add additional poster size options
         if poster_path:
             movie_dict['poster_urls'] = {
@@ -562,7 +562,7 @@ class SearchMoviesTool(BaseTool):
                 'large': f"https://image.tmdb.org/t/p/w780{poster_path}",
                 'original': f"https://image.tmdb.org/t/p/original{poster_path}"
             }
-            
+
         return movie_dict
 
     def _create_movie_dict(self, **kwargs) -> Dict[str, Any]:

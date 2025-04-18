@@ -234,7 +234,7 @@ def send_message(request):
                 )
                 # Store location in session for future use
                 request.session['user_location'] = location
-                
+
                 # Extract timezone information (passed from frontend)
                 timezone_str = (
                     data.get('timezone') or
@@ -467,11 +467,11 @@ def send_message(request):
                                         start_time_str = showtime_data.get('start_time', '')
                                         if not start_time_str:
                                             continue
-                                            
+
                                         # If the time is in HH:mm AM/PM format from SerpAPI
                                         if ':' in start_time_str and ('AM' in start_time_str or 'PM' in start_time_str):
                                             # Convert to a datetime object with date from the selected day
-                                            
+
                                             # Get the date part from the string if available
                                             if 'T' in start_time_str:
                                                 # Already has date information
@@ -480,16 +480,16 @@ def send_message(request):
                                                 # Extract time
                                                 time_format = '%I:%M %p' if ' ' in start_time_str else '%H:%M'
                                                 time_only = datetime.strptime(start_time_str, time_format).time()
-                                                
+
                                                 # Combine with today's date
                                                 start_time = datetime.combine(datetime.today().date(), time_only)
-                                            
+
                                             # Add timezone info - use Django's timezone utilities
                                             start_time = timezone.make_aware(start_time)
                                         else:
                                             # Standard ISO format processing
                                             start_time = dt.fromisoformat(start_time_str.replace(' ', 'T'))
-                                            
+
                                             # Ensure timezone is set
                                             from django.utils import timezone as django_timezone
                                             if django_timezone.is_naive(start_time):

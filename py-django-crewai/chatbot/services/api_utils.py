@@ -42,9 +42,9 @@ class APIRequestHandler:
             Exception: If all retry attempts fail
         """
         # Use provided values or defaults from settings
-        timeout = timeout or getattr(settings, 'API_REQUEST_TIMEOUT', 10)
-        max_retries = max_retries or getattr(settings, 'API_MAX_RETRIES', 3)
-        backoff_factor = backoff_factor or getattr(settings, 'API_RETRY_BACKOFF_FACTOR', 0.5)
+        timeout = timeout or getattr(settings, 'API_REQUEST_TIMEOUT', 15)  # Increased timeout for SerpAPI
+        max_retries = max_retries or getattr(settings, 'API_MAX_RETRIES', 4)  # Increased retries
+        backoff_factor = backoff_factor or getattr(settings, 'API_RETRY_BACKOFF_FACTOR', 1.0)  # Increased backoff factor
 
         # Only add timeout parameter if it's not already present AND the function can accept it
         # Check if the function can accept a timeout parameter (either directly or via **kwargs)
@@ -95,9 +95,23 @@ class APIRequestHandler:
                     logger.error(f"API request failed after {max_retries+1} attempts: {str(e)}")
                     raise
             except Exception as e:
-                # For other exceptions, don't retry
-                logger.error(f"API request failed with unexpected error: {str(e)}")
-                raise
+                # For other exceptions, check if it's worth retrying
+                logger.error(f"API request failed with error: {str(e)}")
+                if 'rate limit' in str(e).lower() or 'too many requests' in str(e).lower() or '429' in str(e):
+                    # This is likely a rate limit issue, retry with backoff
+                    last_exception = e
+                    logger.warning(f"Rate limit detected, will retry with backoff (attempt {attempt+1}/{max_retries+1})")
+                    # Use a longer delay for rate limit errors
+                    time.sleep(backoff_factor * (4 ** (attempt)))
+                    
+                    # If this was the last attempt, re-raise the exception
+                    if attempt == max_retries:
+                        logger.error(f"API request failed after {max_retries+1} attempts due to rate limiting")
+                        raise
+                else:
+                    # For other non-retryable exceptions, don't retry
+                    logger.error(f"API request failed with non-retryable error: {str(e)}")
+                    raise
 
         # This should not be reached due to the raise in the except block above
         if last_exception:
