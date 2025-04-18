@@ -1,4 +1,4 @@
-# CrewAI + Django Movie Booking Chatbot
+# CrewAI + Django Movie Chatbot
 
 ![Status](https://img.shields.io/badge/status-ready-darkgreen) ![Github Action CI Workflow Status](https://github.com/cf-toolsuite/tanzu-genai-showcase/actions/workflows/py-django-crewai.yml/badge.svg)
 
@@ -8,7 +8,7 @@ This example demonstrates a movie booking chatbot built with Django and CrewAI t
 
 - Conversational interface to find movies based on interests or topics
 - Two conversation modes:
-  - **First Run Mode**: Find movies currently in theaters with showtimes 
+  - **First Run Mode**: Find movies currently in theaters with showtimes
   - **Casual Viewing Mode**: Discover movies from any time period
 - Recommends top 3 movie choices based on user preferences
 - Shows nearby theaters where movies are playing with available showtimes
@@ -26,17 +26,17 @@ graph TD
     User(User) --> WebUI(Web UI)
     WebUI --> DjangoView(Django View)
     DjangoView --> MovieCrewManager(Movie Crew Manager)
-    
+
     subgraph "CrewAI Orchestration"
         MovieCrewManager --> MovieFinder(Movie Finder Agent)
         MovieCrewManager --> Recommender(Recommendation Agent)
         MovieCrewManager --> TheaterFinder(Theater Finder Agent)
-        
+
         MovieFinder --> TMDbAPI[(TMDb API)]
         TheaterFinder --> GeoServices[(Location Services)]
         TheaterFinder --> SerpAPI[(SerpAPI Showtimes)]
     end
-    
+
     WebUI --> Location(Location Detection)
     Location --> BrowserGeo(Browser Geolocation)
     Location --> IPApiGeo(ipapi.co Geolocation)
@@ -57,11 +57,11 @@ The application consists of:
 
 - Python 3.10+ and pip
 - Cloud Foundry CLI (for deployment)
-- Access to Tanzu Platform for Cloud Foundry with GenAI tile installed 
+- Access to Tanzu Platform for Cloud Foundry with GenAI tile installed
 - API keys for external services:
+  - An OpenAI-compatible LLM API key (when running locally without GenAI tile)
   - TMDB API key (sign-up for a free account [here](https://www.themoviedb.org/signup))
-  - LLM API key (when running locally without GenAI tile)
-  - SerpAPI key (optional, for enhanced showtime data)
+  - SerpAPI key (sign-up for a free account [here](https://serpapi.com/users/sign_up))
 
 ## Local Development
 
@@ -88,6 +88,9 @@ The application consists of:
 4. Create a `.env` file with your API keys and configuration options (for local development only):
 
    ```bash
+   # Django secret
+   DJANGO_SECRET_KEY=any_old_django_secret
+
    # Required API keys
    OPENAI_API_KEY=your_llm_api_key_here
    LLM_BASE_URL=optional_custom_endpoint
@@ -123,7 +126,8 @@ The application consists of:
 7. Open your browser to `http://localhost:8000`
 
 8. Testing both modes:
-   - **First Run Mode**: Default tab for finding movies currently in theaters 
+
+   - **First Run Mode**: Default tab for finding movies currently in theaters
    - **Casual Viewing Mode**: Switch to this tab for historical movie recommendations
 
 ## Building for Production
@@ -135,12 +139,14 @@ The application consists of:
    ```
 
 2. Set up database:
+
    - For local testing, SQLite is fine
    - For production, configure a PostgreSQL database via DATABASE_URL
 
 ## Deploying to Tanzu Platform for Cloud Foundry
 
-### Prerequisites
+### Additional Prerequisites
+
 - Cloud Foundry CLI installed and configured
 - Access to a Tanzu Platform for Cloud Foundry environment
 - GenAI tile installed in the target environment
@@ -156,20 +162,20 @@ The application consists of:
 2. Deploy the application:
 
    ```bash
-   cf push
+   cf push --no-start
    ```
 
 3. Bind to a GenAI service instance:
 
    ```bash
-   # Create a GenAI service instance 
-   cf create-service genai PLAN_NAME movie-booking-llm
-   
+   # Create a GenAI service instance
+   cf create-service genai PLAN_NAME movie-chatbot-llm
+
    # Bind the application to the service
-   cf bind-service movie-chatbot movie-booking-llm
-   
-   # Restage the application to apply the binding
-   cf restage movie-chatbot
+   cf bind-service movie-chatbot movie-chatbot-llm
+
+   # Start the application
+   cf start movie-chatbot
    ```
 
 4. Verify the deployment:
@@ -185,20 +191,24 @@ The application automatically integrates with the GenAI tile through service bin
 
 ### How Service Binding Works
 
-1. **Automatic Detection**: 
+1. **Automatic Detection**:
+
    - When deployed to Cloud Foundry, the application automatically detects the `VCAP_SERVICES` environment variables
    - These variables contain the bound service instances and their credentials
 
 2. **Credential Extraction**:
+
    - The application parses the `VCAP_SERVICES` to extract LLM service credentials
-   - It looks for services labeled 'genai' or named 'my-llm-service'
+   - It looks for services labeled 'genai' or named 'movie-chatbot-llm'
    - It extracts the API key, base URL, and model name
 
 3. **Fallback Mechanism**:
+
    - If no bound services are found, the application falls back to environment variables
    - This allows for flexibility in different deployment scenarios
 
 4. **CrewAI Configuration**:
+
    - The extracted credentials are used to configure the CrewAI agents
    - Agents are initialized with the appropriate LLM service configuration
    - This allows the agents to make API calls to the LLM service
@@ -208,8 +218,8 @@ The application automatically integrates with the GenAI tile through service bin
 ```python
 def get_llm_config():
     # Check if running in Cloud Foundry with bound services
-    if cf_env.get_service(label='genai') or cf_env.get_service(name='my-llm-service'):
-        service = cf_env.get_service(label='genai') or cf_env.get_service(name='my-llm-service')
+    if cf_env.get_service(label='genai') or cf_env.get_service(name='movie-chatbot-llm'):
+        service = cf_env.get_service(label='genai') or cf_env.get_service(name='movie-chatbot-llm')
         credentials = service.credentials
 
         return {
@@ -259,12 +269,14 @@ def get_llm_config():
 To enable debug logging:
 
 1. For local development, add to your `.env` file:
-   ```
+
+   ```bash
    DEBUG=True
    LOG_LEVEL=DEBUG
    ```
 
 2. For Cloud Foundry, set environment variables:
+
    ```bash
    cf set-env movie-chatbot DEBUG True
    cf set-env movie-chatbot LOG_LEVEL DEBUG
@@ -272,6 +284,7 @@ To enable debug logging:
    ```
 
 3. View logs:
+
    ```bash
    cf logs movie-chatbot --recent
    ```
@@ -284,4 +297,9 @@ To enable debug logging:
 - [The Movie Database Developer Documentation](https://developer.themoviedb.org/docs/getting-started)
 - [SerpAPI Showtimes Documentation](https://serpapi.com/showtimes-results)
 - [ipapi.co Documentation](https://ipapi.co/api/)
-- [Detailed Architecture Document](./docs/ARCHITECTURE.md)
+
+- [Architecture Guide](./docs/ARCHITECTURE.md)
+- [Developer Guide](./docs/DEVELOPMENT.md)
+- [Troubleshooting Guide](./docs/TROUBLESHOOTING.md)
+- [Deployment Guide](./docs/DEPLOYMENT-SCENARIOS.md)
+- [Contributing](./docs/CONTRIBUTING.md)

@@ -1,6 +1,6 @@
 # Troubleshooting Guide
 
-This document provides guidance on troubleshooting common issues with the Movie Booking Chatbot application.
+This document provides guidance on troubleshooting common issues with the Movie Chatbot application.
 
 ## Table of Contents
 
@@ -20,33 +20,38 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### Django Application Fails to Start
 
 **Symptoms**:
+
 - Error message: "Error loading application"
 - Application crashes immediately after startup
 
 **Solutions**:
 
 1. **Check for syntax errors**:
+
    ```bash
    python -m compileall .
    ```
 
 2. **Verify virtual environment**:
+
    ```bash
    pip list  # Check installed packages
    pip install -r requirements.txt  # Reinstall dependencies
    ```
 
 3. **Check Django configuration**:
+
    ```bash
    python manage.py check  # Run Django system check
    python manage.py validate  # Validate models
    ```
 
 4. **Examine error logs**:
+
    ```bash
    # Local development
    python manage.py runserver --traceback
-   
+
    # Cloud Foundry
    cf logs movie-chatbot --recent
    ```
@@ -54,22 +59,26 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### Missing Dependencies
 
 **Symptoms**:
+
 - ImportError or ModuleNotFoundError
 - "No module named X" errors
 
 **Solutions**:
 
 1. **Reinstall dependencies**:
+
    ```bash
    pip install -r requirements.txt
    ```
 
 2. **Check for conflicts**:
+
    ```bash
    pip check
    ```
 
 3. **For deployment issues**:
+
    ```bash
    # Cloud Foundry
    cf ssh movie-chatbot -c "cd app && pip list"
@@ -80,6 +89,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### LLM API Authentication Failures
 
 **Symptoms**:
+
 - "Authentication error" in logs
 - "Error initializing language model" message to users
 - "Technical difficulties with the language model" error messages
@@ -87,31 +97,35 @@ This document provides guidance on troubleshooting common issues with the Movie 
 **Solutions**:
 
 1. **Check API key configuration**:
+
    ```bash
    # Local development
    echo $OPENAI_API_KEY  # Verify key is set
-   
+
    # Cloud Foundry
    cf env movie-chatbot  # Check environment variables
    ```
 
 2. **Verify service binding**:
+
    ```bash
    cf services  # List services
    cf service movie-booking-llm  # Check LLM service details
    ```
 
 3. **Inspect code that handles credentials**:
+
    - Check `movie_chatbot/settings.py` for credential handling
    - Review `get_llm_config()` for proper service detection
 
 4. **Test API key directly**:
+
    ```python
    import openai
-   
+
    openai.api_key = "your_api_key_here"
    openai.base_url = "your_base_url_here"  # If using custom endpoint
-   
+
    try:
        response = openai.chat.completions.create(
            model="gpt-4o-mini",
@@ -125,18 +139,21 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### TMDb API Issues
 
 **Symptoms**:
+
 - No movie results
 - "Error searching for movies" message
 
 **Solutions**:
 
 1. **Verify TMDb API key**:
+
    ```bash
    # Check environment variable
    echo $TMDB_API_KEY
    ```
 
 2. **Inspect request logs**:
+
    ```bash
    # Enable debug logging
    export LOG_LEVEL=DEBUG
@@ -144,12 +161,13 @@ This document provides guidance on troubleshooting common issues with the Movie 
    ```
 
 3. **Test TMDb API key directly**:
+
    ```python
    import requests
-   
+
    api_key = "your_tmdb_api_key_here"
    url = f"https://api.themoviedb.org/3/movie/550?api_key={api_key}"
-   
+
    response = requests.get(url)
    print(f"Status: {response.status_code}")
    print(response.json())
@@ -160,6 +178,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### Browser Geolocation Not Working
 
 **Symptoms**:
+
 - Location field remains empty
 - "Please enter a US city and state" prompt
 - No theaters showing in results
@@ -171,6 +190,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
    - Check browser console for geolocation errors
 
 2. **Test geolocation manually**:
+
    ```javascript
    // Run in browser console
    navigator.geolocation.getCurrentPosition(
@@ -180,16 +200,19 @@ This document provides guidance on troubleshooting common issues with the Movie 
    ```
 
 3. **Verify HTTPS**:
+
    - Geolocation requires HTTPS in modern browsers
    - Use a secure connection or development exceptions
 
 4. **Implement clear user instructions**:
+
    - Display a prompt explaining the need for location access
    - Provide visual cues for granting permissions
 
 ### ipapi.co Fallback Issues
 
 **Symptoms**:
+
 - Location detection fails when browser geolocation is denied
 - Incorrect location displayed
 - "Location not determined" errors
@@ -197,6 +220,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 **Solutions**:
 
 1. **Check network connectivity to ipapi.co**:
+
    ```javascript
    // Run in browser console
    fetch('https://ipapi.co/json/')
@@ -206,6 +230,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
    ```
 
 2. **Verify request is not rate-limited**:
+
    - ipapi.co has rate limits for free tier
    - Check response for rate limit messages
 
@@ -221,10 +246,12 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### Non-US Location Issues
 
 **Symptoms**:
+
 - Theater search doesn't work outside the US
 - "Please enter a US city and state" message persists
 
 **Explanation**:
+
 - The application relies on US-based theater data
 - SerpAPI primarily provides reliable theater data for US locations
 
@@ -247,6 +274,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### No Movies Found
 
 **Symptoms**:
+
 - "No movies found matching your criteria" message
 - Empty search results
 
@@ -265,16 +293,18 @@ This document provides guidance on troubleshooting common issues with the Movie 
    - Compare response with what's expected
 
 4. **Inspect search implementation**:
+
    ```bash
    # Enable debug logging
    LOG_LEVEL=DEBUG
-   
+
    # Check logs for SearchMoviesTool execution
    ```
 
 ### Incorrect Movie Recommendations
 
 **Symptoms**:
+
 - Movies don't match user preferences
 - Irrelevant recommendations
 
@@ -297,6 +327,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### No Theaters Found
 
 **Symptoms**:
+
 - "No theaters found showing these movies" message
 - Movie recommendations appear but without theater information
 
@@ -307,6 +338,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
    - Try entering a major city name manually
 
 2. **Review theater search radius**:
+
    ```bash
    # Increase search radius
    cf set-env movie-chatbot THEATER_SEARCH_RADIUS_MILES 30
@@ -314,16 +346,18 @@ This document provides guidance on troubleshooting common issues with the Movie 
    ```
 
 3. **Test SerpAPI directly**:
+
    ```python
    from serpapi import GoogleSearch
-   
+
    params = {
-     "engine": "google_showtimes",
-     "q": "The Matrix",
-     "location": "New York, NY",
+     "q": "The Matrix theater",
+     "location": "New York, NY, United States",
+     "hl": "en",
+      "gl": "us",
      "api_key": "your_api_key"
    }
-   
+
    search = GoogleSearch(params)
    results = search.get_dict()
    print(results)
@@ -336,6 +370,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### Incorrect Showtimes
 
 **Symptoms**:
+
 - Showtimes display at wrong times
 - Missing showtimes
 - "Format showtimes function" errors in logs
@@ -343,18 +378,21 @@ This document provides guidance on troubleshooting common issues with the Movie 
 **Solutions**:
 
 1. **Check timezone handling**:
+
    - Verify the detected timezone is correct
    - Check showtimes conversion to local time
 
 2. **Review date selection**:
+
    - Test different date tabs in the UI
    - Verify showtime filtering by date
 
 3. **Inspect raw showtime data**:
+
    ```python
    # Enable debug logging
    LOG_LEVEL=DEBUG
-   
+
    # Check logs for raw showtime data vs. displayed data
    ```
 
@@ -363,6 +401,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### Agent Execution Failures
 
 **Symptoms**:
+
 - "Error executing crew" in logs
 - "Failed to initialize one or more agents" messages
 - Blank or default responses to queries
@@ -370,6 +409,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 **Solutions**:
 
 1. **Debug CrewAI execution**:
+
    ```python
    # Enable verbose mode for agents
    agent = Agent(
@@ -379,7 +419,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
        verbose=True,  # Enable verbose
        llm=llm
    )
-   
+
    # Enable verbose mode for crew
    crew = Crew(
        agents=[agent1, agent2],
@@ -389,22 +429,26 @@ This document provides guidance on troubleshooting common issues with the Movie 
    ```
 
 2. **Test agents individually**:
+
    - Run each agent independently to isolate issues
    - Check task outputs separately
 
 3. **Examine CrewAI logs**:
+
    ```bash
    LOG_LEVEL=DEBUG
    # Check output for CrewAI-specific logs
    ```
 
 4. **Verify tool implementations**:
+
    - Test tools directly outside of agent context
    - Check for exceptions in tool execution
 
 ### Response Parsing Issues
 
 **Symptoms**:
+
 - "Error parsing agent response" in logs
 - "JSONDecodeError" or similar parsing errors
 - Malformed responses
@@ -412,14 +456,17 @@ This document provides guidance on troubleshooting common issues with the Movie 
 **Solutions**:
 
 1. **Improve robust parsing**:
+
    - Review JSON extraction in JsonParser class
    - Add more fallback parsing strategies
 
 2. **Verify LLM output formats**:
+
    - Check that LLM responses match expected formats
    - Update prompts to enforce specific formats
 
 3. **Test with simple queries**:
+
    - Use basic test queries to validate JSON parsing
    - Check for patterns in failing queries
 
@@ -428,6 +475,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### Session Management Issues
 
 **Symptoms**:
+
 - User needs to re-enter preferences frequently
 - Conversation history lost between page refreshes
 - "Conversation not found" errors
@@ -439,10 +487,11 @@ This document provides guidance on troubleshooting common issues with the Movie 
    - Check session backend configuration
 
 2. **Examine database connections**:
+
    ```bash
    # Run Django checks
    python manage.py check
-   
+
    # For Cloud Foundry
    cf ssh movie-chatbot -c "cd app && python manage.py dbshell"
    ```
@@ -454,6 +503,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### Database Migration Failures
 
 **Symptoms**:
+
 - "Migration failed" errors
 - Database inconsistency errors
 - "Table already exists" messages
@@ -461,16 +511,19 @@ This document provides guidance on troubleshooting common issues with the Movie 
 **Solutions**:
 
 1. **Check migration history**:
+
    ```bash
    python manage.py showmigrations
    ```
 
 2. **Fake initial migrations if needed**:
+
    ```bash
    python manage.py migrate --fake-initial
    ```
 
 3. **For Cloud Foundry deployments**:
+
    ```bash
    cf ssh movie-chatbot -c "cd app && python manage.py migrate --no-input"
    ```
@@ -480,6 +533,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### Slow Query Responses
 
 **Symptoms**:
+
 - Long waiting times for movie recommendations
 - Timeout errors
 - UI progress bar stays at high percentage for long time
@@ -487,17 +541,19 @@ This document provides guidance on troubleshooting common issues with the Movie 
 **Solutions**:
 
 1. **Profile LLM requests**:
+
    - Add timing to LLM API calls
    - Consider model size vs. speed tradeoffs
 
 2. **Implement caching for common queries**:
+
    ```python
    # Add caching for TMDb responses
    from django.core.cache import cache
-   
+
    cache_key = f"tmdb_search_{query_hash}"
    cached_result = cache.get(cache_key)
-   
+
    if cached_result:
        return cached_result
    else:
@@ -519,6 +575,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### Memory Usage Issues
 
 **Symptoms**:
+
 - "Memory limit exceeded" errors in Cloud Foundry
 - Application crashes under load
 - "Out of memory" errors
@@ -526,16 +583,19 @@ This document provides guidance on troubleshooting common issues with the Movie 
 **Solutions**:
 
 1. **Monitor memory usage**:
+
    ```bash
    # For Cloud Foundry
    cf app movie-chatbot
    ```
 
 2. **Optimize CrewAI resource usage**:
+
    - Limit context sizes for LLM calls
    - Process responses in chunks
 
 3. **Scale application appropriately**:
+
    ```bash
    # Increase memory allocation
    cf scale movie-chatbot -m 1G
@@ -546,6 +606,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### Cloud Foundry Deployment Failures
 
 **Symptoms**:
+
 - "Failed to stage application" errors
 - "Buildpack compilation error" messages
 - "Start command failed" errors
@@ -561,6 +622,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
    - Verify environment variables are properly set
 
 3. **Examine staging logs**:
+
    ```bash
    cf logs movie-chatbot --recent
    ```
@@ -572,6 +634,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 ### Service Binding Issues
 
 **Symptoms**:
+
 - "Service binding failed" errors
 - "Could not find bound service" in application logs
 - LLM connection errors after binding
@@ -579,23 +642,27 @@ This document provides guidance on troubleshooting common issues with the Movie 
 **Solutions**:
 
 1. **Verify service instance**:
+
    ```bash
-   cf service movie-booking-llm
+   cf service movie-chatbot-llm
    ```
 
 2. **Check binding details**:
+
    ```bash
-   cf service-keys movie-booking-llm
+   cf service-keys movie-chatbot-llm
    ```
 
 3. **Rebind service**:
+
    ```bash
-   cf unbind-service movie-chatbot movie-booking-llm
-   cf bind-service movie-chatbot movie-booking-llm
+   cf unbind-service movie-chatbot movie-chatbot-llm
+   cf bind-service movie-chatbot movie-chatbot-llm
    cf restage movie-chatbot
    ```
 
 4. **Examine VCAP_SERVICES format**:
+
    ```bash
    cf env movie-chatbot
    # Check structure of VCAP_SERVICES for expected fields
@@ -608,6 +675,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 Production systems should use appropriate logging levels, but for troubleshooting, enable debug logging:
 
 1. **Local development**:
+
    ```bash
    # In .env file
    DEBUG=True
@@ -615,6 +683,7 @@ Production systems should use appropriate logging levels, but for troubleshootin
    ```
 
 2. **Cloud Foundry deployment**:
+
    ```bash
    cf set-env movie-chatbot DEBUG True
    cf set-env movie-chatbot LOG_LEVEL DEBUG

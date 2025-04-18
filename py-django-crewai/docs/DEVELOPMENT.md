@@ -1,6 +1,6 @@
 # Developer Guide
 
-This document provides guidelines and information for developers working on or contributing to the Movie Booking Chatbot application.
+This document provides guidelines and information for developers working on or contributing to the Movie Chatbot application.
 
 ## Table of Contents
 
@@ -21,9 +21,9 @@ This document provides guidelines and information for developers working on or c
 - Git
 - A code editor (VS Code recommended)
 - API keys for external services:
+  - An OpenAI-compatible LLM API key (for local development)
   - TMDb API key (sign-up [here](https://www.themoviedb.org/signup))
-  - LLM API key (for local development)
-  - SerpAPI key (optional, for real showtimes data)
+  - SerpAPI key (sign-up for a free account [here](https://serpapi.com/users/sign_up))
 
 ### Local Setup
 
@@ -222,6 +222,7 @@ longer description if needed
 ```
 
 Where `type` is one of:
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -272,7 +273,7 @@ from unittest.mock import patch
 class ChatbotViewTests(TestCase):
     def setUp(self):
         self.client = Client()
-        
+
     @patch('chatbot.services.movie_crew.MovieCrewManager.process_query')
     def test_send_message(self, mock_process_query):
         """Test the send_message view with a mocked crew manager."""
@@ -281,12 +282,12 @@ class ChatbotViewTests(TestCase):
             "response": "Here are some movies.",
             "movies": [{"title": "Test Movie"}]
         }
-        
+
         # Send a test message
-        response = self.client.post('/send-message/', 
-                                  {'message': 'Find action movies'}, 
+        response = self.client.post('/send-message/',
+                                  {'message': 'Find action movies'},
                                   content_type='application/json')
-        
+
         # Check the response
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response.json()['status'], 'success')
@@ -365,11 +366,11 @@ To add a new agent to the system:
    ```python
    # In manager.py
    from .agents.new_agent import NewAgentName
-   
+
    # In process_query method
    new_agent = NewAgentName.create(llm)
    new_tool = NewTool()
-   
+
    # Create a task for the new agent
    new_task = Task(
        description="Task description",
@@ -377,7 +378,7 @@ To add a new agent to the system:
        agent=new_agent,
        tools=[new_tool]
    )
-   
+
    # Update crew creation
    crew = Crew(
        agents=[movie_finder, recommender, theater_finder, new_agent],
@@ -400,7 +401,7 @@ To add a new conversation mode:
            ('casual', 'Casual Viewing'),
            ('new_mode', 'New Mode Name'),
        ]
-       
+
        # Rest of the model...
    ```
 
@@ -411,7 +412,7 @@ To add a new conversation mode:
    <li class="nav-item" role="presentation">
      <button class="nav-link" id="new-mode-tab" data-bs-toggle="tab" data-bs-target="#new-mode" type="button" role="tab" aria-controls="new-mode" aria-selected="false">New Mode</button>
    </li>
-   
+
    <!-- Add the tab content -->
    <div class="tab-pane fade" id="new-mode" role="tabpanel" aria-labelledby="new-mode-tab">
      <!-- New mode content -->
@@ -441,7 +442,7 @@ To add a new conversation mode:
    # In movie_crew/manager.py
    def process_query(self, query: str, conversation_history: List[Dict[str, str]], mode: str = 'first_run') -> Dict[str, Any]:
        """Process a user query based on the specified mode."""
-       
+
        if mode == 'first_run':
            # First Run mode logic
            pass
@@ -499,7 +500,7 @@ When troubleshooting CrewAI issues:
        verbose=True,  # Enable verbose logging
        llm=llm
    )
-   
+
    crew = Crew(
        agents=[agent1, agent2],
        tasks=[task1, task2],
@@ -567,4 +568,4 @@ When troubleshooting CrewAI issues:
 - [CrewAI Documentation](https://docs.crewai.com/)
 - [Django Documentation](https://docs.djangoproject.com/)
 - [TMDb API Documentation](https://developer.themoviedb.org/docs)
-- [SerpAPI Documentation](https://serpapi.com/docs)
+- [SerpAPI Documentation](https://serpapi.com/search-api)

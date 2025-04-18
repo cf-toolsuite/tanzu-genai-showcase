@@ -1,4 +1,4 @@
-# Contributing to the Movie Booking Chatbot
+# Contributing to the Movie Chatbot
 
 Thank you for your interest in contributing to the Movie Booking Chatbot project! This document provides guidelines and workflows for contributing effectively.
 
@@ -113,13 +113,14 @@ Review the [ARCHITECTURE.md](./ARCHITECTURE.md) and [DEVELOPMENT.md](./DEVELOPME
 
 Follow the [Conventional Commits](https://www.conventionalcommits.org/) format:
 
-```
+```text
 type(scope): short description
 
 longer description if needed
 ```
 
 Where `type` is one of:
+
 - `feat`: New feature
 - `fix`: Bug fix
 - `docs`: Documentation changes
@@ -129,6 +130,7 @@ Where `type` is one of:
 - `chore`: Build process or auxiliary tool changes
 
 Example:
+
 ```
 feat(theater-finder): add timezone support for showtimes
 
@@ -159,6 +161,7 @@ feat(theater-finder): add timezone support for showtimes
 4. **After Merging**:
    - Delete your feature branch
    - Update your local repository:
+
      ```bash
      git checkout dev
      git pull upstream dev
@@ -223,6 +226,7 @@ def function_name(param1, param2):
    - Test individual components in isolation
    - Mock external dependencies
    - Example:
+
      ```python
      from django.test import TestCase
      from chatbot.services.movie_crew.utils import JsonParser
@@ -237,6 +241,7 @@ def function_name(param1, param2):
 2. **Integration Tests**:
    - Test interactions between components
    - Example:
+
      ```python
      from django.test import TestCase, Client
      from unittest.mock import patch
@@ -245,12 +250,12 @@ def function_name(param1, param2):
          def test_send_message(self):
              with patch('chatbot.services.movie_crew.MovieCrewManager.process_query') as mock_process:
                  mock_process.return_value = {"response": "Test response", "movies": []}
-                 
+
                  client = Client()
-                 response = client.post('/send-message/', 
-                                      {'message': 'Test message'}, 
+                 response = client.post('/send-message/',
+                                      {'message': 'Test message'},
                                       content_type='application/json')
-                 
+
                  self.assertEqual(response.status_code, 200)
      ```
 
@@ -289,6 +294,7 @@ coverage report
 ### When to Update Documentation
 
 Documentation should be updated:
+
 - When adding new features
 - When changing existing behavior
 - When deprecating functionality
@@ -323,4 +329,4 @@ When suggesting features:
 
 ---
 
-Thank you for contributing to the Movie Booking Chatbot project! Your efforts help make this application better for everyone.
+Thank you for contributing to the Movie Chatbot project! Your efforts help make this application better for everyone.

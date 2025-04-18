@@ -124,8 +124,8 @@ cf_env = cfenv.AppEnv()
 # Get LLM credentials from Cloud Foundry service binding or environment variables
 def get_llm_config():
     # Check if running in Cloud Foundry with bound services
-    if cf_env.get_service(label='genai') or cf_env.get_service(name='my-llm-service'):
-        service = cf_env.get_service(label='genai') or cf_env.get_service(name='my-llm-service')
+    if cf_env.get_service(label='genai') or cf_env.get_service(name='movie-chatbot-llm'):
+        service = cf_env.get_service(label='genai') or cf_env.get_service(name='movie-chatbot-llm')
         credentials = service.credentials
 
         return {

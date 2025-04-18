@@ -1,6 +1,6 @@
-# Movie Booking Chatbot Architecture
+# Movie Chatbot Architecture
 
-This document outlines the architecture of the Movie Booking Chatbot application, a Django-based web application that utilizes CrewAI for intelligent movie recommendations and theater information.
+This document outlines the architecture of the Movie Chatbot application, a Django-based web application that utilizes CrewAI for intelligent movie recommendations and theater information.
 
 ## Table of Contents
 
@@ -18,7 +18,7 @@ This document outlines the architecture of the Movie Booking Chatbot application
 
 ## System Overview
 
-The Movie Booking Chatbot is a web application that enables users to interact with an AI-powered chatbot to:
+The Movie Chatbot is a web application that enables users to interact with an AI-powered chatbot to:
 
 - Find movies based on their interests and preferences
 - Get movie recommendations with detailed information
@@ -26,6 +26,7 @@ The Movie Booking Chatbot is a web application that enables users to interact wi
 - View available showtimes
 
 The system provides two primary modes:
+
 - **First Run Mode**: Focused on current movies playing in theaters with real showtimes
 - **Casual Viewing Mode**: For exploring movies from any time period without theater information
 
@@ -58,7 +59,7 @@ graph TD
         TaskSequencer --> Crew[Crew Object]
         Crew --> Agents[AI Agents]
         Crew --> Tasks[Task Definitions]
-        
+
         Agents --> MovieFinder[Movie Finder Agent]
         Agents --> Recommender[Recommendation Agent]
         Agents --> TheaterFinder[Theater Finder Agent]
@@ -66,11 +67,11 @@ graph TD
         Tasks --> SearchTask[Movie Search Task]
         Tasks --> RecommendTask[Recommendation Task]
         Tasks --> TheaterTask[Theater Finder Task]
-        
+
         SearchTask --- SearchTool[SearchMoviesTool]
         RecommendTask --- AnalyzeTool[AnalyzePreferencesTool]
         TheaterTask --- TheaterTool[FindTheatersTool]
-        
+
         SearchTool --> TMDb[TMDb API]
         TheaterTool --> LocationService[Theater/Location Services]
         TheaterTool --> SerpAPI[SerpAPI Showtimes]
@@ -216,14 +217,14 @@ sequenceDiagram
     View->>View: Extract client IP
     View->>View: Get conversation based on mode
     View->>DB: Create user message
-    
+
     Note over View,Manager: Mode-specific processing
     View->>Manager: process_query(query, history, first_run_mode)
-    
+
     Manager->>CrewAI: Initialize LLM with credentials
     Manager->>CrewAI: Create appropriate agents
     Manager->>CrewAI: Configure tasks based on mode
-    
+
     alt First Run Mode
         CrewAI->>Agents: Movie Finder task (prioritize current)
         CrewAI->>Agents: Recommendation task
@@ -232,38 +233,38 @@ sequenceDiagram
         CrewAI->>Agents: Movie Finder task (any time period)
         CrewAI->>Agents: Recommendation task
     end
-    
+
     Agents->>External: Query TMDb API
-    
+
     alt First Run Mode
         Agents->>External: Get location data
         Agents->>External: Find theaters (OpenStreetMap)
         Agents->>External: Get showtimes (SerpAPI)
     end
-    
+
     External->>Agents: API responses
     Agents->>CrewAI: Task outputs
     CrewAI->>Manager: Crew execution result
-    
+
     Manager->>Manager: Process data and handle errors
     Manager->>Manager: Classify movies (current/older)
     Manager->>Manager: Combine movies with theaters (First Run)
     Manager->>View: Return structured response
-    
+
     View->>DB: Store bot message
     View->>DB: Store movie recommendations
     View->>DB: Store theaters & showtimes
-    
+
     View->>UI: JSON response with recommendations
     UI->>UI: Update progress bar (100%)
     UI->>UI: Update conversation display
-    
+
     alt First Run Mode
         UI->>UI: Show movies with theaters & showtimes
     else Casual Viewing Mode
         UI->>UI: Show historical movie recommendations
     end
-    
+
     UI->>User: Display complete response
 ```
 
@@ -387,32 +388,32 @@ The application uses CrewAI to implement a multiple-agent system, where each age
 graph TD
     User[User Query] --> Manager[Movie Crew Manager]
     Manager --> Crew[CrewAI Crew]
-    
+
     Crew --> A1[Movie Finder Agent]
     Crew --> A2[Recommendation Agent]
     Crew --> A3[Theater Finder Agent]
-    
+
     A1 --> T1[Search Movies Tool]
     A2 --> T2[Analyze Preferences Tool]
     A3 --> T3[Find Theaters Tool]
-    
+
     Manager --> TaskSequence[Task Sequence Definition]
     TaskSequence --> Crew
-    
+
     subgraph "Task Execution Flow"
         direction LR
         Task1[Find Movies] --> Task2[Recommend Top Movies]
         Task2 --> Task3[Find Theaters & Showtimes]
     end
-    
+
     Manager --> ModeSelector[Mode Selector]
     ModeSelector --> FirstRun[First Run Mode]
     ModeSelector --> Casual[Casual Mode]
-    
+
     FirstRun -.-> Task1
     FirstRun -.-> Task2
     FirstRun -.-> Task3
-    
+
     Casual -.-> Task1
     Casual -.-> Task2
 ```
@@ -523,8 +524,8 @@ The application is designed to integrate with any LLM service that provides an O
 # LLM Configuration from settings.py
 def get_llm_config():
     # Check if running in Cloud Foundry with bound services
-    if cf_env.get_service(label='genai') or cf_env.get_service(name='my-llm-service'):
-        service = cf_env.get_service(label='genai') or cf_env.get_service(name='my-llm-service')
+    if cf_env.get_service(label='genai') or cf_env.get_service(name='movie-chatbot-llm'):
+        service = cf_env.get_service(label='genai') or cf_env.get_service(name='movie-chatbot-llm')
         credentials = service.credentials
 
         return {
@@ -592,12 +593,11 @@ class SerpShowtimeService:
         """Initialize the SerpAPI service."""
         self.api_key = api_key
 
-    def search_showtimes(self, movie_title: str, location: str, radius_miles: int = 20):
+    def search_showtimes(self, movie_title: str, location: str):
         """Search for movie showtimes for a specific movie in a location."""
         # Construct parameters for SerpAPI
         params = {
-            "engine": "google_showtimes",
-            "q": movie_title,
+            "q": f"{movie_title} theater",
             "location": location,
             "hl": "en",
             "gl": "us",
@@ -663,16 +663,16 @@ The application uses multiple approaches to determine user location:
                return;
            }
 
-           // Extract city and state for US locations
-           const city = data.city;
-           const state = data.region;
-           const country = data.country_name;
-
            // Capture timezone information
            if (data.timezone) {
                window.userTimezone = data.timezone;
                console.log(`Captured user timezone: ${window.userTimezone}`);
            }
+
+           // Extract city and state for US locations
+           const city = data.city;
+           const state = data.region;
+           const country = data.country_name;
 
            // If we have all values, use the standard "City, State, Country" format
            if (city && state && country) {

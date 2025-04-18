@@ -1,6 +1,6 @@
 # Deployment Scenarios
 
-This document outlines various deployment scenarios for the Movie Booking Chatbot application, focusing on Cloud Foundry deployment options with the Tanzu Platform.
+This document outlines various deployment scenarios for the Movie Chatbot application, focusing on Cloud Foundry deployment options with the Tanzu Platform.
 
 ## Table of Contents
 
@@ -111,6 +111,7 @@ For basic operation without service binding, you'll need to set API keys:
 ```bash
 cf set-env movie-chatbot OPENAI_API_KEY your_openai_api_key
 cf set-env movie-chatbot TMDB_API_KEY your_tmdb_api_key
+cf set-env movie-chatbot SERPAPI_API_KEY your_serpapi_key
 cf restage movie-chatbot
 ```
 
@@ -123,21 +124,21 @@ The application is designed to work with the GenAI tile, which provides LLM capa
 1. Check available service plans:
 
    ```bash
-   cf marketplace | grep genai
+   cf marketplace -e genai
    ```
 
 2. Create a service instance:
 
    ```bash
-   cf create-service genai PLAN_NAME movie-booking-llm
+   cf create-service genai PLAN_NAME movie-chatbot-llm
    ```
 
-   Where `PLAN_NAME` is one of the available service plans (e.g., `standard`, `enterprise`).
+   Where `PLAN_NAME` is one of the available service plans.
 
 3. Check the service creation status:
 
    ```bash
-   cf service movie-booking-llm
+   cf service movie-chatbot-llm
    ```
 
 ### Binding the GenAI Service
@@ -145,7 +146,7 @@ The application is designed to work with the GenAI tile, which provides LLM capa
 1. Bind the service to your application:
 
    ```bash
-   cf bind-service movie-chatbot movie-booking-llm
+   cf bind-service movie-chatbot movie-chatbot-llm
    ```
 
 2. Restage the application to apply the binding:
@@ -178,8 +179,8 @@ Example `VCAP_SERVICES` structure:
   "genai": [
     {
       "binding_name": null,
-      "instance_name": "movie-booking-llm",
-      "name": "movie-booking-llm",
+      "instance_name": "movie-chatbot-llm",
+      "name": "movie-chatbot-llm",
       "label": "genai",
       "tags": ["ai", "llm"],
       "plan": "standard",
@@ -202,7 +203,7 @@ By default, the application uses SQLite for local development. For production de
 1. Check available database services:
 
    ```bash
-   cf marketplace | grep postgres
+   cf marketplace -e postgres
    ```
 
 2. Create a database service instance:
@@ -316,13 +317,6 @@ To use a custom domain for your application:
 
    This would make your app available at `booking.example.com`.
 
-3. Configure SSL (if not automatically handled by your CF platform):
-
-   ```bash
-   cf create-service ssl PLAN_NAME movie-chatbot-ssl
-   cf bind-route-service example.com --hostname booking movie-chatbot-ssl
-   ```
-
 ## Scaling Considerations
 
 ### Memory Sizing
@@ -369,38 +363,44 @@ Consider using performance-optimized instance types for production deployments.
 **Possible causes and solutions**:
 
 1. **Missing environment variables**:
-   
+
    Check logs for missing configuration:
+
    ```bash
    cf logs movie-chatbot --recent
    ```
-   
+
    Solution: Add missing environment variables:
+
    ```bash
    cf set-env movie-chatbot MISSING_VARIABLE value
    cf restage movie-chatbot
    ```
 
 2. **Database migration issues**:
-   
+
    Check logs for migration errors:
+
    ```bash
    cf logs movie-chatbot --recent | grep -i migration
    ```
-   
+
    Solution: Connect via SSH and run migrations manually:
+
    ```bash
    cf ssh movie-chatbot -c "cd app && python manage.py migrate --no-input"
    ```
 
 3. **Memory limits exceeded**:
-   
+
    Check if the application is hitting memory limits:
+
    ```bash
    cf app movie-chatbot
    ```
-   
+
    Solution: Increase memory allocation:
+
    ```bash
    cf scale movie-chatbot -m 1G
    ```
@@ -412,25 +412,28 @@ Consider using performance-optimized instance types for production deployments.
 **Possible causes and solutions**:
 
 1. **Incorrect service binding**:
-   
+
    Verify service binding:
+
    ```bash
    cf services
    cf env movie-chatbot
    ```
-   
+
    Solution: Rebind the service:
+
    ```bash
-   cf unbind-service movie-chatbot movie-booking-llm
-   cf bind-service movie-chatbot movie-booking-llm
+   cf unbind-service movie-chatbot movie-chatbot-llm
+   cf bind-service movie-chatbot movie-chatbot-llm
    cf restage movie-chatbot
    ```
 
 2. **Incompatible API format**:
-   
+
    Check if the GenAI service provides an OpenAI-compatible API.
-   
+
    Solution: Set a custom base URL if needed:
+
    ```bash
    cf set-env movie-chatbot LLM_BASE_URL custom_endpoint_url
    cf restage movie-chatbot
@@ -443,18 +446,19 @@ Consider using performance-optimized instance types for production deployments.
 **Possible causes and solutions**:
 
 1. **Outbound network restrictions**:
-   
+
    Check if outbound network requests are blocked by network policies.
-   
+
    Solution: Configure network policies to allow outbound connections:
+
    ```bash
    cf add-network-policy movie-chatbot --destination-app internet --protocol tcp --port 443
    ```
 
 2. **API rate limiting**:
-   
+
    Check logs for rate limit errors from TMDb or SerpAPI.
-   
+
    Solution: Implement request throttling or upgrade API plans.
 
 ## Deployment Checklist
