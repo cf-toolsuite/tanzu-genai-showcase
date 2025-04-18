@@ -278,7 +278,7 @@ class SerpShowtimeService:
                                         start_time = start_time.replace(tzinfo=tz)
                                         logger.info("Applied a timezone to the showtime")
                                     except Exception as tz_error:
-                                        logger.warning(f"Could not apply timezone {timezone_info}: {str(tz_error)}")
+                                        logger.warning(f"Could not apply timezone: {str(tz_error)}")
 
                                 # Create a standardized showtime object with timezone info
                                 showtime_info = {
