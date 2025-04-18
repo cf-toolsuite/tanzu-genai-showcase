@@ -431,8 +431,39 @@ document.addEventListener('DOMContentLoaded', function() {
         const sortedTheaters = Array.from(allTheaters.values())
             .sort((a, b) => (a.distance_miles || 0) - (b.distance_miles || 0));
 
-        // Display each theater
-        sortedTheaters.forEach(theater => {
+        // Filter theaters to only include those with showtimes for the selected date
+        const theatersWithShowtimesForDate = sortedTheaters.filter(theater => {
+            // Check if this theater has any showtimes for the selected date
+            const today = new Date();
+            const selectedDate = new Date(today);
+            selectedDate.setDate(today.getDate() + dateIndex);
+            const selectedDateStr = selectedDate.toISOString().split('T')[0];
+            
+            // Look through all movies at this theater
+            for (const movie of Object.values(theater.movies)) {
+                // Look through all formats for this movie
+                for (const [format, times] of Object.entries(movie.showtimesByFormat)) {
+                    // Filter times for the selected date
+                    const timesForDate = times.filter(timeStr => {
+                        const date = new Date(timeStr);
+                        return date.toISOString().split('T')[0] === selectedDateStr;
+                    });
+                    
+                    // If we found any showtimes for this date, include the theater
+                    if (timesForDate.length > 0) {
+                        return true;
+                    }
+                }
+            }
+            
+            // No showtimes found for this date at this theater
+            return false;
+        });
+        
+        console.log(`Found ${theatersWithShowtimesForDate.length} theaters with showtimes for selected date`);
+        
+        // Display each theater that has showtimes for the selected date
+        theatersWithShowtimesForDate.forEach(theater => {
             const theaterSection = document.createElement('div');
             theaterSection.className = 'theater-section mb-3';
 
@@ -483,7 +514,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         formatDiv.innerHTML = `<div class="small text-muted mb-1">${format}</div>`;
 
                         const showtimesDiv = document.createElement('div');
-                        showtimesDiv.className = 'd-flex flex-wrap gap-2';
+                        showtimesDiv.className = 'showtimes-scroll-container';
 
                         // Sort and format times
                         timesForDate
@@ -523,7 +554,7 @@ document.addEventListener('DOMContentLoaded', function() {
         });
 
         // If no theaters have showtimes for the selected date
-        if (sortedTheaters.length === 0) {
+        if (theatersWithShowtimesForDate.length === 0) {
             theatersContainer.innerHTML = `
                 <p class="text-muted">No theaters are showing the recommended movies on this date.</p>
             `;

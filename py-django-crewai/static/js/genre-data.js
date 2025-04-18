@@ -145,7 +145,7 @@ function switchGenreTab(genreId) {
         colDiv.className = 'col-6';
 
         const button = document.createElement('button');
-        button.className = 'btn btn-netflix w-100 mb-2';
+        button.className = 'btn btn-red-carpet w-100 mb-2';
         button.onclick = function() {
             sendCasualSampleQuestion(`Show me ${subgenre.query}`);
         };

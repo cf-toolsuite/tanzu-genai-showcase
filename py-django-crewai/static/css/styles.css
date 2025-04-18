@@ -1,16 +1,16 @@
 :root {
-    --netflix-red: #E50914;
-    --netflix-dark: #141414;
-    --netflix-black: #000000;
-    --netflix-gray: #303030;
-    --netflix-light-gray: #BDBDBD;
-    --netflix-text: #FFFFFF;
-    --netflix-highlight: #F5F5F1;
+    --red-carpet-red: #E50914;
+    --red-carpet-dark: #141414;
+    --red-carpet-black: #000000;
+    --red-carpet-gray: #303030;
+    --red-carpet-light-gray: #BDBDBD;
+    --red-carpet-text: #FFFFFF;
+    --red-carpet-highlight: #F5F5F1;
 }
 
 body {
-    background-color: var(--netflix-black);
-    color: var(--netflix-text);
+    background-color: var(--red-carpet-black);
+    color: var(--red-carpet-text);
     font-family: 'Netflix Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
 }
 
@@ -18,11 +18,11 @@ body {
     background-color: rgba(0, 0, 0, 0.8);
     padding: 1rem 0;
     margin-bottom: 2rem;
-    border-bottom: 1px solid var(--netflix-gray);
+    border-bottom: 1px solid var(--red-carpet-gray);
 }
 
-.netflix-logo {
-    color: var(--netflix-red);
+.red-carpet-logo {
+    color: var(--red-carpet-red);
     font-weight: bold;
     font-size: 1.8rem;
     letter-spacing: -1px;
@@ -30,11 +30,11 @@ body {
 
 /* Tab styling */
 .nav-tabs {
-    border-bottom: 1px solid var(--netflix-gray);
+    border-bottom: 1px solid var(--red-carpet-gray);
 }
 
 .nav-tabs .nav-link {
-    color: var(--netflix-light-gray);
+    color: var(--red-carpet-light-gray);
     background-color: transparent;
     border: none;
     border-bottom: 3px solid transparent;
@@ -45,26 +45,26 @@ body {
 }
 
 .nav-tabs .nav-link:hover {
-    color: var(--netflix-text);
-    border-bottom-color: var(--netflix-light-gray);
+    color: var(--red-carpet-text);
+    border-bottom-color: var(--red-carpet-light-gray);
 }
 
 .nav-tabs .nav-link.active {
-    color: var(--netflix-text);
+    color: var(--red-carpet-text);
     background-color: transparent;
-    border-bottom-color: var(--netflix-red);
+    border-bottom-color: var(--red-carpet-red);
 }
 
 /* Chatbot styling */
 .chat-container {
     height: 60vh;
     overflow-y: auto;
-    border: 1px solid var(--netflix-gray);
+    border: 1px solid var(--red-carpet-gray);
     border-radius: 0.5rem;
-    background-color: var(--netflix-dark);
+    background-color: var(--red-carpet-dark);
     padding: 1rem;
     scrollbar-width: thin;
-    scrollbar-color: var(--netflix-light-gray) var(--netflix-dark);
+    scrollbar-color: var(--red-carpet-light-gray) var(--red-carpet-dark);
 }
 
 .chat-container::-webkit-scrollbar {
@@ -72,11 +72,11 @@ body {
 }
 
 .chat-container::-webkit-scrollbar-track {
-    background: var(--netflix-dark);
+    background: var(--red-carpet-dark);
 }
 
 .chat-container::-webkit-scrollbar-thumb {
-    background-color: var(--netflix-light-gray);
+    background-color: var(--red-carpet-light-gray);
     border-radius: 20px;
 }
 
@@ -88,7 +88,7 @@ body {
 
 .user-message {
     float: right;
-    background-color: var(--netflix-red);
+    background-color: var(--red-carpet-red);
     color: white;
     border-radius: 1rem 1rem 0 1rem;
     padding: 0.75rem 1rem;
@@ -96,8 +96,8 @@ body {
 
 .bot-message {
     float: left;
-    background-color: var(--netflix-gray);
-    color: var(--netflix-text);
+    background-color: var(--red-carpet-gray);
+    color: var(--red-carpet-text);
     border-radius: 1rem 1rem 1rem 0;
     padding: 0.75rem 1rem;
     white-space: pre-line;
@@ -105,35 +105,35 @@ body {
 
 .message-time {
     font-size: 0.75rem;
-    color: var(--netflix-light-gray);
+    color: var(--red-carpet-light-gray);
     margin-top: 0.25rem;
     clear: both;
     display: block;
 }
 
 .input-group .form-control {
-    background-color: var(--netflix-gray);
-    border: 1px solid var(--netflix-light-gray);
-    color: var(--netflix-text);
+    background-color: var(--red-carpet-gray);
+    border: 1px solid var(--red-carpet-light-gray);
+    color: var(--red-carpet-text);
 }
 
 .input-group .form-control::placeholder {
-    color: var(--netflix-light-gray);
+    color: var(--red-carpet-light-gray);
 }
 
 .input-group .input-group-text {
-    background-color: var(--netflix-gray);
-    border: 1px solid var(--netflix-light-gray);
-    color: var(--netflix-light-gray);
+    background-color: var(--red-carpet-gray);
+    border: 1px solid var(--red-carpet-light-gray);
+    color: var(--red-carpet-light-gray);
 }
 
-.btn-netflix {
-    background-color: var(--netflix-red);
-    border-color: var(--netflix-red);
+.btn-red-carpet {
+    background-color: var(--red-carpet-red);
+    border-color: var(--red-carpet-red);
     color: white;
 }
 
-.btn-netflix:hover {
+.btn-red-carpet:hover {
     background-color: #f40612;
     border-color: #f40612;
     color: white;
@@ -166,7 +166,7 @@ body {
 }
 
 .movie-slider::-webkit-scrollbar-thumb {
-    background: var(--netflix-light-gray);
+    background: var(--red-carpet-light-gray);
     border-radius: 6px;
 }
 
@@ -193,7 +193,7 @@ body {
 .movie-card.selected {
     transform: scale(1.05);
     box-shadow: 0 0 15px rgba(229, 9, 20, 0.7);
-    border: 2px solid var(--netflix-red);
+    border: 2px solid var(--red-carpet-red);
     z-index: 15;
 }
 
@@ -207,7 +207,7 @@ body {
     height: 300px;
     object-fit: cover;
     min-height: 300px; /* Ensure minimum height even when image fails */
-    background-color: var(--netflix-gray); /* Background color while loading or if fails */
+    background-color: var(--red-carpet-gray); /* Background color while loading or if fails */
 }
 
 .movie-info {
@@ -274,7 +274,7 @@ body {
     position: absolute;
     top: 10px;
     right: 10px;
-    background-color: var(--netflix-red);
+    background-color: var(--red-carpet-red);
     color: white;
     font-size: 0.7rem;
     padding: 0.25rem 0.5rem;
@@ -288,7 +288,7 @@ body {
     height: 300px; /* Fixed height for scrollable area */
     overflow-y: auto; /* Enable vertical scrolling */
     scrollbar-width: thin;
-    scrollbar-color: var(--netflix-light-gray) var(--netflix-dark);
+    scrollbar-color: var(--red-carpet-light-gray) var(--red-carpet-dark);
     padding-right: 5px; /* Add padding for scrollbar */
     margin-bottom: 10px; /* Add small margin to separate from chat input */
     scroll-behavior: smooth; /* Smooth scrolling */
@@ -301,27 +301,27 @@ body {
 }
 
 #theatersContainer::-webkit-scrollbar-track {
-    background: var(--netflix-dark);
+    background: var(--red-carpet-dark);
 }
 
 #theatersContainer::-webkit-scrollbar-thumb {
-    background-color: var(--netflix-light-gray);
+    background-color: var(--red-carpet-light-gray);
     border-radius: 20px;
 }
 
 /* Theater sections styling */
 .theater-section {
-    background-color: var(--netflix-dark);
-    border: 1px solid var(--netflix-gray);
+    background-color: var(--red-carpet-dark);
+    border: 1px solid var(--red-carpet-gray);
     border-radius: 0.5rem;
     margin-bottom: 1rem;
     overflow: hidden;
 }
 
 .theater-header {
-    background-color: var(--netflix-gray);
+    background-color: var(--red-carpet-gray);
     padding: 0.75rem 1rem;
-    color: var(--netflix-text);
+    color: var(--red-carpet-text);
     position: sticky;
     top: 0;
     z-index: 1;
@@ -353,16 +353,42 @@ body {
 
 /* No need for duplicate theatersContainer rule */
 
+/* Horizontal scrolling container for showtimes */
+.showtimes-scroll-container {
+    display: flex;
+    overflow-x: auto;
+    overflow-y: hidden;
+    white-space: nowrap;
+    padding-bottom: 5px; /* Add some padding for scrollbar */
+    margin-bottom: 0.5rem;
+    scroll-behavior: smooth;
+    max-width: 100%;
+    height: 38px; /* Fixed height to maintain consistency */
+}
+
+.showtimes-scroll-container::-webkit-scrollbar {
+    height: 4px;
+}
+
+.showtimes-scroll-container::-webkit-scrollbar-track {
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.showtimes-scroll-container::-webkit-scrollbar-thumb {
+    background: var(--red-carpet-light-gray);
+    border-radius: 4px;
+}
+
 .showtime-badge {
-    background-color: var(--netflix-dark);
-    border: 1px solid var(--netflix-light-gray);
-    color: var(--netflix-text);
+    background-color: var(--red-carpet-dark);
+    border: 1px solid var(--red-carpet-light-gray);
+    color: var(--red-carpet-text);
     padding: 0.25rem 0.5rem;
     border-radius: 0.25rem;
     font-size: 0.75rem;
     margin-right: 0.5rem;
-    margin-bottom: 0.5rem;
     display: inline-block;
+    flex: 0 0 auto; /* Prevent shrinking */
 }
 
 .showtime-badge.imax {
@@ -383,18 +409,18 @@ body {
 
 .progress {
     height: 0.5rem;
-    background-color: var(--netflix-gray);
+    background-color: var(--red-carpet-gray);
 }
 
 .progress-bar {
-    background-color: var(--netflix-red);
+    background-color: var(--red-carpet-red);
 }
 
 /* Sample question buttons */
 .btn-sample {
-    background-color: var(--netflix-gray);
-    border: 1px solid var(--netflix-light-gray);
-    color: var(--netflix-text);
+    background-color: var(--red-carpet-gray);
+    border: 1px solid var(--red-carpet-light-gray);
+    color: var(--red-carpet-text);
     font-size: 0.85rem;
     margin-right: 0.5rem;
     margin-bottom: 0;
@@ -405,8 +431,8 @@ body {
 }
 
 .btn-sample:hover {
-    background-color: var(--netflix-light-gray);
-    color: var(--netflix-text);
+    background-color: var(--red-carpet-light-gray);
+    color: var(--red-carpet-text);
 }
 
 /* Date tabs */
@@ -429,8 +455,8 @@ body {
     flex: 1 1 24%; /* Distribute space to fit exactly 4 days */
     padding: 0.5rem 0.75rem; /* Slightly increased padding */
     margin-right: 0.25rem; /* Reduced margin */
-    background-color: var(--netflix-gray);
-    color: var(--netflix-text);
+    background-color: var(--red-carpet-gray);
+    color: var(--red-carpet-text);
     border-radius: 0.25rem;
     cursor: pointer;
     border: none;
@@ -440,7 +466,7 @@ body {
 }
 
 .date-tab.active {
-    background-color: var(--netflix-red);
+    background-color: var(--red-carpet-red);
     color: white;
 }
 
@@ -484,18 +510,18 @@ body {
 }
 
 .location-input-group .input-group-text {
-    background-color: var(--netflix-dark);
-    border-color: var(--netflix-gray);
-    color: var(--netflix-red);
+    background-color: var(--red-carpet-dark);
+    border-color: var(--red-carpet-gray);
+    color: var(--red-carpet-red);
 }
 
 .location-input-group .form-control {
-    background-color: var(--netflix-dark);
-    border-color: var(--netflix-gray);
-    color: var(--netflix-text);
+    background-color: var(--red-carpet-dark);
+    border-color: var(--red-carpet-gray);
+    color: var(--red-carpet-text);
 }
 
 .location-input-group .form-control::placeholder {
-    color: var(--netflix-light-gray);
+    color: var(--red-carpet-light-gray);
     font-size: 0.9rem;
 }
