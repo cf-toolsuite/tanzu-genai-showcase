@@ -464,7 +464,7 @@ class FindTheatersTool(BaseTool):
 
                     # Use timezone from tool (passed from manager) or extract from user coordinates if available
                     user_timezone = self.timezone or (user_coords.get('timezone') if user_coords else None)
-                    logger.info(f"Using timezone for showtimes: {user_timezone}")
+                    logger.info("Using a timezone for showtimes.")
 
                     # Perform the search with our retry mechanism
                     try:
