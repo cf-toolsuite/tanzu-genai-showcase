@@ -22,7 +22,7 @@ class SerpShowtimeService:
     @staticmethod
     def _sanitize_params(params: Dict[str, Any], sensitive_keys: List[str]) -> Dict[str, Any]:
         """
-        Redact sensitive fields in a dictionary.
+        Redact sensitive fields in a dictionary, including nested dictionaries.
 
         Args:
             params: Dictionary containing parameters to sanitize.
@@ -31,7 +31,12 @@ class SerpShowtimeService:
         Returns:
             A sanitized copy of the dictionary with sensitive fields redacted.
         """
-        return {k: (v if k not in sensitive_keys else '[REDACTED]') for k, v in params.items()}
+        def redact(value):
+            if isinstance(value, dict):
+                return {k: redact(v) for k, v in value.items()}
+            return '[REDACTED]' if value in sensitive_keys else value
+
+        return {k: redact(v) if k in sensitive_keys else v for k, v in params.items()}
 
     def __init__(self, api_key: str):
         """Initialize the SerpAPI service.
@@ -158,7 +163,7 @@ class SerpShowtimeService:
                 # Log the detailed error and complete parameters for debugging
                 logger.error(f"SerpAPI returned error: {error_message}")
                 sanitized_params = self._sanitize_params(params, sensitive_keys=['api_key', 'location'])
-                logger.error(f"Request parameters: {json.dumps(sanitized_params)}")
+                logger.error("Request parameters contain sensitive data and have been redacted.")
                 return []
 
             # Process and format the results
