@@ -1,6 +1,6 @@
 # External API Integration
 
-This document provides detailed information about the external APIs used in the Movie Booking Chatbot application, including authentication methods, key endpoints, and implementation details.
+This document provides detailed information about the external APIs used in the Movie Chatbot application, including authentication methods, key endpoints, and implementation details.
 
 ## Table of Contents
 
@@ -32,8 +32,8 @@ The application supports multiple ways to configure LLM integration:
 # LLM Configuration from settings.py
 def get_llm_config():
     # Check if running in Cloud Foundry with bound services
-    if cf_env.get_service(label='genai') or cf_env.get_service(name='my-llm-service'):
-        service = cf_env.get_service(label='genai') or cf_env.get_service(name='my-llm-service')
+    if cf_env.get_service(label='genai') or cf_env.get_service(name='movie-chatbot-llm'):
+        service = cf_env.get_service(label='genai') or cf_env.get_service(name='movie-chatbot-llm')
         credentials = service.credentials
 
         return {
@@ -198,11 +198,10 @@ class SerpShowtimeService:
         """Initialize the SerpAPI service."""
         self.api_key = api_key
 
-    def search_showtimes(self, movie_title: str, location: str, radius_miles: int = 20):
+    def search_showtimes(self, movie_title: str, location: str):
         """Search for movie showtimes for a specific movie in a location."""
         # Construct parameters for SerpAPI
         params = {
-            "engine": "google_showtimes",
             "q": movie_title,
             "location": location,
             "hl": "en",
@@ -234,8 +233,7 @@ class SerpShowtimeService:
     "total_time_taken": 1.31
   },
   "search_parameters": {
-    "engine": "google_showtimes",
-    "q": "Dune",
+    "q": "Dune theater",
     "location": "Seattle, Washington, United States",
     "hl": "en",
     "gl": "us"
@@ -313,15 +311,15 @@ function gatherLocationDataFromIpApi() {
             return;
         }
 
-        // Extract city and state for US locations
-        const city = data.city;
-        const state = data.region;
-        const country = data.country_name;
-
         // Capture timezone information
         if (data.timezone) {
             window.userTimezone = data.timezone;
         }
+
+        // Extract city and state for US locations
+        const city = data.city;
+        const state = data.region;
+        const country = data.country_name;
 
         // Format location
         if (city && state && country) {
@@ -375,7 +373,7 @@ def geocode_location(location_str: str):
     try:
         geolocator = Nominatim(user_agent="movie_booking_chatbot")
         location = geolocator.geocode(location_str)
-        
+
         if location:
             return {
                 "latitude": location.latitude,
@@ -384,7 +382,7 @@ def geocode_location(location_str: str):
             }
     except Exception as e:
         logger.error(f"Geocoding error: {str(e)}")
-    
+
     return None
 ```
 
@@ -427,7 +425,7 @@ try:
     # API call
     response = requests.get(api_url, params=params, timeout=settings.API_REQUEST_TIMEOUT_SECONDS)
     response.raise_for_status()  # Raise exception for 4XX/5XX errors
-    
+
     # Process response
     data = response.json()
     # ...
@@ -481,10 +479,10 @@ def test_tmdb_api_search(mock_get):
     mock_response.status_code = 200
     mock_response.json.return_value = {"results": [{"id": 123, "title": "Test Movie"}]}
     mock_get.return_value = mock_response
-    
+
     # Test API call
     result = search_movies("test query")
-    
+
     # Assertions
     assert len(result) == 1
     assert result[0]["title"] == "Test Movie"
