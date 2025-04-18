@@ -59,10 +59,18 @@ window.renderTMDBGrid = function(movies, containerId, isFirstRunMode = true) {
         // Create the movie card with data attributes and click handler
         const movieCard = document.createElement('div');
         movieCard.className = 'movie-card';
-        movieCard.setAttribute('data-movie-id', movie.id || movie.tmdb_id || '');
+        
+        // Use a consistent movie ID approach - always use string IDs
+        const movieId = String(movie.id || movie.tmdb_id || '');
+        
+        // Set data attributes using consistent string ID
+        movieCard.setAttribute('data-movie-id', movieId);
         movieCard.setAttribute('data-movie-title', movie.title || '');
+        
+        // Use consistent ID for click handler
         movieCard.onclick = function() {
-            window.handleMovieClick(movie.id || movie.tmdb_id || '', movie.title || '');
+            console.log(`Movie card clicked: ${movie.title} (ID: ${movieId})`);
+            window.handleMovieClick(movieId, movie.title || '');
         };
 
         // Create a simple div wrapper for the poster
@@ -172,6 +180,15 @@ window.enhanceMoviePosters = function(movies, callback) {
         }
 
         console.log(`Processing movie: ${movie.title || 'Unknown'}, ID: ${movie.id || movie.tmdb_id || 'None'}`);
+        
+        // Ensure consistent ID handling - convert all IDs to strings
+        if (movie.id) {
+            movie.id = String(movie.id);
+        }
+        if (movie.tmdb_id) {
+            movie.tmdb_id = String(movie.tmdb_id);
+        }
+        
         // Make sure both id and tmdb_id are set for compatibility
         if (movie.id && !movie.tmdb_id) {
             movie.tmdb_id = movie.id;
@@ -179,7 +196,16 @@ window.enhanceMoviePosters = function(movies, callback) {
         } else if (movie.tmdb_id && !movie.id) {
             movie.id = movie.tmdb_id;
             console.log(`Set id from tmdb_id for movie: ${movie.title}`);
+        } else if (!movie.id && !movie.tmdb_id) {
+            // If neither ID exists, set a placeholder ID
+            const placeholderId = `temp-${index}`;
+            movie.id = placeholderId;
+            movie.tmdb_id = placeholderId;
+            console.warn(`No ID found for movie: ${movie.title}, using placeholder: ${placeholderId}`);
         }
+        
+        // Log the final IDs for debugging
+        console.log(`Final movie IDs - id: ${movie.id}, tmdb_id: ${movie.tmdb_id}`);
 
         // If poster_url is missing but we have poster_urls, use one of those
         if (!movie.poster_url && movie.poster_urls) {

@@ -62,6 +62,16 @@ body {
     min-height: 80vh;
 }
 
+/* Theaters outer wrapper - container for the showtime section */
+.theaters-outer-wrapper {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    margin-bottom: 1rem;
+}
+
 /* Chatbot styling */
 .chat-container {
     height: 50vh;
@@ -290,11 +300,20 @@ body {
     z-index: 5;
 }
 
+/* Theaters and showtimes section styling */
+#showtimesSection {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    overflow: hidden;
+}
+
 /* Theater and showtime styling */
 #theatersContainer {
     position: relative;
-    max-height: 350px; /* Set maximum height for scrollable area */
-    height: auto; /* Allow container to adjust based on content up to max-height */
+    flex: 1; /* Take remaining space */
+    min-height: 0; /* Allow container to shrink below content size */
     overflow-y: auto; /* Enable vertical scrolling */
     scrollbar-width: thin;
     scrollbar-color: var(--red-carpet-light-gray) var(--red-carpet-dark);
@@ -340,23 +359,22 @@ body {
     padding: 1rem;
 }
 
-/* Adjust max-height for different screen sizes */
-@media (max-height: 900px) {
-    #theatersContainer {
-        max-height: calc(100vh - 380px);
+/* Responsive theaters container height */
+@media (min-height: 600px) {
+    .theaters-outer-wrapper {
+        min-height: 300px;
     }
 }
 
-@media (max-height: 700px) {
-    #theatersContainer {
-        max-height: calc(100vh - 360px);
+@media (min-height: 900px) {
+    .theaters-outer-wrapper {
+        min-height: 400px;
     }
 }
 
-/* Add additional rule for very large screens */
-@media (min-height: 1000px) {
-    #theatersContainer {
-        max-height: calc(100vh - 420px);
+@media (min-height: 1200px) {
+    .theaters-outer-wrapper {
+        min-height: 500px;
     }
 }
 
