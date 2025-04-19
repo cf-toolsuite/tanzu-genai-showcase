@@ -5,12 +5,17 @@ parameters:
     llm.api_key: '%env(GENAI_API_KEY)%'
     llm.base_url: '%env(GENAI_BASE_URL)%'
     llm.model: '%env(GENAI_MODEL)%'
+    # Define the mock flag parameter from the environment variable
+    env(USE_MOCK_DATA): '%env(bool:USE_MOCK_DATA)%'
 
 services:
     # default configuration for services in *this* file
     _defaults:
         autowire: true      # Automatically injects dependencies
         autoconfigure: true # Automatically registers services
+        bind:
+            # Make logger available via typehint for mock clients too
+            Psr\Log\LoggerInterface: '@logger'
 
     # makes classes in src/ available to be used as services
     App\:
@@ -19,16 +24,126 @@ services:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
+            # Exclude ALL specific API client implementations (both real and mock)
+            # We will define them explicitly below with conditions
+            - '../src/Service/ApiClient/'
 
-    # custom services for the application
+    # --- Conditional Service Definitions ---
+
+    # LlmClientFactory (always needed)
     App\Service\LlmClientFactory:
         arguments:
             $apiKey: '%llm.api_key%'
             $baseUrl: '%llm.base_url%'
             $model: '%llm.model%'
 
-    # No need to define App\Service\ApiClient\LinkedInApiClient here if autowiring is sufficient.
-    # If autowiring fails for $params or $logger, you might need to bring back the explicit definition
-    # in linkedin_api.yaml, but only defining those non-standard arguments.
+    # --- API Clients (Conditional Wiring) ---
 
-    # Add other service definitions below...
+    # Define REAL services ONLY when USE_MOCK_DATA is false (or not 'true')
+    when@env('not(env(USE_MOCK_DATA))'):
+        services:
+            # Real AlphaVantage Client
+            App\Service\ApiClient\AlphaVantageClient:
+                alias: App\Service\ApiClient\ApiClientInterface $alphaVantageApiClient # Alias for specific injection
+
+            # Real YahooFinance Client
+            App\Service\ApiClient\YahooFinanceClient:
+                alias: App\Service\ApiClient\ApiClientInterface $yahooFinanceApiClient
+
+            # Real SecApiClient
+            App\Service\ApiClient\SecApiClient:
+                alias: App\Service\ApiClient\ApiClientInterface $secApiClient
+
+            # Real NewsApiClient
+            App\Service\ApiClient\NewsApiClient:
+                alias: App\Service\ApiClient\ApiClientInterface $newsApiClient
+
+            # Real EdgarApiClient
+            App\Service\ApiClient\EdgarApiClient:
+                alias: App\Service\ApiClient\ApiClientInterface $edgarApiClient
+
+            # Real LinkedInApiClient (No interface, alias the class name)
+            App\Service\ApiClient\LinkedInApiClient: ~
+                alias: App\Service\ApiClient\LinkedInApiClient $realLinkedInApiClient
+
+    # Define MOCK services ONLY when USE_MOCK_DATA is true
+    when@env('env(USE_MOCK_DATA)'):
+        services:
+            # Mock AlphaVantage Client
+            App\Service\ApiClient\MockAlphaVantageClient:
+                alias: App\Service\ApiClient\ApiClientInterface $alphaVantageApiClient
+
+            # Mock YahooFinance Client
+            App\Service\ApiClient\MockYahooFinanceClient:
+                alias: App\Service\ApiClient\ApiClientInterface $yahooFinanceApiClient
+
+            # Mock SecApiClient
+            App\Service\ApiClient\MockSecApiClient:
+                alias: App\Service\ApiClient\ApiClientInterface $secApiClient
+
+            # Mock NewsApiClient
+            App\Service\ApiClient\MockNewsApiClient:
+                alias: App\Service\ApiClient\ApiClientInterface $newsApiClient
+
+            # Mock EdgarApiClient
+            App\Service\ApiClient\MockEdgarApiClient:
+                alias: App\Service\ApiClient\ApiClientInterface $edgarApiClient
+
+            # Mock LinkedInApiClient (No interface, alias the class name)
+            App\Service\ApiClient\MockLinkedInApiClient: ~
+                alias: App\Service\ApiClient\LinkedInApiClient $mockLinkedInApiClient
+
+    # --- Service Definitions that use the API Clients ---
+    # These services will automatically get the correct implementation (real or mock)
+    # based on the aliases defined above when they type-hint the *interface* or the *base class name*.
+
+    # Example: StockDataService needs multiple clients. Use the ALIASES for injection.
+    App\Service\StockDataService:
+        arguments:
+            # Use the specific aliases we created
+            $alphaVantageClient: '@App\Service\ApiClient\ApiClientInterface $alphaVantageApiClient'
+            $yahooFinanceClient: '@App\Service\ApiClient\ApiClientInterface $yahooFinanceApiClient'
+            $newsApiClient: '@App\Service\ApiClient\ApiClientInterface $newsApiClient'
+            $secApiClient: '@App\Service\ApiClient\ApiClientInterface $secApiClient'
+            # Other dependencies
+            $entityManager: '@doctrine.orm.entity_manager'
+            $cache: '@stock_data.cache' # Assumes stock_data.cache is defined elsewhere
+            $logger: '@logger'
+
+    # Example: SecFilingService needs EdgarApiClient
+    App\Service\SecFilingService:
+        arguments:
+            $edgarApiClient: '@App\Service\ApiClient\ApiClientInterface $edgarApiClient' # Use the alias
+            # Other dependencies...
+            $neuronAiService: '@App\Service\NeuronAiService'
+            $entityManager: '@doctrine.orm.entity_manager'
+            $secFilingRepository: '@App\Repository\SecFilingRepository'
+            $logger: '@logger'
+
+    # Example: LinkedInService needs LinkedInApiClient
+    App\Service\LinkedInService:
+        arguments:
+            # Use the class name itself, which will resolve to the alias (real or mock)
+            $linkedInApiClient: '@App\Service\ApiClient\LinkedInApiClient'
+            # Other dependencies...
+            $entityManager: '@doctrine.orm.entity_manager'
+            $logger: '@logger'
+            $requestStack: '@request_stack' # Already autowired? Explicit is safer.
+
+    # Define other services like NeuronAiService, ReportExportService etc.
+    # If they don't depend on the conditional API clients, they don't need special handling.
+    App\Service\NeuronAiService:
+        arguments:
+            $clientFactory: '@App\Service\LlmClientFactory'
+
+    App\Service\ReportExportService:
+        arguments:
+            $projectDir: '%kernel.project_dir%'
+
+    # Cache definition (example, might be in packages/cache.yaml)
+    stock_data.cache:
+        class: Symfony\Component\Cache\Adapter\FilesystemAdapter
+        arguments:
+            $namespace: 'stock_data'
+            $defaultLifetime: 3600
+            $directory: '%kernel.cache_dir%/stock_data'

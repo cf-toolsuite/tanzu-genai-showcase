@@ -180,11 +180,6 @@ Using Homebrew:
 
 # Install PHP
 brew install php
-
-# Install essential extensions for Symfony development
-# Note: Many extensions may already be bundled with the main PHP package
-# The following ensures you have all the required extensions from the Ubuntu setup
-brew install php-intl php-curl php-mbstring php-xml php-zip
 ```
 
 **Note**: Homebrew's PHP package often includes many extensions by default. Check installed extensions with `php -m` after installation to see what you already have and what might still be needed.
@@ -232,7 +227,7 @@ php -r "copy('https://getcomposer.org/installer', 'composer-setup.php');"
 php -r "if (hash_file('sha384', 'composer-setup.php') === file_get_contents('https://composer.github.io/installer.sig')) { echo 'Installer verified'; } else { echo 'Installer corrupt'; unlink('composer-setup.php'); } echo PHP_EOL;"
 
 # Install globally
-php composer-setup.php --install-dir=/usr/local/bin --filename=composer
+sudo php composer-setup.php --install-dir=/usr/local/bin --filename=composer
 
 # Clean up
 php -r "unlink('composer-setup.php');"
