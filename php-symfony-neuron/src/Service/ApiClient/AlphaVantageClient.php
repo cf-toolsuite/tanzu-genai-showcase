@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Service/ApiClient;
+namespace App\Service\ApiClient;
 
 // No need for ParameterBagInterface here if only used for API key which is now handled in AbstractApiClient
 use Psr\Log\LoggerInterface;
