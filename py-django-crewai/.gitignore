@@ -139,3 +139,6 @@ logs/
 .env.*
 !.env.example
 
+# Generated
+staticfiles/
+

@@ -162,7 +162,15 @@ The application consists of:
 2. Deploy the application:
 
    ```bash
+   # You have two options:
+
+   # 1. Download dependencies during build phase
    cf push --no-start
+
+   # Or
+
+   # 2. Download dependencies in advance into vendor directory
+   ./deploy-on-tp4cf.sh
    ```
 
 3. Bind to a GenAI service instance:

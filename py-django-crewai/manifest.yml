@@ -6,11 +6,9 @@ applications:
   instances: 1
   buildpacks:
     - python_buildpack
-  command: gunicorn movie_chatbot.wsgi --log-file -
+  command: python manage.py makemigrations chatbot && python manage.py migrate && gunicorn movie_chatbot.wsgi --log-file -
   path: .
   env:
-    BP_PIP_VERSION: latest
     DJANGO_SETTINGS_MODULE: movie_chatbot.settings
     DJANGO_DEBUG: False
     DISABLE_COLLECTSTATIC: 1
-

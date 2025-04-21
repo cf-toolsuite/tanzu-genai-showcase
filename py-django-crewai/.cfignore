@@ -26,19 +26,22 @@ db.sqlite3
 db.sqlite3-journal
 media
 
-# Environment variables
+# Development/deployment files
 .env
 .env.example
-
-# Version control
 .git
 .gitignore
-
-# Editor directories and files
 .idea
 .vscode
 *.swp
 *.swo
-
-# OS specific
 .DS_Store
+setup-vendor.sh
+vendor_path.py
+DEPLOY.md
+requirements.txt.bak
+requirements-minimal.txt
+
+# Docs and tests
+docs/
+tests/
