@@ -18,6 +18,14 @@ GitHub Actions workflows are located in the `.github/workflows` directory at the
 - **Usage**: Workflows automatically run when changes are pushed to the respective project directories.
 - **Configuration**: No additional configuration is needed as long as the repository is hosted on GitHub.
 
+#### GitHub Actions Status Badges
+
+GitHub Actions workflow status badges are included in most project README.md files. The badge syntax is:
+
+```markdown
+![Github Action CI Workflow Status](https://github.com/username/repo-name/actions/workflows/workflow-file-name.yml/badge.svg)
+```
+
 ### GitLab CI/CD
 
 GitLab CI/CD configurations are located in each project's `ci/gitlab/.gitlab-ci.yml` file.
@@ -33,6 +41,29 @@ GitLab CI/CD configurations are located in each project's `ci/gitlab/.gitlab-ci.
 
 - The pipelines will automatically run when changes are detected in the respective project directories.
 - Artifacts are stored in the GitLab Package Registry and can be accessed through the GitLab UI.
+
+#### GitLab CI Status Badges
+
+To add GitLab CI status badges to your project READMEs:
+
+1. In your GitLab project, go to `Settings` > `General` > `Badges`.
+2. Add a new badge with these settings:
+   - Name: GitLab CI Pipeline Status
+   - Link: `https://gitlab.com/<username>/<repo-name>`
+   - Badge image URL: `https://gitlab.com/<username>/<repo-name>/badges/<branch>/pipeline.svg`
+3. Add the badge to your README.md files:
+
+```markdown
+![GitLab CI Pipeline Status](https://gitlab.com/<username>/<repo-name>/badges/<branch>/pipeline.svg)
+```
+
+For specific job status badges:
+
+```markdown
+![GitLab CI Job Status](https://gitlab.com/<username>/<repo-name>/badges/<branch>/job-name.svg)
+```
+
+Replace `<username>`, `<repo-name>`, `<branch>`, and `job-name` with your specific values.
 
 ### Bitbucket Pipelines
 
@@ -51,6 +82,30 @@ Bitbucket Pipelines configurations are located in each project's `ci/bitbucket/b
 
 - Pipelines automatically run when changes are pushed to the respective project directories.
 - Artifacts are uploaded to Bitbucket Downloads and can be accessed through the Bitbucket UI.
+
+#### Bitbucket Pipelines Status Badges
+
+To add Bitbucket Pipelines status badges to your project READMEs:
+
+1. Generate the badge URL in this format:
+
+   ```
+   https://bitbucket.org/<workspace>/<repo-name>/pipelines/results/branch/<branch>.svg
+   ```
+
+2. Add the badge to your README.md files:
+
+```markdown
+![Bitbucket Pipelines Status](https://bitbucket.org/<workspace>/<repo-name>/pipelines/results/branch/<branch>.svg)
+```
+
+Replace `<workspace>`, `<repo-name>`, and `<branch>` with your specific values.
+
+If you want custom badge styles, you can use a third-party badge service like shields.io:
+
+```markdown
+![Bitbucket Pipelines Status](https://img.shields.io/bitbucket/pipelines/<workspace>/<repo-name>/<branch>)
+```
 
 ### Jenkins
 
@@ -80,6 +135,31 @@ Jenkins pipeline definitions are located in each project's `ci/jenkins/Jenkinsfi
 - Jenkins jobs are triggered based on SCM polling (every 5 minutes by default).
 - Artifacts are archived in Jenkins and can be found in the build details.
 - For deployment to external systems (AWS S3, Nexus, Artifactory), uncomment and configure the appropriate sections in the Jenkinsfile.
+
+#### Jenkins Status Badges
+
+To add Jenkins build status badges to your project READMEs:
+
+1. Install the "Embeddable Build Status" plugin in Jenkins.
+2. In your Jenkins job, go to the job page.
+3. On the right side menu, click on "Embeddable Build Status".
+4. Select the format and style you prefer (Markdown, HTML, etc.).
+
+For Markdown format, use:
+
+```markdown
+[![Build Status](https://your-jenkins-server.com/buildStatus/icon?job=job-name&subject=build)](https://your-jenkins-server.com/job/job-name/)
+```
+
+If using Jenkins with authentication, you might need to generate tokens or use the anonymous endpoint option.
+
+If using the Blue Ocean interface, the badge URL would be:
+
+```markdown
+![Jenkins Build Status](https://your-jenkins-server.com/blue/organizations/jenkins/job-name/badge/master)
+```
+
+Replace `your-jenkins-server.com` and `job-name` with your specific values.
 
 ## Common CI Tasks
 
