@@ -55,7 +55,7 @@ The application consists of:
 
 ## Prerequisites
 
-- Python 3.10+ and pip
+- Python 3.12+ and pip
 - Cloud Foundry CLI (for deployment)
 - Access to Tanzu Platform for Cloud Foundry with GenAI tile installed
 - API keys for external services:
@@ -89,7 +89,7 @@ The application consists of:
 
    ```bash
    # Django secret
-   DJANGO_SECRET_KEY=any_old_django_secret
+   DJANGO_SECRET_KEY=any_old_django_hash
 
    # Required API keys
    OPENAI_API_KEY=your_llm_api_key_here
@@ -168,17 +168,37 @@ The application consists of:
 3. Bind to a GenAI service instance:
 
    ```bash
+   # Discover available GenAI tile service offering plans
+   cf marketplace -e genai
+
    # Create a GenAI service instance
    cf create-service genai PLAN_NAME movie-chatbot-llm
 
    # Bind the application to the service
    cf bind-service movie-chatbot movie-chatbot-llm
+   ```
 
-   # Start the application
+   > [!IMPORTANT]
+   > Replace `PLAN_NAME` above with an available plan from the GenAI tile service offering
+
+4. Add hash and service API keys
+
+   ```bash
+   cf set-env movie-chatbot DJANGO_SECRET_KEY any_old_django_hash
+   cf set-env movie-chatbot TMDB_API_KEY your_movie_db_api_key
+   cf set-env movie-chatbot SERPAPI_API_KEY your_serpapi_key_for_real_showtimes
+   ```
+
+   > [!IMPORTANT]
+   > Replace the hash and API key values above with authorized key values from each service.  For `DJANGO_SECRET_KEY`, this can be any value, it's used for hashing purposes.
+
+5. Start application
+
+   ```bash
    cf start movie-chatbot
    ```
 
-4. Verify the deployment:
+6. Verify the deployment:
 
    ```bash
    cf apps
@@ -212,29 +232,6 @@ The application automatically integrates with the GenAI tile through service bin
    - The extracted credentials are used to configure the CrewAI agents
    - Agents are initialized with the appropriate LLM service configuration
    - This allows the agents to make API calls to the LLM service
-
-### Service Binding Code Example
-
-```python
-def get_llm_config():
-    # Check if running in Cloud Foundry with bound services
-    if cf_env.get_service(label='genai') or cf_env.get_service(name='movie-chatbot-llm'):
-        service = cf_env.get_service(label='genai') or cf_env.get_service(name='movie-chatbot-llm')
-        credentials = service.credentials
-
-        return {
-            'api_key': credentials.get('api_key') or credentials.get('apiKey'),
-            'base_url': credentials.get('url') or credentials.get('baseUrl'),
-            'model': credentials.get('model') or 'gpt-4o-mini'
-        }
-
-    # Fallback to environment variables for local development
-    return {
-        'api_key': os.getenv('OPENAI_API_KEY'),
-        'base_url': os.getenv('LLM_BASE_URL'),
-        'model': os.getenv('LLM_MODEL', 'gpt-4o-mini')
-    }
-```
 
 ## Troubleshooting
 

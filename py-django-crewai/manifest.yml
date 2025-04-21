@@ -2,14 +2,15 @@
 applications:
 - name: movie-chatbot
   memory: 512M
+  disk_quota: 2G
   instances: 1
   buildpacks:
     - python_buildpack
   command: gunicorn movie_chatbot.wsgi --log-file -
   path: .
   env:
+    BP_PIP_VERSION: latest
     DJANGO_SETTINGS_MODULE: movie_chatbot.settings
-    DJANGO_SECRET_KEY: replace-this-with-secure-key-in-prod
     DJANGO_DEBUG: False
     DISABLE_COLLECTSTATIC: 1
 
