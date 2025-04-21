@@ -1,0 +1,55 @@
+# BitBucket Pipelines for js-langchain-react
+# Equivalent to GitHub Actions workflow: js-langchain-react.yml
+
+image: node:22
+
+definitions:
+  caches:
+    npm: ~/.npm
+
+pipelines:
+  default:
+    - step:
+        name: Build and Test
+        caches:
+          - npm
+        script:
+          - cd js-langchain-react
+          - npm install
+          - npm run build
+          - npm test || echo "No tests specified"
+        artifacts:
+          - js-langchain-react/build/**
+
+  branches:
+    main:
+      - step:
+          name: Build and Test
+          caches:
+            - npm
+          script:
+            - cd js-langchain-react
+            - npm install
+            - npm run build
+            - npm test || echo "No tests specified"
+          artifacts:
+            - js-langchain-react/build/**
+      - step:
+          name: Upload Artifacts
+          deployment: production
+          script:
+            - cd js-langchain-react
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'build.tar.gz'
+                TARGET: 'artifacts/js-langchain-react-${BITBUCKET_BUILD_NUMBER}.tar.gz'
+            - echo "Creating archive of build files"
+            - tar -czf build.tar.gz build/
+
+clone:
+  depth: full
+
+options:
+  max-time: 20

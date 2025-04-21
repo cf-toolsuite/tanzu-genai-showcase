@@ -1,0 +1,55 @@
+# BitBucket Pipelines for dotnet-extensions-ai
+# Equivalent to GitHub Actions workflow: dotnet-extensions-ai.yml
+
+image: mcr.microsoft.com/dotnet/sdk:latest
+
+definitions:
+  caches:
+    dotnet: ~/.nuget/packages
+
+pipelines:
+  default:
+    - step:
+        name: Build and Test
+        caches:
+          - dotnet
+        script:
+          - cd dotnet-extensions-ai
+          - dotnet restore
+          - dotnet build --no-restore
+          - dotnet test --no-build --verbosity normal
+
+  branches:
+    main:
+      - step:
+          name: Build and Test
+          caches:
+            - dotnet
+          script:
+            - cd dotnet-extensions-ai
+            - dotnet restore
+            - dotnet build --no-restore
+            - dotnet test --no-build --verbosity normal
+      - step:
+          name: Publish and Upload
+          deployment: production
+          caches:
+            - dotnet
+          script:
+            - cd dotnet-extensions-ai
+            - dotnet publish -c Release -o ./publish
+            - tar -czf publish.tar.gz publish/
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'publish.tar.gz'
+                TARGET: 'artifacts/dotnet-extensions-ai-${BITBUCKET_BUILD_NUMBER}.tar.gz'
+          artifacts:
+            - dotnet-extensions-ai/publish/**
+
+clone:
+  depth: full
+
+options:
+  max-time: 20

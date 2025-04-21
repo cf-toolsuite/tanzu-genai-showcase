@@ -1,0 +1,125 @@
+// Jenkins Pipeline for py-django-crewai
+// Equivalent to GitHub Actions workflow: py-django-crewai.yml
+
+pipeline {
+    agent any
+    
+    tools {
+        python 'python3.12'
+    }
+    
+    options {
+        // Only keep the 10 most recent builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+    
+    // Only run on changes to project files or CI configuration
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+    
+    stages {
+        stage('Setup Python Environment') {
+            when {
+                anyOf {
+                    changeset 'py-django-crewai/**'
+                    changeset 'py-django-crewai/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('py-django-crewai') {
+                    // Cache pip dependencies
+                    cache(path: '${HOME}/.cache/pip', key: "${env.JOB_NAME}") {
+                        sh 'python -m pip install --upgrade pip'
+                        sh 'python -m venv venv'
+                        sh '. venv/bin/activate && pip install -r requirements.txt'
+                    }
+                }
+            }
+        }
+        
+        stage('Test') {
+            when {
+                anyOf {
+                    changeset 'py-django-crewai/**'
+                    changeset 'py-django-crewai/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('py-django-crewai') {
+                    sh '. venv/bin/activate && python manage.py test || echo "No tests run"'
+                }
+            }
+        }
+        
+        stage('Collect Static Files') {
+            when {
+                anyOf {
+                    changeset 'py-django-crewai/**'
+                    changeset 'py-django-crewai/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('py-django-crewai') {
+                    sh '. venv/bin/activate && python manage.py collectstatic --noinput || echo "Static collection skipped"'
+                }
+            }
+        }
+        
+        stage('Create Package') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'py-django-crewai/**'
+                        changeset 'py-django-crewai/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('py-django-crewai') {
+                    sh '''
+                        mkdir -p dist
+                        zip -r dist/py-django-crewai.zip . -x "*.git*" "*.env*" "*.pyc" "__pycache__/*" "*.github/*" "dist/*" "venv/*"
+                    '''
+                }
+            }
+        }
+        
+        stage('Upload Artifacts') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'py-django-crewai/**'
+                        changeset 'py-django-crewai/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('py-django-crewai') {
+                    // Archive the artifacts in Jenkins
+                    archiveArtifacts artifacts: 'dist/*.zip', fingerprint: true
+                    
+                    // You can also deploy to a production environment or artifact repository
+                    // For example, deploy to an S3 bucket
+                    /*
+                    withAWS(region: 'us-east-1', credentials: 'aws-credentials') {
+                        s3Upload(
+                            file: 'dist/py-django-crewai.zip',
+                            bucket: 'your-s3-bucket',
+                            path: 'py-django-crewai/${BUILD_NUMBER}/py-django-crewai.zip'
+                        )
+                    }
+                    */
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

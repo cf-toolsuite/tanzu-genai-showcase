@@ -1,0 +1,62 @@
+# BitBucket Pipelines for java-spring-ai-mcp
+# Equivalent to GitHub Actions workflow: java-spring-ai-mcp.yml
+
+image: bellsoft/liberica-openjdk-debian:21
+
+definitions:
+  caches:
+    maven: ~/.m2/repository
+
+pipelines:
+  default:
+    - step:
+        name: Build and Test
+        caches:
+          - maven
+        script:
+          - cd java-spring-ai-mcp
+          - mvn -B package --file pom.xml
+        artifacts:
+          - java-spring-ai-mcp/client/target/*.jar
+          - java-spring-ai-mcp/server/target/*.jar
+          - java-spring-ai-mcp/api/target/*.jar
+
+  branches:
+    main:
+      - step:
+          name: Build and Test
+          caches:
+            - maven
+          script:
+            - cd java-spring-ai-mcp
+            - mvn -B package --file pom.xml
+          artifacts:
+            - java-spring-ai-mcp/client/target/*.jar
+            - java-spring-ai-mcp/server/target/*.jar
+            - java-spring-ai-mcp/api/target/*.jar
+      - step:
+          name: Upload Artifacts
+          deployment: production
+          script:
+            - cd java-spring-ai-mcp
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'client/target/java-spring-ai-mcp-client-*.jar'
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'server/target/java-spring-ai-mcp-server-*.jar'
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'api/target/java-spring-ai-mcp-api-*.jar'
+
+clone:
+  depth: full
+
+options:
+  max-time: 20

@@ -1,0 +1,113 @@
+# GitLab CI/CD for php-symfony-neuron
+# Equivalent to GitHub Actions workflow: php-symfony-neuron.yml
+
+image: php:8.3
+
+# Define stages in the pipeline
+stages:
+  - prepare
+  - validate
+  - test
+  - build
+  - upload
+
+# Cache Composer packages between pipeline jobs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - vendor/
+
+# Run CI only when changes in the project files or CI configuration
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      changes:
+        - php-symfony-neuron/**/*
+        - php-symfony-neuron/ci/gitlab/.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - php-symfony-neuron/**/*
+        - php-symfony-neuron/ci/gitlab/.gitlab-ci.yml
+
+# Prepare the environment
+prepare:
+  stage: prepare
+  script:
+    - cd php-symfony-neuron
+    - apt-get update -yqq
+    - apt-get install -yqq git unzip zip libzip-dev
+    - docker-php-ext-install zip pdo pdo_mysql
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - composer install --prefer-dist --no-progress
+
+# Validate composer files
+validate:
+  stage: validate
+  script:
+    - cd php-symfony-neuron
+    - apt-get update -yqq
+    - apt-get install -yqq git unzip
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - composer validate --strict
+  needs:
+    - prepare
+
+# Run tests
+test:
+  stage: test
+  script:
+    - cd php-symfony-neuron
+    - apt-get update -yqq
+    - apt-get install -yqq git unzip libzip-dev
+    - docker-php-ext-install zip
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - |
+      if [ -d "tests" ]; then
+        vendor/bin/phpunit
+      else
+        echo "No tests directory found, skipping tests"
+      fi
+  needs:
+    - validate
+
+# Create build package
+build:
+  stage: build
+  script:
+    - cd php-symfony-neuron
+    - apt-get update -yqq
+    - apt-get install -yqq git unzip zip
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - composer dump-autoload --optimize --no-dev
+    - mkdir -p build
+    - zip -r build/php-symfony-neuron.zip . -x ".git/*" "tests/*" ".env*" ".github/*" "build/*"
+  artifacts:
+    paths:
+      - php-symfony-neuron/build/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - test
+
+# Upload artifacts - only on main branch
+upload:
+  stage: upload
+  script:
+    - echo "Uploading build artifacts to GitLab Package Registry"
+    - |
+      if [ -f "php-symfony-neuron/build/php-symfony-neuron.zip" ]; then
+        cd php-symfony-neuron
+        apt-get update -yqq
+        apt-get install -yqq curl
+        curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+             --upload-file build/php-symfony-neuron.zip \
+             "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/php-symfony-neuron/${CI_COMMIT_TAG:-latest}/php-symfony-neuron.zip"
+      else
+        echo "Build package not found"
+        exit 1
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - build

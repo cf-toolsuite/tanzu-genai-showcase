@@ -6,7 +6,7 @@ This repository contains multiple examples of applications that can be deployed 
 
 Each subdirectory in this repository represents a different tech stack implementation showcasing how to integrate with GenAI LLM services. These examples cover a variety of use cases, from chatbots and recommendation systems to research assistants and event discovery applications.
 
-# Project Samples
+## Project Samples
 
 | Link | Description | Languages and Frameworks |
 |------|-------------|--------------------------|

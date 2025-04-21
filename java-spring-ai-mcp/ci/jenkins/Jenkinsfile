@@ -1,0 +1,102 @@
+// Jenkins Pipeline for java-spring-ai-mcp
+// Equivalent to GitHub Actions workflow: java-spring-ai-mcp.yml
+
+pipeline {
+    agent any
+    
+    tools {
+        jdk 'jdk21'
+        maven 'maven3'
+    }
+    
+    options {
+        // Only keep the 10 most recent builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+    
+    // Only run on changes to project files or CI configuration
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+    
+    stages {
+        stage('Build') {
+            when {
+                anyOf {
+                    changeset 'java-spring-ai-mcp/**'
+                    changeset 'java-spring-ai-mcp/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('java-spring-ai-mcp') {
+                    // Cache Maven dependencies
+                    cache(path: '${HOME}/.m2/repository', key: "${env.JOB_NAME}") {
+                        sh 'mvn -B package --file pom.xml'
+                    }
+                }
+            }
+        }
+        
+        stage('Upload Artifacts') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'java-spring-ai-mcp/**'
+                        changeset 'java-spring-ai-mcp/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('java-spring-ai-mcp') {
+                    // Archive the artifacts in Jenkins
+                    archiveArtifacts artifacts: 'client/target/*.jar', fingerprint: true
+                    archiveArtifacts artifacts: 'server/target/*.jar', fingerprint: true
+                    archiveArtifacts artifacts: 'api/target/*.jar', fingerprint: true
+                    
+                    // You can also upload to an artifact repository like Nexus or Artifactory
+                    // Example for Nexus deployment:
+                    /*
+                    sh '''
+                        mvn deploy:deploy-file \
+                          -DgroupId=com.example \
+                          -DartifactId=java-spring-ai-mcp-client \
+                          -Dversion=${BUILD_NUMBER} \
+                          -DgeneratePom=true \
+                          -Dpackaging=jar \
+                          -DrepositoryId=nexus \
+                          -Durl=${NEXUS_URL}/repository/maven-releases \
+                          -Dfile=client/target/java-spring-ai-mcp-client-*.jar
+                        
+                        mvn deploy:deploy-file \
+                          -DgroupId=com.example \
+                          -DartifactId=java-spring-ai-mcp-server \
+                          -Dversion=${BUILD_NUMBER} \
+                          -DgeneratePom=true \
+                          -Dpackaging=jar \
+                          -DrepositoryId=nexus \
+                          -Durl=${NEXUS_URL}/repository/maven-releases \
+                          -Dfile=server/target/java-spring-ai-mcp-server-*.jar
+                        
+                        mvn deploy:deploy-file \
+                          -DgroupId=com.example \
+                          -DartifactId=java-spring-ai-mcp-api \
+                          -Dversion=${BUILD_NUMBER} \
+                          -DgeneratePom=true \
+                          -Dpackaging=jar \
+                          -DrepositoryId=nexus \
+                          -Durl=${NEXUS_URL}/repository/maven-releases \
+                          -Dfile=api/target/java-spring-ai-mcp-api-*.jar
+                    '''
+                    */
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

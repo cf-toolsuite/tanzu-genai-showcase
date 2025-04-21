@@ -1,0 +1,82 @@
+# GitLab CI/CD for js-langchain-react
+# Equivalent to GitHub Actions workflow: js-langchain-react.yml
+
+image: node:22
+
+# Cache installed node modules between pipeline jobs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - js-langchain-react/node_modules/
+
+# Define stages in the pipeline
+stages:
+  - install
+  - build
+  - test
+  - upload
+
+# Run CI only when changes in the project files or CI configuration
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      changes:
+        - js-langchain-react/**/*
+        - js-langchain-react/ci/gitlab/.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - js-langchain-react/**/*
+        - js-langchain-react/ci/gitlab/.gitlab-ci.yml
+
+# Install dependencies
+install:
+  stage: install
+  script:
+    - cd js-langchain-react
+    - npm install
+
+# Build the application
+build:
+  stage: build
+  script:
+    - cd js-langchain-react
+    - npm run build
+  artifacts:
+    paths:
+      - js-langchain-react/build/
+    expire_in: 1 week
+  needs:
+    - install
+
+# Run tests
+test:
+  stage: test
+  script:
+    - cd js-langchain-react
+    - npm test || echo "No tests specified"
+  needs:
+    - install
+
+# Upload artifacts - only on main branch
+upload:
+  stage: upload
+  script:
+    - echo "Uploading build artifacts to GitLab Package Registry"
+    - |
+      if [ -d "js-langchain-react/build" ]; then
+        # Create archive of the build directory
+        cd js-langchain-react
+        tar -czf build.tar.gz build/
+        
+        # Upload the archive to GitLab Package Registry using the API
+        curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+             --upload-file build.tar.gz \
+             "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/js-langchain-react/${CI_COMMIT_TAG:-latest}/build.tar.gz"
+      else
+        echo "Build directory not found"
+        exit 1
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - build

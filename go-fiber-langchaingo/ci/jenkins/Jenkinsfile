@@ -1,0 +1,96 @@
+// Jenkins Pipeline for go-fiber-langchaingo
+// Equivalent to GitHub Actions workflow: go-fiber-langchaingo.yml
+
+pipeline {
+    agent any
+    
+    tools {
+        go 'go1.21'
+    }
+    
+    environment {
+        GOPATH = "${WORKSPACE}/.go"
+        GO111MODULE = "on"
+        PATH = "${GOPATH}/bin:${PATH}"
+    }
+    
+    options {
+        // Only keep the 10 most recent builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+    
+    // Only run on changes to project files or CI configuration
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+    
+    stages {
+        stage('Test') {
+            when {
+                anyOf {
+                    changeset 'go-fiber-langchaingo/**'
+                    changeset 'go-fiber-langchaingo/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('go-fiber-langchaingo') {
+                    // Cache go mod dependencies
+                    cache(path: '${HOME}/.cache/go-build', key: "${env.JOB_NAME}") {
+                        sh 'go test ./... -v'
+                    }
+                }
+            }
+        }
+        
+        stage('Build') {
+            when {
+                anyOf {
+                    changeset 'go-fiber-langchaingo/**'
+                    changeset 'go-fiber-langchaingo/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('go-fiber-langchaingo') {
+                    sh 'mkdir -p bin'
+                    sh 'make build || go build -o ./bin/app ./cmd/server'
+                }
+            }
+        }
+        
+        stage('Upload Artifacts') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'go-fiber-langchaingo/**'
+                        changeset 'go-fiber-langchaingo/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('go-fiber-langchaingo') {
+                    // Archive the artifacts in Jenkins
+                    archiveArtifacts artifacts: 'bin/**', fingerprint: true
+                    
+                    // You can also deploy to a production environment or artifact repository
+                    // For example, deploy to an S3 bucket
+                    /*
+                    withAWS(region: 'us-east-1', credentials: 'aws-credentials') {
+                        s3Upload(
+                            file: 'bin/app',
+                            bucket: 'your-s3-bucket',
+                            path: 'go-fiber-langchaingo/${BUILD_NUMBER}/app'
+                        )
+                    }
+                    */
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

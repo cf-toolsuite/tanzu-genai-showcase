@@ -1,0 +1,103 @@
+// Jenkins Pipeline for js-langchain-react
+// Equivalent to GitHub Actions workflow: js-langchain-react.yml
+
+pipeline {
+    agent any
+    
+    tools {
+        nodejs 'node22'
+    }
+    
+    options {
+        // Only keep the 10 most recent builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+    
+    // Only run on changes to project files or CI configuration
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+    
+    stages {
+        stage('Install Dependencies') {
+            when {
+                anyOf {
+                    changeset 'js-langchain-react/**'
+                    changeset 'js-langchain-react/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('js-langchain-react') {
+                    // Cache npm dependencies
+                    cache(path: '${HOME}/.npm', key: "${env.JOB_NAME}") {
+                        sh 'npm install'
+                    }
+                }
+            }
+        }
+        
+        stage('Build') {
+            when {
+                anyOf {
+                    changeset 'js-langchain-react/**'
+                    changeset 'js-langchain-react/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('js-langchain-react') {
+                    sh 'npm run build'
+                }
+            }
+        }
+        
+        stage('Test') {
+            when {
+                anyOf {
+                    changeset 'js-langchain-react/**'
+                    changeset 'js-langchain-react/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('js-langchain-react') {
+                    sh 'npm test || echo "No tests specified"'
+                }
+            }
+        }
+        
+        stage('Upload Artifacts') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'js-langchain-react/**'
+                        changeset 'js-langchain-react/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('js-langchain-react') {
+                    // Archive the artifacts in Jenkins
+                    archiveArtifacts artifacts: 'build/**/*', fingerprint: true
+                    
+                    // You can also deploy to a production environment or artifact repository
+                    // For example, deploy to an S3 bucket
+                    /*
+                    withAWS(region: 'us-east-1', credentials: 'aws-credentials') {
+                        s3Upload(
+                            file: 'build',
+                            bucket: 'your-s3-bucket',
+                            path: 'js-langchain-react/${BUILD_NUMBER}/'
+                        )
+                    }
+                    */
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

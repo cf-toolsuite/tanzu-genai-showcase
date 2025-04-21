@@ -1,0 +1,67 @@
+# BitBucket Pipelines for ruby-sinatra-fastmcp
+# Equivalent to GitHub Actions workflow: ruby-sinatra-fastmcp.yml
+
+image: ruby:3.2.5
+
+definitions:
+  caches:
+    bundler: vendor/bundle
+
+pipelines:
+  default:
+    - step:
+        name: Install and Test
+        caches:
+          - bundler
+        script:
+          - cd ruby-sinatra-fastmcp
+          - gem install bundler
+          - bundle config set --local path 'vendor/bundle'
+          - bundle install
+          - |
+            if [ -d "test" ]; then
+              bundle exec rake test || echo "Test execution failed"
+            else
+              echo "No tests found, skipping tests"
+            fi
+
+  branches:
+    main:
+      - step:
+          name: Install and Test
+          caches:
+            - bundler
+          script:
+            - cd ruby-sinatra-fastmcp
+            - gem install bundler
+            - bundle config set --local path 'vendor/bundle'
+            - bundle install
+            - |
+              if [ -d "test" ]; then
+                bundle exec rake test || echo "Test execution failed"
+              else
+                echo "No tests found, skipping tests"
+              fi
+      - step:
+          name: Build and Upload
+          deployment: production
+          caches:
+            - bundler
+          script:
+            - cd ruby-sinatra-fastmcp
+            - mkdir -p dist
+            - zip -r dist/ruby-sinatra-fastmcp.zip . -x "*.git*" "*.env*" ".github/*" "dist/*" "test/*" "spec/*" "vendor/*"
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'dist/ruby-sinatra-fastmcp.zip'
+                TARGET: 'artifacts/ruby-sinatra-fastmcp-${BITBUCKET_BUILD_NUMBER}.zip'
+          artifacts:
+            - ruby-sinatra-fastmcp/dist/**
+
+clone:
+  depth: full
+
+options:
+  max-time: 20

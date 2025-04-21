@@ -1,0 +1,84 @@
+# GitLab CI/CD for dotnet-extensions-ai
+# Equivalent to GitHub Actions workflow: dotnet-extensions-ai.yml
+
+image: mcr.microsoft.com/dotnet/sdk:latest
+
+# Cache NuGet packages between pipeline jobs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .nuget/
+
+# Define stages in the pipeline
+stages:
+  - build
+  - test
+  - publish
+  - upload
+
+# Run CI only when changes in the project files or CI configuration
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      changes:
+        - dotnet-extensions-ai/**/*
+        - dotnet-extensions-ai/ci/gitlab/.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - dotnet-extensions-ai/**/*
+        - dotnet-extensions-ai/ci/gitlab/.gitlab-ci.yml
+
+# Set environment variables for the pipeline
+variables:
+  NUGET_PACKAGES: .nuget
+
+# Build the application
+build:
+  stage: build
+  script:
+    - cd dotnet-extensions-ai
+    - dotnet restore
+    - dotnet build --no-restore
+
+# Run tests
+test:
+  stage: test
+  script:
+    - cd dotnet-extensions-ai
+    - dotnet test --no-build --verbosity normal
+  needs:
+    - build
+
+# Publish the application
+publish:
+  stage: publish
+  script:
+    - cd dotnet-extensions-ai
+    - dotnet publish -c Release -o ./publish
+  artifacts:
+    paths:
+      - dotnet-extensions-ai/publish/
+    expire_in: 1 week
+  needs:
+    - test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# Upload artifacts - only on main branch
+upload:
+  stage: upload
+  script:
+    - echo "Uploading build artifacts to GitLab Package Registry"
+    - |
+      cd dotnet-extensions-ai
+      # Create archive of the publish directory
+      tar -czf publish.tar.gz publish/
+      
+      # Upload the archive to GitLab Package Registry using the API
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           --upload-file publish.tar.gz \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/dotnet-extensions-ai/${CI_COMMIT_TAG:-latest}/publish.tar.gz"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - publish

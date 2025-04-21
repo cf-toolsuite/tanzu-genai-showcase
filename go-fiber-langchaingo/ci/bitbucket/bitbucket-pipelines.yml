@@ -1,0 +1,65 @@
+# BitBucket Pipelines for go-fiber-langchaingo
+# Equivalent to GitHub Actions workflow: go-fiber-langchaingo.yml
+
+image: golang:latest
+
+definitions:
+  caches:
+    go-mod: ~/.cache/go-build
+
+pipelines:
+  default:
+    - step:
+        name: Test
+        caches:
+          - go-mod
+        script:
+          - cd go-fiber-langchaingo
+          - go test ./... -v
+    - step:
+        name: Build
+        caches:
+          - go-mod
+        script:
+          - cd go-fiber-langchaingo
+          - mkdir -p bin
+          - make build || go build -o ./bin/app ./cmd/server
+        artifacts:
+          - go-fiber-langchaingo/bin/**
+
+  branches:
+    main:
+      - step:
+          name: Test
+          caches:
+            - go-mod
+          script:
+            - cd go-fiber-langchaingo
+            - go test ./... -v
+      - step:
+          name: Build
+          caches:
+            - go-mod
+          script:
+            - cd go-fiber-langchaingo
+            - mkdir -p bin
+            - make build || go build -o ./bin/app ./cmd/server
+          artifacts:
+            - go-fiber-langchaingo/bin/**
+      - step:
+          name: Upload Artifacts
+          deployment: production
+          script:
+            - cd go-fiber-langchaingo
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'bin/app'
+                TARGET: 'artifacts/go-fiber-langchaingo-${BITBUCKET_BUILD_NUMBER}'
+
+clone:
+  depth: full
+
+options:
+  max-time: 20

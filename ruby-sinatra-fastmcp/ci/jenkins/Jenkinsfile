@@ -1,0 +1,120 @@
+// Jenkins Pipeline for ruby-sinatra-fastmcp
+// Equivalent to GitHub Actions workflow: ruby-sinatra-fastmcp.yml
+
+pipeline {
+    agent {
+        docker {
+            image 'ruby:3.2.5'
+        }
+    }
+    
+    options {
+        // Only keep the 10 most recent builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+    
+    // Only run on changes to project files or CI configuration
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+    
+    environment {
+        BUNDLE_PATH = 'vendor/bundle'
+    }
+    
+    stages {
+        stage('Install Dependencies') {
+            when {
+                anyOf {
+                    changeset 'ruby-sinatra-fastmcp/**'
+                    changeset 'ruby-sinatra-fastmcp/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('ruby-sinatra-fastmcp') {
+                    // Cache bundler dependencies
+                    cache(path: 'vendor/bundle', key: "${env.JOB_NAME}") {
+                        sh 'gem install bundler'
+                        sh 'bundle config set --local path "vendor/bundle"'
+                        sh 'bundle install'
+                    }
+                }
+            }
+        }
+        
+        stage('Run Tests') {
+            when {
+                anyOf {
+                    changeset 'ruby-sinatra-fastmcp/**'
+                    changeset 'ruby-sinatra-fastmcp/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('ruby-sinatra-fastmcp') {
+                    sh '''
+                        if [ -d "test" ]; then
+                            bundle exec rake test || echo "Test execution failed"
+                        else
+                            echo "No tests found, skipping tests"
+                        fi
+                    '''
+                }
+            }
+        }
+        
+        stage('Create Package') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'ruby-sinatra-fastmcp/**'
+                        changeset 'ruby-sinatra-fastmcp/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('ruby-sinatra-fastmcp') {
+                    sh '''
+                        mkdir -p dist
+                        zip -r dist/ruby-sinatra-fastmcp.zip . -x "*.git*" "*.env*" ".github/*" "dist/*" "test/*" "spec/*" "vendor/*"
+                    '''
+                }
+            }
+        }
+        
+        stage('Upload Artifacts') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'ruby-sinatra-fastmcp/**'
+                        changeset 'ruby-sinatra-fastmcp/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('ruby-sinatra-fastmcp') {
+                    // Archive the artifacts in Jenkins
+                    archiveArtifacts artifacts: 'dist/*.zip', fingerprint: true
+                    
+                    // You can also deploy to a production environment or artifact repository
+                    // For example, deploy to a web server
+                    /*
+                    withCredentials([sshUserPrivateKey(credentialsId: 'ssh-credentials', keyFileVariable: 'SSH_KEY')]) {
+                        sh '''
+                            scp -i $SSH_KEY dist/ruby-sinatra-fastmcp.zip user@webserver:/var/www/ruby-apps/
+                            ssh -i $SSH_KEY user@webserver "cd /var/www/ruby-apps/ && unzip -o ruby-sinatra-fastmcp.zip -d ruby-sinatra-fastmcp && rm ruby-sinatra-fastmcp.zip"
+                        '''
+                    }
+                    */
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

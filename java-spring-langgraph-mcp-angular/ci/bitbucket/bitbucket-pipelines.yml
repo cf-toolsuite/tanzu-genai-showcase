@@ -1,0 +1,85 @@
+# BitBucket Pipelines for java-spring-langgraph-mcp-angular
+# Equivalent to GitHub Actions workflow: java-spring-langgraph-mcp-angular.yml
+
+definitions:
+  caches:
+    maven: ~/.m2/repository
+    npm: ~/.npm
+
+pipelines:
+  default:
+    - parallel:
+        - step:
+            name: Build Backend
+            image: bellsoft/liberica-openjdk-debian:21
+            caches:
+              - maven
+            script:
+              - cd java-spring-langgraph-mcp-angular/backend
+              - mvn -B package --file pom.xml
+            artifacts:
+              - java-spring-langgraph-mcp-angular/backend/target/*.jar
+        - step:
+            name: Build Frontend
+            image: node:18
+            caches:
+              - npm
+            script:
+              - cd java-spring-langgraph-mcp-angular/frontend
+              - npm install
+              - npm run build -- --configuration production
+            artifacts:
+              - java-spring-langgraph-mcp-angular/frontend/dist/**
+
+  branches:
+    main:
+      - parallel:
+          - step:
+              name: Build Backend
+              image: bellsoft/liberica-openjdk-debian:21
+              caches:
+                - maven
+              script:
+                - cd java-spring-langgraph-mcp-angular/backend
+                - mvn -B package --file pom.xml
+              artifacts:
+                - java-spring-langgraph-mcp-angular/backend/target/*.jar
+          - step:
+              name: Build Frontend
+              image: node:18
+              caches:
+                - npm
+              script:
+                - cd java-spring-langgraph-mcp-angular/frontend
+                - npm install
+                - npm run build -- --configuration production
+              artifacts:
+                - java-spring-langgraph-mcp-angular/frontend/dist/**
+      - step:
+          name: Upload Artifacts
+          deployment: production
+          script:
+            # Upload backend artifacts
+            - cd java-spring-langgraph-mcp-angular/backend
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'target/*.jar'
+                TARGET: 'artifacts/java-spring-langgraph-mcp-angular-backend-${BITBUCKET_BUILD_NUMBER}.jar'
+            
+            # Upload frontend artifacts
+            - cd ../frontend
+            - tar -czf frontend.tar.gz dist/
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'frontend.tar.gz'
+                TARGET: 'artifacts/java-spring-langgraph-mcp-angular-frontend-${BITBUCKET_BUILD_NUMBER}.tar.gz'
+
+clone:
+  depth: full
+
+options:
+  max-time: 30

@@ -1,0 +1,91 @@
+# BitBucket Pipelines for php-symfony-neuron
+# Equivalent to GitHub Actions workflow: php-symfony-neuron.yml
+
+image: php:8.3
+
+definitions:
+  caches:
+    composer: vendor
+
+pipelines:
+  default:
+    - step:
+        name: Prepare and Validate
+        caches:
+          - composer
+        script:
+          - cd php-symfony-neuron
+          - apt-get update -yqq
+          - apt-get install -yqq git unzip zip libzip-dev
+          - docker-php-ext-install zip pdo pdo_mysql
+          - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+          - composer validate --strict
+          - composer install --prefer-dist --no-progress
+    - step:
+        name: Test
+        caches:
+          - composer
+        script:
+          - cd php-symfony-neuron
+          - apt-get update -yqq
+          - apt-get install -yqq git unzip zip libzip-dev
+          - docker-php-ext-install zip
+          - |
+            if [ -d "tests" ]; then
+              vendor/bin/phpunit
+            else
+              echo "No tests directory found, skipping tests"
+            fi
+
+  branches:
+    main:
+      - step:
+          name: Prepare and Validate
+          caches:
+            - composer
+          script:
+            - cd php-symfony-neuron
+            - apt-get update -yqq
+            - apt-get install -yqq git unzip zip libzip-dev
+            - docker-php-ext-install zip pdo pdo_mysql
+            - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+            - composer validate --strict
+            - composer install --prefer-dist --no-progress
+      - step:
+          name: Test
+          caches:
+            - composer
+          script:
+            - cd php-symfony-neuron
+            - |
+              if [ -d "tests" ]; then
+                vendor/bin/phpunit
+              else
+                echo "No tests directory found, skipping tests"
+              fi
+      - step:
+          name: Build and Upload
+          deployment: production
+          caches:
+            - composer
+          script:
+            - cd php-symfony-neuron
+            - apt-get update -yqq
+            - apt-get install -yqq git unzip zip
+            - composer dump-autoload --optimize --no-dev
+            - mkdir -p build
+            - zip -r build/php-symfony-neuron.zip . -x ".git/*" "tests/*" ".env*" ".github/*" "build/*"
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'build/php-symfony-neuron.zip'
+                TARGET: 'artifacts/php-symfony-neuron-${BITBUCKET_BUILD_NUMBER}.zip'
+          artifacts:
+            - php-symfony-neuron/build/**
+
+clone:
+  depth: full
+
+options:
+  max-time: 20

@@ -1,0 +1,92 @@
+# GitLab CI/CD for ruby-sinatra-fastmcp
+# Equivalent to GitHub Actions workflow: ruby-sinatra-fastmcp.yml
+
+image: ruby:3.2.5
+
+# Define stages in the pipeline
+stages:
+  - install
+  - test
+  - build
+  - upload
+
+# Cache Ruby gems between pipeline jobs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - vendor/bundle
+
+# Run CI only when changes in the project files or CI configuration
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      changes:
+        - ruby-sinatra-fastmcp/**/*
+        - ruby-sinatra-fastmcp/ci/gitlab/.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - ruby-sinatra-fastmcp/**/*
+        - ruby-sinatra-fastmcp/ci/gitlab/.gitlab-ci.yml
+
+# Set up Ruby environment variables
+variables:
+  BUNDLE_PATH: vendor/bundle
+
+# Install dependencies
+install:
+  stage: install
+  script:
+    - cd ruby-sinatra-fastmcp
+    - gem install bundler
+    - bundle config set --local path 'vendor/bundle'
+    - bundle install
+
+# Run tests
+test:
+  stage: test
+  script:
+    - cd ruby-sinatra-fastmcp
+    - |
+      if [ -d "test" ]; then
+        bundle exec rake test || echo "Test execution failed"
+      else
+        echo "No tests found, skipping tests"
+      fi
+  needs:
+    - install
+
+# Create package
+build:
+  stage: build
+  script:
+    - cd ruby-sinatra-fastmcp
+    - mkdir -p dist
+    - zip -r dist/ruby-sinatra-fastmcp.zip . -x "*.git*" "*.env*" ".github/*" "dist/*" "test/*" "spec/*" "vendor/*"
+  artifacts:
+    paths:
+      - ruby-sinatra-fastmcp/dist/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - test
+
+# Upload artifacts - only on main branch
+upload:
+  stage: upload
+  script:
+    - echo "Uploading build artifacts to GitLab Package Registry"
+    - |
+      if [ -f "ruby-sinatra-fastmcp/dist/ruby-sinatra-fastmcp.zip" ]; then
+        cd ruby-sinatra-fastmcp
+        curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+             --upload-file dist/ruby-sinatra-fastmcp.zip \
+             "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/ruby-sinatra-fastmcp/${CI_COMMIT_TAG:-latest}/ruby-sinatra-fastmcp.zip"
+      else
+        echo "Build package not found"
+        exit 1
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - build

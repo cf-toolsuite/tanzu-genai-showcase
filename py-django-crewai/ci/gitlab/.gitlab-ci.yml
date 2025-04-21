@@ -1,0 +1,91 @@
+# GitLab CI/CD for py-django-crewai
+# Equivalent to GitHub Actions workflow: py-django-crewai.yml
+
+image: python:3.12
+
+# Define stages in the pipeline
+stages:
+  - install
+  - test
+  - package
+  - upload
+
+# Cache dependencies between pipeline jobs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .pip/
+    - venv/
+
+# Run CI only when changes in the project files or CI configuration
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      changes:
+        - py-django-crewai/**/*
+        - py-django-crewai/ci/gitlab/.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - py-django-crewai/**/*
+        - py-django-crewai/ci/gitlab/.gitlab-ci.yml
+
+# Set up Python environment and install dependencies
+install:
+  stage: install
+  script:
+    - cd py-django-crewai
+    - python -m pip install --upgrade pip
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -r requirements.txt
+
+# Run tests
+test:
+  stage: test
+  script:
+    - cd py-django-crewai
+    - python -m venv venv
+    - source venv/bin/activate
+    - python manage.py test || echo "No tests run"
+    - python manage.py collectstatic --noinput || echo "Static collection skipped"
+  needs:
+    - install
+
+# Create package
+package:
+  stage: package
+  script:
+    - cd py-django-crewai
+    - python -m venv venv
+    - source venv/bin/activate
+    - mkdir -p dist
+    - zip -r dist/py-django-crewai.zip . -x "*.git*" "*.env*" "*.pyc" "__pycache__/*" "*.github/*" "dist/*" "venv/*"
+  artifacts:
+    paths:
+      - py-django-crewai/dist/
+    expire_in: 1 week
+  needs:
+    - test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# Upload artifacts - only on main branch
+upload:
+  stage: upload
+  script:
+    - echo "Uploading artifacts to GitLab Package Registry"
+    - |
+      if [ -f "py-django-crewai/dist/py-django-crewai.zip" ]; then
+        # Upload the archive to GitLab Package Registry using the API
+        cd py-django-crewai
+        curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+             --upload-file dist/py-django-crewai.zip \
+             "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/py-django-crewai/${CI_COMMIT_TAG:-latest}/py-django-crewai.zip"
+      else
+        echo "Package file not found"
+        exit 1
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - package

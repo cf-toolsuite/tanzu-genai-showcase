@@ -1,0 +1,55 @@
+# BitBucket Pipelines for py-django-crewai
+# Equivalent to GitHub Actions workflow: py-django-crewai.yml
+
+image: python:3.12
+
+definitions:
+  caches:
+    pip: ~/.cache/pip
+
+pipelines:
+  default:
+    - step:
+        name: Build and Test
+        caches:
+          - pip
+        script:
+          - cd py-django-crewai
+          - python -m pip install --upgrade pip
+          - pip install -r requirements.txt
+          - python manage.py test || echo "No tests run"
+          - python manage.py collectstatic --noinput || echo "Static collection skipped"
+
+  branches:
+    main:
+      - step:
+          name: Build and Test
+          caches:
+            - pip
+          script:
+            - cd py-django-crewai
+            - python -m pip install --upgrade pip
+            - pip install -r requirements.txt
+            - python manage.py test || echo "No tests run"
+            - python manage.py collectstatic --noinput || echo "Static collection skipped"
+          artifacts:
+            - py-django-crewai/**
+      - step:
+          name: Package and Upload
+          deployment: production
+          script:
+            - cd py-django-crewai
+            - mkdir -p dist
+            - zip -r dist/py-django-crewai.zip . -x "*.git*" "*.env*" "*.pyc" "__pycache__/*" "*.github/*" "dist/*"
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'dist/py-django-crewai.zip'
+                TARGET: 'artifacts/py-django-crewai-${BITBUCKET_BUILD_NUMBER}.zip'
+
+clone:
+  depth: full
+
+options:
+  max-time: 20

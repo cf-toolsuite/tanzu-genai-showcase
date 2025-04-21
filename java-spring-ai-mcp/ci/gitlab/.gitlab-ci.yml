@@ -1,0 +1,66 @@
+# GitLab CI/CD for java-spring-ai-mcp
+# Equivalent to GitHub Actions workflow: java-spring-ai-mcp.yml
+
+image: bellsoft/liberica-openjdk-debian:21
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+
+# Cache Maven dependencies between pipeline jobs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .m2/repository/
+
+# Defines stages in the pipeline
+stages:
+  - build
+  - upload
+
+# Run CI only when changes in the project files or CI configuration
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      changes:
+        - java-spring-ai-mcp/**/*
+        - java-spring-ai-mcp/ci/gitlab/.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - java-spring-ai-mcp/**/*
+        - java-spring-ai-mcp/ci/gitlab/.gitlab-ci.yml
+
+# Build job
+build:
+  stage: build
+  script:
+    - cd java-spring-ai-mcp
+    - mvn -B package --file pom.xml
+  artifacts:
+    paths:
+      - java-spring-ai-mcp/client/target/*.jar
+      - java-spring-ai-mcp/server/target/*.jar
+      - java-spring-ai-mcp/api/target/*.jar
+    expire_in: 1 week
+
+# Upload artifacts job - only on main branch
+upload:
+  stage: upload
+  script:
+    - echo "Uploading artifacts to GitLab package registry"
+    - cd java-spring-ai-mcp
+    - |
+      for module in client server api; do
+        mvn deploy:deploy-file \
+          -DgroupId=com.example \
+          -DartifactId=java-spring-ai-mcp-${module} \
+          -Dversion=${CI_COMMIT_TAG:-0.0.1-SNAPSHOT} \
+          -DgeneratePom=true \
+          -Dpackaging=jar \
+          -DrepositoryId=gitlab-maven \
+          -Durl=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
+          -Dfile=${module}/target/java-spring-ai-mcp-${module}-*.jar
+      done
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  dependencies:
+    - build

@@ -1,0 +1,101 @@
+# GitLab CI/CD for java-spring-langgraph-mcp-angular
+# Equivalent to GitHub Actions workflow: java-spring-langgraph-mcp-angular.yml
+
+# Define the stages for the pipeline
+stages:
+  - build-backend
+  - build-frontend
+  - upload
+
+# Variables for both jobs
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+  NPM_CONFIG_CACHE: ".npm"
+
+# Cache dependencies for both backend and frontend
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .m2/repository/
+    - .npm/
+
+# Run CI only when changes in the project files or CI configuration
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      changes:
+        - java-spring-langgraph-mcp-angular/**/*
+        - java-spring-langgraph-mcp-angular/ci/gitlab/.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - java-spring-langgraph-mcp-angular/**/*
+        - java-spring-langgraph-mcp-angular/ci/gitlab/.gitlab-ci.yml
+
+# Backend build job
+build-backend:
+  stage: build-backend
+  image: bellsoft/liberica-openjdk-debian:21
+  script:
+    - cd java-spring-langgraph-mcp-angular/backend
+    - mvn -B package --file pom.xml
+  artifacts:
+    paths:
+      - java-spring-langgraph-mcp-angular/backend/target/*.jar
+    expire_in: 1 week
+
+# Frontend build job
+build-frontend:
+  stage: build-frontend
+  image: node:18
+  script:
+    - cd java-spring-langgraph-mcp-angular/frontend
+    - npm install
+    - npm run build -- --configuration production
+  artifacts:
+    paths:
+      - java-spring-langgraph-mcp-angular/frontend/dist/
+    expire_in: 1 week
+
+# Upload artifacts job - only on main branch
+upload:
+  stage: upload
+  image: alpine:latest
+  script:
+    - echo "Uploading artifacts to GitLab Package Registry"
+    
+    # Backend artifacts
+    - |
+      if [ -d "java-spring-langgraph-mcp-angular/backend/target" ]; then
+        cd java-spring-langgraph-mcp-angular/backend
+        apk add --no-cache curl
+        jar_file=$(find target -name "*.jar" | head -1)
+        if [ -n "$jar_file" ]; then
+          curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+               --upload-file $jar_file \
+               "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/java-spring-langgraph-mcp-angular-backend/${CI_COMMIT_TAG:-latest}/backend.jar"
+        else
+          echo "No JAR file found in backend/target directory"
+        fi
+        cd ../..
+      else
+        echo "Backend target directory not found"
+      fi
+    
+    # Frontend artifacts
+    - |
+      if [ -d "java-spring-langgraph-mcp-angular/frontend/dist" ]; then
+        cd java-spring-langgraph-mcp-angular/frontend
+        apk add --no-cache tar gzip
+        tar -czf frontend.tar.gz dist/
+        apk add --no-cache curl
+        curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+             --upload-file frontend.tar.gz \
+             "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/java-spring-langgraph-mcp-angular-frontend/${CI_COMMIT_TAG:-latest}/frontend.tar.gz"
+      else
+        echo "Frontend dist directory not found"
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - build-backend
+    - build-frontend

@@ -1,0 +1,117 @@
+// Jenkins Pipeline for dotnet-extensions-ai
+// Equivalent to GitHub Actions workflow: dotnet-extensions-ai.yml
+
+pipeline {
+    agent any
+    
+    tools {
+        dotnetsdk 'dotnet-sdk-latest'
+    }
+    
+    options {
+        // Only keep the 10 most recent builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+    
+    // Only run on changes to project files or CI configuration
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+    
+    stages {
+        stage('Restore Dependencies') {
+            when {
+                anyOf {
+                    changeset 'dotnet-extensions-ai/**'
+                    changeset 'dotnet-extensions-ai/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('dotnet-extensions-ai') {
+                    // Cache NuGet packages
+                    cache(path: '${HOME}/.nuget/packages', key: "${env.JOB_NAME}") {
+                        sh 'dotnet restore'
+                    }
+                }
+            }
+        }
+        
+        stage('Build') {
+            when {
+                anyOf {
+                    changeset 'dotnet-extensions-ai/**'
+                    changeset 'dotnet-extensions-ai/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('dotnet-extensions-ai') {
+                    sh 'dotnet build --no-restore'
+                }
+            }
+        }
+        
+        stage('Test') {
+            when {
+                anyOf {
+                    changeset 'dotnet-extensions-ai/**'
+                    changeset 'dotnet-extensions-ai/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('dotnet-extensions-ai') {
+                    sh 'dotnet test --no-build --verbosity normal'
+                }
+            }
+        }
+        
+        stage('Publish') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'dotnet-extensions-ai/**'
+                        changeset 'dotnet-extensions-ai/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('dotnet-extensions-ai') {
+                    sh 'dotnet publish -c Release -o ./publish'
+                }
+            }
+        }
+        
+        stage('Upload Artifacts') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'dotnet-extensions-ai/**'
+                        changeset 'dotnet-extensions-ai/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('dotnet-extensions-ai') {
+                    // Archive the artifacts in Jenkins
+                    archiveArtifacts artifacts: 'publish/**', fingerprint: true
+                    
+                    // You can also deploy to a production environment or artifact repository
+                    // For example, deploy to a NuGet repository
+                    /*
+                    sh '''
+                        cd publish
+                        dotnet nuget push *.nupkg --source "YourNuGetRepo" --api-key ${NUGET_API_KEY}
+                    '''
+                    */
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

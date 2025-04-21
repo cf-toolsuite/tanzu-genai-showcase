@@ -1,0 +1,131 @@
+// Jenkins Pipeline for java-spring-langgraph-mcp-angular
+// Equivalent to GitHub Actions workflow: java-spring-langgraph-mcp-angular.yml
+
+pipeline {
+    agent any
+    
+    tools {
+        jdk 'jdk21'
+        maven 'maven3'
+        nodejs 'node18'
+    }
+    
+    options {
+        // Only keep the 10 most recent builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+    
+    // Only run on changes to project files or CI configuration
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+    
+    stages {
+        stage('Build Backend') {
+            when {
+                anyOf {
+                    changeset 'java-spring-langgraph-mcp-angular/**'
+                    changeset 'java-spring-langgraph-mcp-angular/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('java-spring-langgraph-mcp-angular/backend') {
+                    // Cache Maven dependencies
+                    cache(path: '${HOME}/.m2/repository', key: "${env.JOB_NAME}-backend") {
+                        sh 'mvn -B package --file pom.xml'
+                    }
+                    
+                    // Archive backend artifacts if on main branch
+                    script {
+                        if (env.BRANCH_NAME == 'main') {
+                            archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Build Frontend') {
+            when {
+                anyOf {
+                    changeset 'java-spring-langgraph-mcp-angular/**'
+                    changeset 'java-spring-langgraph-mcp-angular/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('java-spring-langgraph-mcp-angular/frontend') {
+                    // Cache npm dependencies
+                    cache(path: '${HOME}/.npm', key: "${env.JOB_NAME}-frontend") {
+                        sh 'npm install'
+                    }
+                    
+                    sh 'npm run build -- --configuration production'
+                    
+                    // Archive frontend artifacts if on main branch
+                    script {
+                        if (env.BRANCH_NAME == 'main') {
+                            archiveArtifacts artifacts: 'dist/**', fingerprint: true
+                        }
+                    }
+                }
+            }
+        }
+        
+        stage('Deploy') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'java-spring-langgraph-mcp-angular/**'
+                        changeset 'java-spring-langgraph-mcp-angular/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                echo "Deploying backend and frontend artifacts..."
+                
+                // Example deployment steps:
+                // - Upload to a repository
+                // - Deploy to a server
+                // - etc.
+                
+                // Example for deploying to a Maven repository
+                /*
+                dir('java-spring-langgraph-mcp-angular/backend') {
+                    sh '''
+                        mvn deploy:deploy-file \
+                          -DgroupId=com.example \
+                          -DartifactId=java-spring-langgraph-mcp-angular-backend \
+                          -Dversion=${BUILD_NUMBER} \
+                          -DgeneratePom=true \
+                          -Dpackaging=jar \
+                          -DrepositoryId=nexus \
+                          -Durl=${NEXUS_URL}/repository/maven-releases \
+                          -Dfile=target/java-spring-langgraph-mcp-angular-backend-*.jar
+                    '''
+                }
+                */
+                
+                // Example for deploying frontend to a web server
+                /*
+                dir('java-spring-langgraph-mcp-angular/frontend') {
+                    sh '''
+                        # Create a tar.gz archive of the dist directory
+                        tar -czf frontend.tar.gz dist/
+                        
+                        # Copy to a web server
+                        scp -i ${SSH_KEY} frontend.tar.gz user@webserver:/path/to/deployment/
+                        ssh -i ${SSH_KEY} user@webserver "cd /path/to/deployment/ && tar -xzf frontend.tar.gz && rm frontend.tar.gz"
+                    '''
+                }
+                */
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

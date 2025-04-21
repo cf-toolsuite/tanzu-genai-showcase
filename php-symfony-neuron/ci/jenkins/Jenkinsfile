@@ -1,0 +1,146 @@
+// Jenkins Pipeline for php-symfony-neuron
+// Equivalent to GitHub Actions workflow: php-symfony-neuron.yml
+
+pipeline {
+    agent {
+        docker {
+            image 'php:8.3'
+            args '-v ${WORKSPACE}:/var/www/html'
+        }
+    }
+    
+    options {
+        // Only keep the 10 most recent builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+    
+    // Only run on changes to project files or CI configuration
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+    
+    stages {
+        stage('Prepare Environment') {
+            when {
+                anyOf {
+                    changeset 'php-symfony-neuron/**'
+                    changeset 'php-symfony-neuron/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('php-symfony-neuron') {
+                    sh '''
+                        apt-get update -yqq
+                        apt-get install -yqq git unzip zip libzip-dev
+                        docker-php-ext-install zip pdo pdo_mysql
+                        curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+                    '''
+                }
+            }
+        }
+        
+        stage('Validate Composer') {
+            when {
+                anyOf {
+                    changeset 'php-symfony-neuron/**'
+                    changeset 'php-symfony-neuron/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('php-symfony-neuron') {
+                    sh 'composer validate --strict'
+                }
+            }
+        }
+        
+        stage('Install Dependencies') {
+            when {
+                anyOf {
+                    changeset 'php-symfony-neuron/**'
+                    changeset 'php-symfony-neuron/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('php-symfony-neuron') {
+                    sh 'composer install --prefer-dist --no-progress'
+                }
+            }
+        }
+        
+        stage('Run Tests') {
+            when {
+                anyOf {
+                    changeset 'php-symfony-neuron/**'
+                    changeset 'php-symfony-neuron/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('php-symfony-neuron') {
+                    sh '''
+                        if [ -d "tests" ]; then
+                            vendor/bin/phpunit
+                        else
+                            echo "No tests directory found, skipping tests"
+                        fi
+                    '''
+                }
+            }
+        }
+        
+        stage('Build Package') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'php-symfony-neuron/**'
+                        changeset 'php-symfony-neuron/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('php-symfony-neuron') {
+                    sh '''
+                        composer dump-autoload --optimize --no-dev
+                        mkdir -p build
+                        zip -r build/php-symfony-neuron.zip . -x ".git/*" "tests/*" ".env*" ".github/*" "build/*"
+                    '''
+                }
+            }
+        }
+        
+        stage('Upload Artifacts') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'php-symfony-neuron/**'
+                        changeset 'php-symfony-neuron/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('php-symfony-neuron') {
+                    // Archive the artifacts in Jenkins
+                    archiveArtifacts artifacts: 'build/*.zip', fingerprint: true
+                    
+                    // You can also deploy to a production environment or artifact repository
+                    // For example, deploy to a web server
+                    /*
+                    withCredentials([sshUserPrivateKey(credentialsId: 'ssh-credentials', keyFileVariable: 'SSH_KEY')]) {
+                        sh '''
+                            scp -i $SSH_KEY build/php-symfony-neuron.zip user@webserver:/var/www/html/
+                            ssh -i $SSH_KEY user@webserver "cd /var/www/html/ && unzip -o php-symfony-neuron.zip && rm php-symfony-neuron.zip"
+                        '''
+                    }
+                    */
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}
