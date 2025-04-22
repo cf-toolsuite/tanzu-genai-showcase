@@ -54,7 +54,14 @@ class GenAIChatProcessor:
             config['api_key'] = credentials['api_key']
 
         if 'model_name' in credentials:
-            config['model'] = "openai/" + credentials['model_name']
+            if 'model_provider' in credentials:
+                # Include provider as prefix if available
+                config['model'] = f"{credentials['model_provider']}/{credentials['model_name']}"
+                config['provider'] = credentials['model_provider']
+            else:
+                # Default to OpenAI provider if not specified
+                config['model'] = "openai/" + credentials['model_name']
+                config['provider'] = "openai"
 
         return config
 
@@ -94,11 +101,30 @@ def get_llm_config():
         logger.error(f"LLM Config: Error getting service with name 'movie-chatbot-llm': {e}", exc_info=True)
 
     # Fallback to environment variables
+    model_str = os.getenv('LLM_MODEL', 'gpt-4o-mini')
+    provider = None
+
+    # Extract provider from model string if present (format: "provider/model")
+    if '/' in model_str:
+        parts = model_str.split('/', 1)
+        if len(parts) == 2:
+            provider, model_name = parts
+            logger.info(f"Detected provider in model string: {provider}/{model_name}")
+    else:
+        # Check if there's an explicit provider setting
+        provider = os.getenv('LLM_PROVIDER', 'openai')
+        logger.info(f"Using provider from environment: {provider}")
+
     config = {
         'api_key': os.getenv('OPENAI_API_KEY') or os.getenv('LLM_API_KEY'),
         'base_url': os.getenv('LLM_BASE_URL') or os.getenv('OPENAI_BASE_URL'),
-        'model': os.getenv('LLM_MODEL', 'gpt-4o-mini')
+        'model': model_str
     }
+
+    # Only add provider if explicitly set
+    if provider:
+        config['provider'] = provider
+        logger.info(f"Added provider '{provider}' to LLM configuration")
 
     # Log configuration status
     if not config['api_key']:

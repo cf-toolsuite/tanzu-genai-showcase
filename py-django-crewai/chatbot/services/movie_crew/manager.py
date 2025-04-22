@@ -37,7 +37,8 @@ class MovieCrewManager:
         tmdb_api_key: Optional[str] = None,
         user_location: Optional[str] = None,
         user_ip: Optional[str] = None,
-        timezone: Optional[str] = None
+        timezone: Optional[str] = None,
+        llm_provider: Optional[str] = None
     ):
         """
         Initialize the MovieCrewManager.
@@ -50,6 +51,7 @@ class MovieCrewManager:
             user_location: Optional user location string
             user_ip: Optional user IP address for geolocation
             timezone: Optional user timezone string (e.g., 'America/Los_Angeles')
+            llm_provider: Optional LLM provider name to use with the model (e.g., 'openai')
         """
         self.api_key = api_key
         self.base_url = base_url
@@ -58,6 +60,7 @@ class MovieCrewManager:
         self.user_location = user_location
         self.user_ip = user_ip
         self.timezone = timezone
+        self.llm_provider = llm_provider
 
         # Configure TMDb API if key is provided
         if tmdb_api_key:
@@ -74,15 +77,68 @@ class MovieCrewManager:
         Returns:
             Configured ChatOpenAI instance
         """
-        config = {
-            "openai_api_key": self.api_key,
-            "model": self.model,
-            "temperature": temperature,
+        # Log configuration details
+        logger.info(f"Creating LLM with model: {self.model}")
+        logger.info(f"API base URL: {self.base_url if self.base_url else 'default'}")
+
+        # Extract model name and provider info
+        model_name = self.model
+        provider = self.llm_provider  # May be None if not specified
+
+        # Process provider/model format if present
+        if '/' in model_name:
+            parts = model_name.split('/', 1)
+            provider_from_name, model_without_prefix = parts
+
+            # If explicit provider was given, it overrides the prefix in the name
+            if not provider:
+                provider = provider_from_name
+                logger.info(f"Using provider from model name: {provider}")
+
+            model_name = model_without_prefix
+            logger.info(f"Extracted model name without prefix: {model_name}")
+
+        # If no provider specified yet, default to openai
+        if not provider:
+            provider = "openai"
+            logger.info(f"No provider specified, defaulting to: {provider}")
+
+        # Ensure model always has provider prefix
+        full_model_name = f"{provider}/{model_name}"
+        logger.info(f"Using model with provider prefix: {full_model_name}")
+
+        # Create model mapping for LiteLLM - place it in model_kwargs
+        litellm_mapping = {model_name: provider}
+
+        # Set up model_kwargs with LiteLLM configuration
+        model_kwargs = {
+            "model_name_map": json.dumps(litellm_mapping)
         }
 
+        # Explicitly set the API key in the environment for LiteLLM's underlying libraries
+        # This is a safer approach that ensures the key is properly propagated
+        import os
+        os.environ["OPENAI_API_KEY"] = self.api_key
+        if self.base_url:
+            os.environ["OPENAI_API_BASE"] = self.base_url
+
+        # Base configuration with the key as a parameter (belt and suspenders approach)
+        config = {
+            "openai_api_key": self.api_key,
+            "model": full_model_name,
+            "temperature": temperature,
+            "model_kwargs": model_kwargs
+        }
+
+        # Add base URL if provided
         if self.base_url:
             config["openai_api_base"] = self.base_url
 
+        # Log detailed configuration for debugging
+        logger.info(f"LiteLLM mapping: {litellm_mapping}")
+        logger.info(f"Using model: {full_model_name} with provider: {provider}")
+
+        # Create the model instance with proper configuration
         return ChatOpenAI(**config)
 
     @LoggingMiddleware.log_method_call
@@ -142,6 +198,9 @@ class MovieCrewManager:
         theater_finder_tool.timezone = self.timezone
 
         logger.info(f"Created SearchMoviesTool with first_run_mode: {first_run_mode}")
+        
+        # Ensure tool compatibility with CrewAI 0.114.0
+        self._ensure_tool_compatibility([search_tool, analyze_tool, theater_finder_tool])
 
         # Set up the image enhancement tool
         enhance_images_tool = EnhanceMovieImagesTool(tmdb_api_key=self.tmdb_api_key)
@@ -192,7 +251,7 @@ class MovieCrewManager:
         # Debug log the task structure
         logger.info(f"Task definitions: {[t.description for t in crew.tasks]}")
 
-        # Execute the crew
+        # Execute the crew with enhanced error handling
         try:
             logger.info("Starting crew execution with query: %s", query)
             logger.debug(f"Crew tasks: {[t.description for t in crew.tasks]}")
@@ -200,6 +259,10 @@ class MovieCrewManager:
 
             # Set execution timeout and execute with detailed logging
             logger.info("Initiating crew kickoff")
+
+            # Add patch for CrewAI tool event tracking issue
+            self._patch_crewai_event_tracking()
+            
             start_time = datetime.now()
             result = crew.kickoff()
             end_time = datetime.now()
@@ -401,6 +464,32 @@ class MovieCrewManager:
                 "movies": []
             }
 
+    def _ensure_tool_compatibility(self, tools: List[Any]) -> None:
+        """
+        Ensure tools have all necessary attributes for CrewAI 0.114.0 compatibility.
+        
+        Args:
+            tools: List of tools to check and enhance
+        """
+        for tool in tools:
+            try:
+                # Make sure the tool has a name attribute
+                if not hasattr(tool, 'name'):
+                    tool_class_name = tool.__class__.__name__
+                    # Derive a name from the class name if needed
+                    derived_name = tool_class_name.lower().replace('tool', '_tool')
+                    setattr(tool, 'name', derived_name)
+                    logger.info(f"Added missing name '{derived_name}' to tool of type {tool_class_name}")
+                
+                # Ensure tool name is registered with CrewAI's event tracking system
+                # This prevents the KeyError: 'search_movies_tool' issue
+                from crewai.utilities.events.utils.console_formatter import ConsoleFormatter
+                if hasattr(ConsoleFormatter, 'tool_usage_counts') and tool.name not in ConsoleFormatter.tool_usage_counts:
+                    ConsoleFormatter.tool_usage_counts[tool.name] = 0
+                    logger.info(f"Pre-registered tool '{tool.name}' with CrewAI event tracking")
+            except Exception as e:
+                logger.warning(f"Error ensuring tool compatibility for {tool.__class__.__name__}: {e}")
+                
     def _process_current_releases(self, recommendations: List[Dict[str, Any]]) -> None:
         """
         Process recommendations to identify current releases.
@@ -436,6 +525,55 @@ class MovieCrewManager:
                 movie['theaters'] = []
                 logger.info(f"Movie '{movie.get('title')}' is an older release ({release_year}), skipping theater lookup")
 
+    def _patch_crewai_event_tracking(self):
+        """
+        Patch CrewAI's event tracking system to handle missing tools gracefully.
+        This addresses the KeyError: 'search_movies_tool' issue in newer CrewAI versions.
+        """
+        try:
+            # Import necessary modules from CrewAI
+            from crewai.utilities.events.utils.console_formatter import ConsoleFormatter
+            from crewai.utilities.events.event_listener import CrewAgentEventListener
+            
+            # Store original handle_tool_usage_finished method
+            original_handle = ConsoleFormatter.handle_tool_usage_finished
+            
+            # Define patched method with error handling
+            def patched_handle_tool_usage_finished(self, event):
+                try:
+                    # First try to initialize tool_usage_counts if it doesn't exist
+                    if not hasattr(self, 'tool_usage_counts'):
+                        self.tool_usage_counts = {}
+                    
+                    # Get tool name safely
+                    tool_name = getattr(event, 'tool_name', 'unknown_tool')
+                    
+                    # Initialize counter for this tool if not already done
+                    if tool_name not in self.tool_usage_counts:
+                        self.tool_usage_counts[tool_name] = 0
+                    
+                    # Now call the original method which should work
+                    return original_handle(self, event)
+                except KeyError as e:
+                    # Log the error but continue execution
+                    logger.warning(f"CrewAI event tracking KeyError handled: {e}")
+                    # Initialize the missing key
+                    if hasattr(event, 'tool_name'):
+                        self.tool_usage_counts[event.tool_name] = 1
+                    return None
+                except Exception as e:
+                    # Log other errors but don't crash
+                    logger.error(f"Error in CrewAI event tracking: {e}")
+                    return None
+            
+            # Apply the patch
+            ConsoleFormatter.handle_tool_usage_finished = patched_handle_tool_usage_finished
+            logger.info("Successfully patched CrewAI event tracking")
+            
+        except Exception as e:
+            # If patching fails, log but continue
+            logger.warning(f"Failed to patch CrewAI event tracking: {e}")
+    
     def _combine_movies_and_theaters(self,
                                     recommendations: List[Dict[str, Any]],
                                     theaters_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

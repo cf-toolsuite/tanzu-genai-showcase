@@ -301,14 +301,32 @@ def send_message(request):
                 client_ip = get_client_ip(request)
                 logger.info(f"Client IP: {client_ip}")
 
+                # Extract model and provider information from LLM_CONFIG
+                model = settings.LLM_CONFIG.get('model', 'gpt-4o-mini')
+                # Check if model includes a provider prefix
+                llm_provider = None
+                if '/' in model:
+                    parts = model.split('/', 1)
+                    if len(parts) == 2:
+                        llm_provider, model_name = parts
+                        logger.info(f"Extracted provider {llm_provider} and model {model_name} from {model}")
+                        # Keep the full model string for compatibility
+                        model = model
+
+                # Use llm_provider from settings if specified directly
+                if 'provider' in settings.LLM_CONFIG:
+                    llm_provider = settings.LLM_CONFIG['provider']
+                    logger.info(f"Using provider from settings: {llm_provider}")
+
                 movie_crew_manager = MovieCrewManager(
                     api_key=settings.LLM_CONFIG['api_key'],
                     base_url=settings.LLM_CONFIG.get('base_url'),
-                    model=settings.LLM_CONFIG.get('model', 'gpt-4o-mini'),
+                    model=model,
                     tmdb_api_key=settings.TMDB_API_KEY,
                     user_location=location,
                     user_ip=client_ip,  # Pass the IP directly in constructor
-                    timezone=timezone_str  # Pass the timezone string for showtime conversions
+                    timezone=timezone_str,  # Pass the timezone string for showtime conversions
+                    llm_provider=llm_provider  # Pass the provider if specified
                 )
                 logger.info("Movie crew manager initialized successfully")
             except Exception as init_error:
