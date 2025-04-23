@@ -378,15 +378,6 @@ jobs:
           if [[ "${{ inputs.project }}" == "go-fiber-langchaingo" && "${{ secrets.CONGRESS_API_KEY }}" != "" ]]; then
             cf set-env "$APP_NAME" CONGRESS_API_KEY "${{ secrets.CONGRESS_API_KEY }}"
           fi
-        #  if [[ "${{ inputs.project }}" == "java-spring-ai-mcp/server" && "${{ secrets.AVIATION_STACK_ACCESS_KEY }}" != "" ]]; then
-            # Check if the UPS was created successfully before setting env var
-        #    if cf service aviation-stack-service-credentials; then
-        #      echo "UPS exists, not setting env var directly for server."
-        #    else
-               # Fallback if UPS failed
-        #      cf set-env "$APP_NAME" AVIATION_STACK_ACCESS_KEY "${{ secrets.AVIATION_STACK_ACCESS_KEY }}"
-        #    fi
-        #  fi
           if [[ "${{ inputs.project }}" == "java-spring-ai-mcp/client" && "${{ secrets.OPENAI_API_KEY }}" != "" ]]; then
              # Client might use service binding OR direct key
              cf set-env "$APP_NAME" SPRING_AI_OPENAI_API_KEY "${{ secrets.OPENAI_API_KEY }}"
