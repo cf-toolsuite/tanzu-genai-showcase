@@ -355,7 +355,7 @@ jobs:
       - name: Push Application to Cloud Foundry
         run: |
           # Determine app name from manifest or project name
-          APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+          APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $3}')
           if [ -z "$APP_NAME" ]; then
             APP_NAME=$(basename "${{ inputs.project }}") # Fallback to directory name
           fi
