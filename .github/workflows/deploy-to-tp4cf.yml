@@ -260,17 +260,17 @@ jobs:
           fi
         continue-on-error: true
 
-      - name: Create User Provided Service (if needed by java-spring-ai-mcp/server)
+     # - name: Create User Provided Service (if needed by java-spring-ai-mcp/server)
         # This requires the AVIATION_STACK_ACCESS_KEY secret
-        if: inputs.project == 'java-spring-ai-mcp/server' && secrets.AVIATION_STACK_ACCESS_KEY != ''
-        run: |
-          if ! cf service aviation-stack-service-credentials; then
-            echo "Creating user-provided service: aviation-stack-service-credentials"
-            cf create-user-provided-service aviation-stack-service-credentials -p '{"access_key":"${{ secrets.AVIATION_STACK_ACCESS_KEY }}"}' || echo "UPS creation might have failed or already exists"
-          else
-            echo "UPS aviation-stack-service-credentials already exists."
-          fi
-        continue-on-error: true
+     #   if: inputs.project == 'java-spring-ai-mcp/server' && secrets.AVIATION_STACK_ACCESS_KEY != ''
+     #   run: |
+     #     if ! cf service aviation-stack-service-credentials; then
+     #       echo "Creating user-provided service: aviation-stack-service-credentials"
+     #       cf create-user-provided-service aviation-stack-service-credentials -p '{"access_key":"${{ secrets.AVIATION_STACK_ACCESS_KEY }}"}' || echo "UPS creation might have failed or already exists"
+     #     else
+     #       echo "UPS aviation-stack-service-credentials already exists."
+     #     fi
+     #   continue-on-error: true
 
       - name: Create GenAI Service (if needed by java-spring-langgraph-mcp-angular)
         if: inputs.project == 'java-spring-langgraph-mcp-angular'
@@ -378,15 +378,15 @@ jobs:
           if [[ "${{ inputs.project }}" == "go-fiber-langchaingo" && "${{ secrets.CONGRESS_API_KEY }}" != "" ]]; then
             cf set-env "$APP_NAME" CONGRESS_API_KEY "${{ secrets.CONGRESS_API_KEY }}"
           fi
-          if [[ "${{ inputs.project }}" == "java-spring-ai-mcp/server" && "${{ secrets.AVIATION_STACK_ACCESS_KEY }}" != "" ]]; then
+        #  if [[ "${{ inputs.project }}" == "java-spring-ai-mcp/server" && "${{ secrets.AVIATION_STACK_ACCESS_KEY }}" != "" ]]; then
             # Check if the UPS was created successfully before setting env var
-            if cf service aviation-stack-service-credentials; then
-              echo "UPS exists, not setting env var directly for server."
-            else
+        #    if cf service aviation-stack-service-credentials; then
+        #      echo "UPS exists, not setting env var directly for server."
+        #    else
                # Fallback if UPS failed
-               cf set-env "$APP_NAME" AVIATION_STACK_ACCESS_KEY "${{ secrets.AVIATION_STACK_ACCESS_KEY }}"
-            fi
-          fi
+        #      cf set-env "$APP_NAME" AVIATION_STACK_ACCESS_KEY "${{ secrets.AVIATION_STACK_ACCESS_KEY }}"
+        #    fi
+        #  fi
           if [[ "${{ inputs.project }}" == "java-spring-ai-mcp/client" && "${{ secrets.OPENAI_API_KEY }}" != "" ]]; then
              # Client might use service binding OR direct key
              cf set-env "$APP_NAME" SPRING_AI_OPENAI_API_KEY "${{ secrets.OPENAI_API_KEY }}"
