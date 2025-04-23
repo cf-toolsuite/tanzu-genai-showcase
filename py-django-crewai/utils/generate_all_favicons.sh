@@ -12,7 +12,7 @@ pip install cairosvg==2.7.1 Pillow==10.2.0
 python generate_favicon.py
 
 # Copy favicon.ico to the root static directory for direct access
-cp static/images/favicon.ico static/favicon.ico
+cp static/images/favicon.ico ../static/favicon.ico
 
 # Run Django collectstatic to collect all static files
 python manage.py collectstatic --noinput
