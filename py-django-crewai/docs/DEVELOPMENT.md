@@ -8,6 +8,8 @@ This document provides guidelines and information for developers working on or c
 - [Project Structure](#project-structure)
 - [Core Concepts](#core-concepts)
 - [Development Workflow](#development-workflow)
+- [Frontend Development](#frontend-development)
+- [Backend Development](#backend-development)
 - [Testing Strategy](#testing-strategy)
 - [Adding New Features](#adding-new-features)
 - [Debugging](#debugging)
@@ -17,7 +19,8 @@ This document provides guidelines and information for developers working on or c
 
 ### Prerequisites
 
-- Python 3.10+ and pip
+- Python 3.12+ and pip
+- Node.js 18+ and npm
 - Git
 - A code editor (VS Code recommended)
 - API keys for external services:
@@ -41,33 +44,52 @@ This document provides guidelines and information for developers working on or c
    source venv/bin/activate  # On Windows, use: venv\Scripts\activate
    ```
 
-3. Install dependencies:
+3. Install backend dependencies:
 
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Create a `.env` file with your API keys and configuration:
+4. Install frontend dependencies:
+
+   ```bash
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+5. Create a `.env` file with your API keys and configuration:
 
    ```bash
    cp .env.example .env
    # Edit the .env file with your API keys and settings
    ```
 
-5. Run migrations:
+6. Run migrations:
 
    ```bash
    python manage.py makemigrations chatbot
    python manage.py migrate
    ```
 
-6. Start the development server:
+7. Start the development server:
 
    ```bash
    python manage.py runserver
    ```
 
-7. Open your browser to `http://localhost:8000`
+8. For frontend development with hot reloading:
+
+   ```bash
+   cd frontend
+   npm start
+   ```
+
+   This will start the Webpack dev server that proxies API requests to your Django server.
+
+9. Open your browser to:
+   - `http://localhost:8000` (backend server)
+   - `http://localhost:8080` (frontend dev server with hot reloading)
 
 ### Environment Variables
 
@@ -94,7 +116,7 @@ LOG_LEVEL=DEBUG                 # Set logging level
 
 ## Project Structure
 
-The application follows a standard Django project structure with some additional organization for CrewAI integration:
+The application follows a dual-structure with Django backend and React frontend:
 
 ```
 py-django-crewai/
@@ -106,20 +128,31 @@ py-django-crewai/
 │   │   │   ├── tools/                 # Tool implementations
 │   │   │   └── utils/                 # Utility functions
 │   │   ├── movie_crew.py              # Manager wrapper
-│   │   └── serp_service.py            # SerpAPI integration
+│   │   ├── location_service.py        # Location services
+│   │   ├── serp_service.py            # SerpAPI integration
+│   │   └── tmdb_service.py            # TMDb API integration
 │   ├── models.py                      # Data models
-│   ├── views.py                       # Request handlers
+│   ├── views.py                       # API endpoints handlers
 │   └── urls.py                        # URL routing
 ├── docs/                              # Documentation
+├── frontend/                          # React frontend application
+│   ├── src/                           # Source code
+│   │   ├── components/                # React components
+│   │   │   ├── Chat/                  # Chat components
+│   │   │   ├── Movies/                # Movie components
+│   │   │   └── Theaters/              # Theater components
+│   │   ├── context/                   # React context providers
+│   │   ├── hooks/                     # Custom React hooks
+│   │   ├── services/                  # Frontend API services
+│   │   └── styles/                    # CSS styles
+│   ├── public/                        # Static assets
+│   ├── package.json                   # npm dependencies
+│   └── webpack.config.js              # Build configuration
 ├── movie_chatbot/                     # Django project settings
 │   ├── settings.py                    # Application settings
 │   ├── urls.py                        # Top-level URL routing
 │   └── wsgi.py                        # WSGI configuration
-├── static/                            # Static assets
-│   ├── css/                           # Stylesheets
-│   └── js/                            # JavaScript files
-├── templates/                         # HTML templates
-│   └── chatbot/                       # App-specific templates
+├── static/                            # Collected static files
 ├── manage.py                          # Django management script
 ├── requirements.txt                   # Python dependencies
 └── manifest.yml                       # Cloud Foundry manifest
@@ -127,13 +160,42 @@ py-django-crewai/
 
 ### Key Directories
 
+#### Backend
 - **chatbot/services/movie_crew/**: Contains the CrewAI implementation with agent definitions, tool implementations, and utilities
 - **chatbot/models.py**: Django ORM models for data persistence
-- **chatbot/views.py**: Request handlers and controller logic
-- **static/js/app.js**: Frontend JavaScript for chat interface and UI interactions
-- **templates/chatbot/**: HTML templates for the web interface
+- **chatbot/views.py**: API endpoint handlers
+
+#### Frontend
+- **frontend/src/components/**: React components organized by feature
+- **frontend/src/context/**: React context providers for state management
+- **frontend/src/services/**: API service integrations
+- **frontend/src/hooks/**: Custom React hooks for reusable behavior
 
 ## Core Concepts
+
+### Frontend Architecture
+
+The frontend is built with modern React practices:
+
+1. **Component-Based Architecture**:
+   - Functional components with hooks for state management
+   - Component organization by feature (Chat, Movies, Theaters)
+   - Suspense and lazy loading for performance optimization
+
+2. **State Management**:
+   - React Context API via `AppContext` for shared state
+   - Separate state for each conversation mode
+   - React Query for data fetching, caching, and background updates
+
+3. **Optimized Loading**:
+   - Progressive loading indicators
+   - Lazy-loaded components
+   - Resource caching for improved performance
+
+4. **API Integration**:
+   - Centralized API service with error handling
+   - Request deduplication and caching
+   - Polling for long-running operations
 
 ### CrewAI Integration
 
@@ -182,24 +244,29 @@ Location determination follows a fallback cascade:
 
 ## Development Workflow
 
-### Feature Development Process
+### Full-Stack Development Process
 
 1. **Planning**:
    - Define the feature scope
-   - Identify affected components
-   - Plan integration with existing code
+   - Identify affected frontend and backend components
+   - Plan data flow between components
 
-2. **Implementation**:
-   - Create or modify required files
-   - Follow code style and patterns
-   - Add appropriate documentation
+2. **Backend Implementation**:
+   - Create or update API endpoints in Django
+   - Implement business logic in services
+   - Add appropriate models and database migrations
 
-3. **Testing**:
-   - Write automated tests
-   - Perform manual testing
+3. **Frontend Implementation**:
+   - Create React components for the new feature
+   - Add state management in context
+   - Implement API service integration
+
+4. **Integration Testing**:
+   - Test the feature end-to-end
+   - Verify data flow between frontend and backend
    - Test with different conversation modes
 
-4. **Code Review**:
+5. **Code Review**:
    - Submit pull request
    - Address review feedback
    - Ensure all tests pass
@@ -231,79 +298,286 @@ Where `type` is one of:
 - `test`: Adding or updating tests
 - `chore`: Build process or auxiliary tool changes
 
+## Frontend Development
+
+### Component Development
+
+When building new components:
+
+1. **Organize by Feature**:
+   - Place related components in the appropriate feature folder
+   - Keep component files small and focused
+   - Use index.js files to organize exports
+
+2. **Use Functional Components**:
+   - Prefer functional components with hooks
+   - Use custom hooks for reusable logic
+   - Implement error boundaries for resilience
+
+3. **Optimize Performance**:
+   - Use React.memo for expensive renders
+   - Implement useMemo and useCallback for optimizations
+   - Lazy load components when appropriate
+
+4. **Implement Progressive Loading**:
+   - Show loading states during data fetching
+   - Provide meaningful progress feedback
+   - Handle errors gracefully with retry options
+
+### React Context
+
+The application uses React Context to manage state:
+
+```jsx
+// Example of using AppContext
+import { useAppContext } from '../../context/AppContext';
+
+function MovieComponent() {
+  const { firstRunMovies, selectMovie, selectedMovieId } = useAppContext();
+
+  return (
+    <div>
+      {firstRunMovies.map(movie => (
+        <div
+          key={movie.id}
+          className={movie.id === selectedMovieId ? 'selected' : ''}
+          onClick={() => selectMovie(movie.id)}
+        >
+          {movie.title}
+        </div>
+      ))}
+    </div>
+  );
+}
+```
+
+### API Service Integration
+
+Use the centralized API service:
+
+```jsx
+// Example of API service usage
+import { chatApi } from '../../services/api';
+
+async function handleSendMessage(message) {
+  try {
+    // Call appropriate API based on mode
+    if (isFirstRunMode) {
+      const response = await chatApi.getMoviesTheatersAndShowtimes(message, location);
+      // Handle response...
+    } else {
+      const response = await chatApi.getMovieRecommendations(message);
+      // Handle response...
+    }
+  } catch (error) {
+    // Handle error...
+  }
+}
+```
+
+## Backend Development
+
+### API Endpoint Development
+
+When creating new API endpoints:
+
+1. **Follow RESTful Principles**:
+   - Use appropriate HTTP methods (GET, POST, PUT, DELETE)
+   - Structure URLs around resources
+   - Return proper status codes
+
+2. **Implement Error Handling**:
+   - Use try/except blocks for robust error handling
+   - Return descriptive error messages in JSON format
+   - Log errors with contextual information
+
+3. **Input Validation**:
+   - Validate all input data
+   - Handle missing or malformed data gracefully
+   - Provide clear error messages for validation failures
+
+### CrewAI Integration
+
+To extend the CrewAI functionality:
+
+1. **Define New Agents**:
+   - Create agent files in the agents directory
+   - Define roles, goals, and backstories
+   - Configure with appropriate LLM settings
+
+2. **Create Custom Tools**:
+   - Implement Pydantic-based tools
+   - Define input schemas
+   - Implement tool logic in _run method
+
+3. **Update Task Sequences**:
+   - Add new tasks to the crew
+   - Configure task dependencies
+   - Update the manager to handle new agents and tasks
+
 ## Testing Strategy
 
-### Unit Tests
+### Frontend Testing
 
-Write unit tests for individual components:
+For testing React components:
 
-- Models
-- Service methods
-- Utility functions
+1. **Component Tests**:
+   - Use React Testing Library for component tests
+   - Test component rendering and user interactions
+   - Mock context providers and API services
 
-Example:
+2. **Hook Tests**:
+   - Test custom hooks with appropriate test harnesses
+   - Verify state changes and side effects
+   - Use act() for asynchronous operations
 
-```python
-from django.test import TestCase
-from chatbot.services.movie_crew.utils.json_parser import JsonParser
+3. **Integration Tests**:
+   - Test component integration with context
+   - Verify data flow between components
+   - Test error handling and edge cases
 
-class JsonParserTests(TestCase):
-    def test_parse_json_output_valid(self):
-        """Test parsing valid JSON output."""
-        json_str = '[{"title": "Test Movie", "id": 123}]'
-        result = JsonParser.parse_json_output(json_str)
-        self.assertEqual(len(result), 1)
-        self.assertEqual(result[0]["title"], "Test Movie")
-```
+### Backend Testing
 
-### Integration Tests
+Test backend components with:
 
-Test interactions between components:
+1. **Unit Tests**:
+   - Test service methods with mocked dependencies
+   - Test utility functions for correctness
+   - Use pytest fixtures for common test data
 
-- API integrations
-- CrewAI agent interactions
-- View functionality
+2. **API Tests**:
+   - Test API endpoints with Django test client
+   - Verify response status codes and payload
+   - Test different input scenarios including errors
 
-Example:
-
-```python
-from django.test import TestCase, Client
-from unittest.mock import patch
-
-class ChatbotViewTests(TestCase):
-    def setUp(self):
-        self.client = Client()
-
-    @patch('chatbot.services.movie_crew.MovieCrewManager.process_query')
-    def test_send_message(self, mock_process_query):
-        """Test the send_message view with a mocked crew manager."""
-        # Mock the crew manager response
-        mock_process_query.return_value = {
-            "response": "Here are some movies.",
-            "movies": [{"title": "Test Movie"}]
-        }
-
-        # Send a test message
-        response = self.client.post('/send-message/',
-                                  {'message': 'Find action movies'},
-                                  content_type='application/json')
-
-        # Check the response
-        self.assertEqual(response.status_code, 200)
-        self.assertEqual(response.json()['status'], 'success')
-```
-
-### Browser Tests
-
-Test frontend functionality:
-
-- UI interactions
-- AJAX requests
-- Location detection
+3. **Integration Tests**:
+   - Test CrewAI agent interactions
+   - Test database operations
+   - Verify end-to-end request processing
 
 ## Adding New Features
 
-### Adding a New Agent
+### Adding a New React Component
+
+To add a new component:
+
+1. Create the component file in the appropriate directory:
+
+   ```jsx
+   // frontend/src/components/Movies/NewMovieComponent.jsx
+   import React from 'react';
+   import { useAppContext } from '../../context/AppContext';
+
+   function NewMovieComponent() {
+     const { firstRunMovies } = useAppContext();
+
+     return (
+       <div className="new-movie-component">
+         {/* Component implementation */}
+       </div>
+     );
+   }
+
+   export default NewMovieComponent;
+   ```
+
+2. Import and use the component:
+
+   ```jsx
+   // In parent component
+   import NewMovieComponent from './NewMovieComponent';
+
+   function ParentComponent() {
+     return (
+       <div>
+         <NewMovieComponent />
+       </div>
+     );
+   }
+   ```
+
+3. Add state to context if needed:
+
+   ```jsx
+   // In AppContext.jsx
+   const [newFeatureState, setNewFeatureState] = useState(initialValue);
+
+   // Add to provider value
+   return (
+     <AppContext.Provider value={{
+       // Existing values...
+       newFeatureState,
+       setNewFeatureState
+     }}>
+       {children}
+     </AppContext.Provider>
+   );
+   ```
+
+### Adding a New API Endpoint
+
+To add a new API endpoint:
+
+1. Create the view function in views.py:
+
+   ```python
+   @csrf_exempt
+   def new_feature_endpoint(request):
+       """Handle requests for the new feature."""
+       if request.method != 'POST':
+           return JsonResponse({
+               'status': 'error',
+               'message': 'This endpoint only accepts POST requests'
+           }, status=405)
+
+       try:
+           data = _parse_request_data(request)
+           # Process the request...
+
+           return JsonResponse({
+               'status': 'success',
+               'data': result_data
+           })
+       except Exception as e:
+           logger.error(f"Error in new feature: {str(e)}")
+           return JsonResponse({
+               'status': 'error',
+               'message': 'An error occurred'
+           }, status=500)
+   ```
+
+2. Add the URL route in urls.py:
+
+   ```python
+   urlpatterns = [
+       # Existing routes...
+       path('new-feature/', views.new_feature_endpoint, name='new_feature'),
+   ]
+   ```
+
+3. Add the API service method:
+
+   ```javascript
+   // In frontend/src/services/api.js
+   newFeature: async (params) => {
+     try {
+       console.log('Calling new feature API');
+
+       const response = await api.post('/new-feature/', params);
+
+       if (!response.data || response.data.status !== 'success') {
+         throw new Error(response.data?.message || 'Failed to process request');
+       }
+
+       return response.data;
+     } catch (error) {
+       console.error('Error in new feature:', error);
+       throw error;
+     }
+   }
+   ```
+
+### Adding a New CrewAI Agent
 
 To add a new agent to the system:
 
@@ -405,143 +679,133 @@ To add a new conversation mode:
        # Rest of the model...
    ```
 
-2. Update the UI in `templates/chatbot/index.html`:
+2. Update the React frontend to support the new mode:
 
-   ```html
-   <!-- Add a new tab -->
-   <li class="nav-item" role="presentation">
-     <button class="nav-link" id="new-mode-tab" data-bs-toggle="tab" data-bs-target="#new-mode" type="button" role="tab" aria-controls="new-mode" aria-selected="false">New Mode</button>
+   ```jsx
+   // In App.jsx, add new tab
+   <li className="nav-item">
+     <button
+       className={`nav-link ${activeTab === 'new-mode' ? 'active' : ''}`}
+       onClick={() => switchTab('new-mode')}
+     >
+       <i className="bi bi-icon-name me-2"></i>New Mode Name
+     </button>
    </li>
 
-   <!-- Add the tab content -->
-   <div class="tab-pane fade" id="new-mode" role="tabpanel" aria-labelledby="new-mode-tab">
-     <!-- New mode content -->
+   // Add tab content
+   <div className={`tab-pane fade ${activeTab === 'new-mode' ? 'show active' : ''}`}>
+     <div className="row">
+       <div className="col-lg-8 mb-4 mb-lg-0">
+         <Suspense fallback={<LoadingFallback />}>
+           <ChatInterface />
+         </Suspense>
+       </div>
+       <div className="col-lg-4">
+         <Suspense fallback={<LoadingFallback />}>
+           <NewModeComponent />
+         </Suspense>
+       </div>
+     </div>
    </div>
    ```
 
-3. Update the `send_message` view to handle the new mode:
+3. Update AppContext to manage state for the new mode:
 
-   ```python
-   # In views.py
-   if mode == 'new_mode':
-       conversation_id = request.session.get('new_mode_conversation_id')
-       if not conversation_id:
-           conversation = Conversation.objects.create(mode='new_mode')
-           request.session['new_mode_conversation_id'] = conversation.id
-       else:
-           try:
-               conversation = Conversation.objects.get(id=conversation_id)
-           except Conversation.DoesNotExist:
-               conversation = Conversation.objects.create(mode='new_mode')
-               request.session['new_mode_conversation_id'] = conversation.id
+   ```jsx
+   // In AppContext.jsx
+   const [newModeMessages, setNewModeMessages] = useState([]);
+   const [newModeData, setNewModeData] = useState([]);
+
+   // Include in context value
+   return (
+     <AppContext.Provider value={{
+       // Existing values...
+       newModeMessages, setNewModeMessages,
+       newModeData, setNewModeData,
+     }}>
+       {children}
+     </AppContext.Provider>
+   );
    ```
 
-4. Update the `MovieCrewManager` to handle the new mode:
+4. Create a new API endpoint for the mode:
 
    ```python
-   # In movie_crew/manager.py
-   def process_query(self, query: str, conversation_history: List[Dict[str, str]], mode: str = 'first_run') -> Dict[str, Any]:
-       """Process a user query based on the specified mode."""
-
-       if mode == 'first_run':
-           # First Run mode logic
-           pass
-       elif mode == 'casual':
-           # Casual Viewing mode logic
-           pass
-       elif mode == 'new_mode':
-           # New mode logic
-           pass
-       else:
-           # Default mode logic
-           pass
+   @csrf_exempt
+   def new_mode_endpoint(request):
+       """Process a message in the new conversation mode."""
+       # Implementation...
    ```
 
 ## Debugging
 
-### Logging
+### Debugging React Frontend
 
-The application uses Python's logging module. To enable debug logging:
+1. **Browser Dev Tools**:
+   - Use React DevTools extension for component inspection
+   - Check network requests in Network tab
+   - Monitor console.log statements in Console tab
 
-1. Set environment variables:
+2. **Debug Logging**:
+   - Add strategic console.log statements
+   - Use console.group/groupEnd for grouped logs
+   - Log component renders and state changes
 
-   ```bash
-   DEBUG=True
-   LOG_LEVEL=DEBUG
-   ```
+3. **Error Monitoring**:
+   - Use Error Boundaries to catch component errors
+   - Implement try/catch blocks for async operations
+   - Add global error handler for unhandled errors
 
-2. Access logs:
-   - Development server: Output to console
-   - Production: Cloud Foundry logs (`cf logs app-name`)
+### Debugging Django Backend
 
-### Debug Toolbar
+1. **Django Debug Toolbar**:
+   - Install and enable for local development
+   - Monitor database queries and performance
+   - Inspect request/response cycle
 
-For local development, Django Debug Toolbar is available:
+2. **Logging**:
+   - Use Python's logging module
+   - Set different log levels (DEBUG, INFO, ERROR)
+   - Log contextual information with error messages
 
-1. Install the package:
+3. **API Testing**:
+   - Use tools like Postman or Insomnia to test endpoints
+   - Verify request and response formats
+   - Test error handling with invalid inputs
 
-   ```bash
-   pip install django-debug-toolbar
-   ```
+### Debugging CrewAI
 
-2. Add to `INSTALLED_APPS` in `settings.py`
+1. **Enable Verbose Mode**:
+   - Set verbose=True on agents and crews
+   - Monitor agent reasoning and task execution
+   - Log intermediate outputs
 
-### Troubleshooting CrewAI
+2. **Tool Debugging**:
+   - Test tools independently
+   - Log tool inputs and outputs
+   - Use mock inputs for testing
 
-When troubleshooting CrewAI issues:
-
-1. Enable verbose mode on agents and crews:
-
-   ```python
-   agent = Agent(
-       role="Role",
-       goal="Goal",
-       backstory="Backstory",
-       verbose=True,  # Enable verbose logging
-       llm=llm
-   )
-
-   crew = Crew(
-       agents=[agent1, agent2],
-       tasks=[task1, task2],
-       verbose=True,  # Enable verbose logging
-   )
-   ```
-
-2. Inspect task outputs:
-
-   ```python
-   # After crew execution
-   for task in crew.tasks:
-       print(f"Task: {task.description}")
-       print(f"Output: {task.output}")
-   ```
-
-3. Test tools independently:
-
-   ```python
-   # Test a tool directly
-   tool = SearchMoviesTool()
-   result = tool._run("action movies")
-   print(result)
-   ```
+3. **Error Handling**:
+   - Implement robust error handling in tools
+   - Log detailed error messages
+   - Add retry mechanisms for transient failures
 
 ## Contribution Guidelines
 
 ### Code Style
 
-- Follow PEP 8 style guidelines
-- Use consistent naming conventions:
-  - CapWords for classes
-  - lowercase_with_underscores for functions and variables
-  - UPPERCASE for constants
-- Add docstrings to all classes and methods (Google style docstrings)
+- **Python**: Follow PEP 8 style guidelines
+- **JavaScript/JSX**: Follow ESLint configuration
+- **General**:
+  - Use meaningful variable and function names
+  - Add comments for complex logic
+  - Keep functions small and focused
 
 ### Documentation
 
 - Update documentation when adding or changing features
-- Document models, views, and services
-- Add inline comments for complex logic
+- Document React components with JSDoc comments
+- Add docstrings to Python classes and functions
 
 ### Pull Request Process
 
@@ -561,11 +825,11 @@ When troubleshooting CrewAI issues:
 - Does it work with both conversation modes?
 - Is error handling implemented properly?
 
----
-
 ## Further Reading
 
 - [CrewAI Documentation](https://docs.crewai.com/)
 - [Django Documentation](https://docs.djangoproject.com/)
+- [React Documentation](https://react.dev/)
+- [React Query Documentation](https://tanstack.com/query/latest)
 - [TMDb API Documentation](https://developer.themoviedb.org/docs)
 - [SerpAPI Documentation](https://serpapi.com/search-api)

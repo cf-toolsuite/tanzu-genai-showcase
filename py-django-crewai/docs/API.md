@@ -4,6 +4,7 @@ This document provides detailed information about the external APIs used in the 
 
 ## Table of Contents
 
+- [Django API Endpoints](#django-api-endpoints)
 - [LLM API Integration](#llm-api-integration)
 - [The Movie Database (TMDb) API](#the-movie-database-tmdb-api)
 - [SerpAPI Google Showtimes](#serpapi-google-showtimes)
@@ -11,8 +12,361 @@ This document provides detailed information about the external APIs used in the 
   - [Browser Geolocation API](#browser-geolocation-api)
   - [ipapi.co](#ipapico)
   - [OpenStreetMap Services](#openstreetmap-services)
-- [Error Handling](#error-handling)
-- [Testing API Integrations](#testing-api-integrations)
+
+## Django API Endpoints
+
+The application exposes several RESTful API endpoints for the React frontend to interact with:
+
+### Chat Endpoints
+
+#### First Run Mode Endpoint
+
+```
+POST /get-movies-theaters-and-showtimes/
+```
+
+**Purpose**: Process user messages in First Run mode (current movies in theaters)
+
+**Request Body**:
+```json
+{
+  "message": "I want to see an action movie this weekend",
+  "location": "Seattle, WA, USA",
+  "timezone": "America/Los_Angeles",
+  "mode": "first_run"
+}
+```
+
+**Response**:
+```json
+{
+  "status": "success",
+  "message": "Based on your interest in action movies, I recommend...",
+  "recommendations": [
+    {
+      "id": 123456,
+      "tmdb_id": 123456,
+      "title": "Action Movie Title",
+      "overview": "Movie description...",
+      "release_date": "2025-04-01",
+      "poster_url": "https://image.tmdb.org/t/p/original/poster_path.jpg",
+      "rating": 8.5,
+      "theaters": [
+        {
+          "name": "AMC Theater",
+          "address": "123 Main St, Seattle, WA",
+          "distance_miles": 2.5,
+          "showtimes": [
+            {
+              "start_time": "2025-04-23T19:30:00-07:00",
+              "format": "Standard"
+            },
+            {
+              "start_time": "2025-04-23T22:00:00-07:00",
+              "format": "IMAX"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
+```
+
+#### Casual Viewing Mode Endpoint
+
+```
+POST /get-movie-recommendations/
+```
+
+**Purpose**: Process user messages in Casual Viewing mode (historical movies)
+
+**Request Body**:
+```json
+{
+  "message": "I'm looking for classic sci-fi movies from the 80s",
+  "timezone": "America/Los_Angeles",
+  "mode": "casual"
+}
+```
+
+**Response**:
+```json
+{
+  "status": "success",
+  "message": "Here are some great sci-fi classics from the 1980s...",
+  "recommendations": [
+    {
+      "id": 789012,
+      "tmdb_id": 789012,
+      "title": "Classic Sci-Fi Movie",
+      "overview": "Movie description...",
+      "release_date": "1982-06-11",
+      "poster_url": "https://image.tmdb.org/t/p/original/poster_path.jpg",
+      "rating": 8.9,
+      "theaters": []
+    }
+  ]
+}
+```
+
+#### Get Theaters Endpoint
+
+```
+GET /get-theaters/{movie_id}/
+```
+
+**Purpose**: Fetch theaters and showtimes for a specific movie
+
+**Response**:
+```json
+{
+  "status": "success",
+  "movie_id": 123456,
+  "movie_title": "Action Movie Title",
+  "theaters": [
+    {
+      "name": "AMC Theater",
+      "address": "123 Main St, Seattle, WA",
+      "distance_miles": 2.5,
+      "showtimes": [
+        {
+          "start_time": "2025-04-23T19:30:00-07:00",
+          "format": "Standard"
+        }
+      ]
+    }
+  ]
+}
+```
+
+**Alternative Response** (when processing):
+```json
+{
+  "status": "processing",
+  "message": "Processing theater data for Action Movie Title. Please check back in a moment."
+}
+```
+
+#### Theater Status Endpoint
+
+```
+GET /theater-status/{movie_id}/
+```
+
+**Purpose**: Poll for theater data status (used when initial request returns "processing")
+
+**Response**: Same as Get Theaters endpoint
+
+#### Reset Conversations Endpoint
+
+```
+GET /reset/
+```
+
+**Purpose**: Reset all conversation history
+
+**Response**: Redirects to index page
+
+### Frontend API Service
+
+The React frontend uses a centralized API service with axios to interact with these endpoints:
+
+```javascript
+// api.js
+import axios from 'axios';
+
+// Create an axios instance with CSRF token handling
+const api = axios.create({
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  // Add timeout to prevent hanging requests
+  timeout: 30000, // 30 seconds
+});
+
+// Add CSRF token to requests
+api.interceptors.request.use(config => {
+  const csrfToken = getCookie('csrftoken');
+  if (csrfToken) {
+    config.headers['X-CSRFToken'] = csrfToken;
+  }
+  return config;
+});
+
+// Simple in-memory cache
+const cache = {
+  theaters: new Map(),
+  // Cache expiration time (5 minutes)
+  expirationTime: 5 * 60 * 1000,
+
+  // Get item from cache
+  get(key) {
+    const item = this.theaters.get(key);
+    if (!item) return null;
+
+    // Check if item is expired
+    if (Date.now() > item.expiry) {
+      this.theaters.delete(key);
+      return null;
+    }
+
+    return item.value;
+  },
+
+  // Set item in cache
+  set(key, value) {
+    const expiry = Date.now() + this.expirationTime;
+    this.theaters.set(key, { value, expiry });
+  },
+
+  // Clear entire cache
+  clear() {
+    this.theaters.clear();
+  }
+};
+
+// API service functions
+export const chatApi = {
+  getMoviesTheatersAndShowtimes: async (message, location = '') => {
+    try {
+      console.log(`[First Run Mode] Getting movies, theaters, and showtimes for: "${message}" (Location: ${location})`);
+
+      const response = await api.post('/get-movies-theaters-and-showtimes/', {
+        message: message,
+        location,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        mode: 'first_run' // Explicitly set mode to first_run
+      });
+
+      if (!response.data || response.data.status !== 'success') {
+        throw new Error(response.data?.message || 'Failed to get movies and theaters');
+      }
+
+      // Cache theaters for each movie if they exist
+      if (response.data.status === 'success' &&
+          response.data.recommendations &&
+          response.data.recommendations.length > 0) {
+        response.data.recommendations.forEach(movie => {
+          if (movie.theaters && movie.theaters.length > 0) {
+            cache.set(movie.id, {
+              status: 'success',
+              theaters: movie.theaters
+            });
+          }
+        });
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error getting movies and theaters:', error);
+      throw error;
+    }
+  },
+
+  getMovieRecommendations: async (message) => {
+    try {
+      console.log(`[Casual Mode] Getting movie recommendations for: "${message}"`);
+
+      const response = await api.post('/get-movie-recommendations/', {
+        message: message,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        mode: 'casual' // Explicitly set mode to casual
+      });
+
+      if (!response.data || response.data.status !== 'success') {
+        throw new Error(response.data?.message || 'Failed to get movie recommendations');
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error getting movie recommendations:', error);
+      throw error;
+    }
+  },
+
+  getTheaters: async (movieId) => {
+    try {
+      console.log(`Fetching theaters for movie ID: ${movieId}`);
+
+      // Check cache first
+      const cachedData = cache.get(movieId);
+      if (cachedData) {
+        console.log('Using cached theater data');
+        return cachedData;
+      }
+
+      // If not in cache, make initial request to fetch or start processing
+      const response = await api.get(`/get-theaters/${movieId}/`);
+
+      // If response contains a status of "processing", start polling
+      if (response.data.status === 'processing') {
+        console.log('Theaters are being processed, will start polling...');
+        return {
+          status: 'processing',
+          message: 'Fetching theaters and showtimes...'
+        };
+      }
+
+      // If we got a direct success response, cache it
+      if (response.data.status === 'success' && response.data.theaters) {
+        cache.set(movieId, response.data);
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error fetching theaters:', error);
+      throw error;
+    }
+  },
+
+  // Method for polling theater status
+  pollTheaterStatus: async (movieId) => {
+    try {
+      const response = await api.get(`/theater-status/${movieId}/`);
+
+      // If the processing is complete, cache the results
+      if (response.data.status === 'success' && response.data.theaters) {
+        cache.set(movieId, response.data);
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error polling theater status:', error);
+      throw error;
+    }
+  },
+
+  resetConversation: async () => {
+    try {
+      console.log('Resetting conversation');
+
+      // Clear cache when resetting conversation
+      cache.clear();
+
+      await api.get('/reset/');
+      return { status: 'success' };
+    } catch (error) {
+      console.error('Error resetting conversation:', error);
+      throw error;
+    }
+  }
+};
+```
+
+### Caching and Polling Mechanism
+
+The frontend implements:
+
+1. **In-memory Caching**:
+   - Caches theater data for 5 minutes
+   - Prevents redundant API calls for the same movie
+   - Automatically expires old data
+
+2. **Polling for Theater Data**:
+   - Initial request to `/get-theaters/{movie_id}/` may return "processing" status
+   - Frontend then polls `/theater-status/{movie_id}/` until data is ready
+   - Provides better user experience for long-running operations
 
 ## LLM API Integration
 
@@ -65,15 +419,49 @@ def create_llm(self, temperature: float = 0.5) -> ChatOpenAI:
     Returns:
         Configured ChatOpenAI instance
     """
-    config = {
-        "openai_api_key": self.api_key,
-        "model": self.model,
-        "temperature": temperature,
+    # Extract model name and provider info
+    model_name = self.model
+    provider = self.llm_provider  # May be None if not specified
+
+    # Process provider/model format if present
+    if '/' in model_name:
+        parts = model_name.split('/', 1)
+        provider_from_name, model_without_prefix = parts
+
+        # If explicit provider was given, it overrides the prefix in the name
+        if not provider:
+            provider = provider_from_name
+
+        model_name = model_without_prefix
+
+    # If no provider specified yet, default to openai
+    if not provider:
+        provider = "openai"
+
+    # Ensure model always has provider prefix
+    full_model_name = f"{provider}/{model_name}"
+
+    # Create model mapping for LiteLLM
+    litellm_mapping = {model_name: provider}
+
+    # Set up model_kwargs with LiteLLM configuration
+    model_kwargs = {
+        "model_name_map": json.dumps(litellm_mapping)
     }
 
+    # Base configuration
+    config = {
+        "openai_api_key": self.api_key,
+        "model": full_model_name,
+        "temperature": temperature,
+        "model_kwargs": model_kwargs
+    }
+
+    # Add base URL if provided
     if self.base_url:
         config["openai_api_base"] = self.base_url
 
+    # Create the model instance with proper configuration
     return ChatOpenAI(**config)
 ```
 
@@ -136,6 +524,73 @@ response = now_playing.now_playing()
 movie_details = tmdb.Movies(movie_id)
 details = movie_details.info()
 images = movie_details.images()
+```
+
+### Enhanced Image Quality Selection
+
+The application includes an image enhancement tool that selects high-quality images:
+
+```python
+class EnhanceMovieImagesTool(BaseTool):
+    """Tool for enhancing movie images with high-quality URLs."""
+
+    name: str = "enhance_movie_images_tool"
+    description: str = "Enhances movie data with high-quality image URLs."
+    tmdb_api_key: str = None
+
+    def _run(self, movies_json: str) -> str:
+        """
+        Enhance movie data with high-quality image URLs.
+
+        Args:
+            movies_json: JSON string containing movie data
+
+        Returns:
+            JSON string with enhanced movie data
+        """
+        try:
+            # Parse input JSON
+            movies = json.loads(movies_json)
+
+            # Configure TMDb API if key is provided
+            if self.tmdb_api_key:
+                tmdb.API_KEY = self.tmdb_api_key
+
+            # Process each movie
+            for movie in movies:
+                # Get movie ID
+                movie_id = movie.get('tmdb_id') or movie.get('id')
+
+                if not movie_id:
+                    continue
+
+                # Get movie details including images
+                movie_details = tmdb.Movies(movie_id)
+                images = movie_details.images()
+
+                # Get poster path
+                poster_path = movie.get('poster_path')
+                if poster_path:
+                    movie['poster_url'] = f"https://image.tmdb.org/t/p/original{poster_path}"
+                elif images and images.get('posters') and len(images['posters']) > 0:
+                    poster_path = images['posters'][0].get('file_path')
+                    if poster_path:
+                        movie['poster_url'] = f"https://image.tmdb.org/t/p/original{poster_path}"
+
+                # Get backdrop path
+                backdrop_path = movie.get('backdrop_path')
+                if backdrop_path:
+                    movie['backdrop_url'] = f"https://image.tmdb.org/t/p/original{backdrop_path}"
+                elif images and images.get('backdrops') and len(images['backdrops']) > 0:
+                    backdrop_path = images['backdrops'][0].get('file_path')
+                    if backdrop_path:
+                        movie['backdrop_url'] = f"https://image.tmdb.org/t/p/original{backdrop_path}"
+
+            # Return enhanced movies as JSON string
+            return json.dumps(movies)
+        except Exception as e:
+            logger.error(f"Error enhancing movie images: {str(e)}")
+            return movies_json
 ```
 
 ### Example Response (Movie Search)
@@ -202,7 +657,7 @@ class SerpShowtimeService:
         """Search for movie showtimes for a specific movie in a location."""
         # Construct parameters for SerpAPI
         params = {
-            "q": movie_title,
+            "q": f"{movie_title} theater",
             "location": location,
             "hl": "en",
             "gl": "us",
@@ -215,6 +670,42 @@ class SerpShowtimeService:
 
         # Process and format the results
         theaters = self._parse_serp_results(results, movie_title)
+        return theaters
+
+    def _parse_serp_results(self, results, movie_title):
+        """Parse SerpAPI results into structured theater data."""
+        theaters = []
+
+        # Extract showtimes data
+        showtimes_data = results.get('showtimes', [])
+
+        for theater_data in showtimes_data:
+            theater_info = theater_data.get('theater', {})
+
+            # Create theater object
+            theater = {
+                "name": theater_info.get('name', 'Unknown Theater'),
+                "address": theater_info.get('address', ''),
+                "movie_title": movie_title,
+                "showtimes": []
+            }
+
+            # Process showtimes
+            raw_showtimes = theater_data.get('showtimes', [])
+            for showtime in raw_showtimes:
+                datetime_str = showtime.get('datetime')
+                format_str = showtime.get('theatre_format', 'Standard')
+
+                if datetime_str:
+                    theater['showtimes'].append({
+                        "datetime": datetime_str,
+                        "format": format_str
+                    })
+
+            # Only add theaters with showtimes
+            if theater['showtimes']:
+                theaters.append(theater)
+
         return theaters
 ```
 
@@ -270,21 +761,98 @@ The application uses multiple geolocation services to determine user location an
 Used to get precise user coordinates directly from the browser:
 
 ```javascript
-if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-        function(position) {
-            const latitude = position.coords.latitude;
-            const longitude = position.coords.longitude;
+// useLocation.js custom hook
+import { useState, useEffect } from 'react';
+
+export function useLocation() {
+  const [location, setLocation] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Function to detect location using browser geolocation
+  const detectLocation = () => {
+    setIsLoading(true);
+    setError(null);
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        // Success callback
+        async (position) => {
+          try {
+            const { latitude, longitude } = position.coords;
 
             // Use reverse geocoding to get readable location
-            fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`)
-                .then(response => response.json())
-                .then(data => {
-                    const locationName = data.display_name;
-                    locationInput.value = locationName;
-                });
+            const response = await fetch(
+              `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+            );
+
+            if (!response.ok) {
+              throw new Error('Geocoding failed');
+            }
+
+            const data = await response.json();
+            const locationName = data.display_name;
+
+            setLocation(locationName);
+            setIsLoading(false);
+          } catch (err) {
+            setError('Failed to convert coordinates to address');
+            setIsLoading(false);
+          }
+        },
+        // Error callback
+        (error) => {
+          console.error('Geolocation error:', error);
+          setError('Unable to get your location. Please enter it manually.');
+          setIsLoading(false);
+
+          // Fall back to IP-based geolocation
+          gatherLocationDataFromIpApi();
         }
-    );
+      );
+    } else {
+      setError('Geolocation is not supported by your browser');
+      setIsLoading(false);
+
+      // Fall back to IP-based geolocation
+      gatherLocationDataFromIpApi();
+    }
+  };
+
+  // Function to gather location data from ipapi.co
+  const gatherLocationDataFromIpApi = async () => {
+    try {
+      const response = await fetch('https://ipapi.co/json/');
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+
+      // Check if location is in the US
+      if (data.country_code !== 'US') {
+        setError('Theater search requires a US location. Please enter a US city and state.');
+        return;
+      }
+
+      // Extract city and state for US locations
+      const { city, region, country_name } = data;
+
+      // Format location
+      if (city && region && country_name) {
+        const locationName = `${city}, ${region}, ${country_name}`;
+        setLocation(locationName);
+      }
+    } catch (err) {
+      console.error('Error fetching location from IP:', err);
+      setError('Could not detect your location. Please enter it manually.');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return { location, setLocation, detectLocation, isLoading, error };
 }
 ```
 
@@ -294,39 +862,44 @@ Used as a fallback when browser geolocation is unavailable or denied:
 
 ```javascript
 // Function to gather location and timezone data from ipapi.co
-function gatherLocationDataFromIpApi() {
+async function gatherLocationDataFromIpApi() {
+  try {
     // Use ipapi.co - no API key needed
-    fetch('https://ipapi.co/json/')
-    .then(response => {
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-        return response.json();
-    })
-    .then(data => {
-        // Check if location is in the US
-        if (!isLocationInUS(data.country_code)) {
-            console.log(`Detected non-US location: ${data.country_name || 'unknown'}`);
-            handleNonUSLocation();
-            return;
-        }
+    const response = await fetch('https://ipapi.co/json/');
 
-        // Capture timezone information
-        if (data.timezone) {
-            window.userTimezone = data.timezone;
-        }
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
 
-        // Extract city and state for US locations
-        const city = data.city;
-        const state = data.region;
-        const country = data.country_name;
+    const data = await response.json();
 
-        // Format location
-        if (city && state && country) {
-            const locationName = `${city}, ${state}, ${country}`;
-            locationInput.value = locationName;
-        }
-    })
+    // Check if location is in the US
+    if (data.country_code !== 'US') {
+      console.log(`Detected non-US location: ${data.country_name || 'unknown'}`);
+      return null;
+    }
+
+    // Capture timezone information
+    const timezone = data.timezone;
+
+    // Extract city and state for US locations
+    const city = data.city;
+    const state = data.region;
+    const country = data.country_name;
+
+    // If we have all values, use the standard "City, State, Country" format
+    if (city && state && country) {
+      return {
+        locationName: `${city}, ${state}, ${country}`,
+        timezone
+      };
+    }
+
+    return null;
+  } catch (error) {
+    console.error('Error fetching location from IP:', error);
+    return null;
+  }
 }
 ```
 
@@ -413,95 +986,3 @@ def search_theaters(self, latitude: float, longitude: float, radius_miles: float
 
     # Process theaters...
 ```
-
-## Error Handling
-
-The application implements robust error handling for all API interactions:
-
-### API Error Handling
-
-```python
-try:
-    # API call
-    response = requests.get(api_url, params=params, timeout=settings.API_REQUEST_TIMEOUT_SECONDS)
-    response.raise_for_status()  # Raise exception for 4XX/5XX errors
-
-    # Process response
-    data = response.json()
-    # ...
-except requests.exceptions.RequestException as e:
-    logger.error(f"API request error: {str(e)}")
-    # Implement fallback strategy
-except json.JSONDecodeError as e:
-    logger.error(f"JSON parsing error: {str(e)}")
-    # Handle invalid JSON
-except Exception as e:
-    logger.error(f"Unexpected error: {str(e)}")
-    # General error handling
-```
-
-### Retry Mechanism
-
-For transient API failures:
-
-```python
-from requests.adapters import HTTPAdapter
-from requests.packages.urllib3.util.retry import Retry
-
-# Configure retry strategy
-retry_strategy = Retry(
-    total=settings.API_MAX_RETRIES,
-    backoff_factor=settings.API_RETRY_BACKOFF_FACTOR,
-    status_forcelist=[429, 500, 502, 503, 504]
-)
-
-# Create session with retry
-session = requests.Session()
-adapter = HTTPAdapter(max_retries=retry_strategy)
-session.mount("http://", adapter)
-session.mount("https://", adapter)
-
-# Make request with retry logic
-response = session.get(api_url, timeout=settings.API_REQUEST_TIMEOUT_SECONDS)
-```
-
-## Testing API Integrations
-
-The application includes comprehensive testing for API integrations:
-
-### Mock Responses
-
-```python
-@patch('requests.get')
-def test_tmdb_api_search(mock_get):
-    # Setup mock response
-    mock_response = MagicMock()
-    mock_response.status_code = 200
-    mock_response.json.return_value = {"results": [{"id": 123, "title": "Test Movie"}]}
-    mock_get.return_value = mock_response
-
-    # Test API call
-    result = search_movies("test query")
-
-    # Assertions
-    assert len(result) == 1
-    assert result[0]["title"] == "Test Movie"
-```
-
-### Configuration for Testing
-
-For testing, use mock APIs or test API keys:
-
-```bash
-# .env.test
-TMDB_API_KEY=test_key
-SERPAPI_API_KEY=test_key
-USE_MOCK_APIS=True
-```
-
-### Sandbox Environments
-
-For SerpAPI and TMDb, use sandbox/test environments:
-
-- **TMDb API**: Use the v3 API sandbox environment
-- **SerpAPI**: Use test credits for integration testing

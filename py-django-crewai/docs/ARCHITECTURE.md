@@ -1,6 +1,6 @@
 # Movie Chatbot Architecture
 
-This document outlines the architecture of the Movie Chatbot application, a Django-based web application that utilizes CrewAI for intelligent movie recommendations and theater information.
+This document outlines the architecture of the Movie Chatbot application, a Django and React-based web application that utilizes CrewAI for intelligent movie recommendations and theater information.
 
 ## Table of Contents
 
@@ -9,6 +9,8 @@ This document outlines the architecture of the Movie Chatbot application, a Djan
 - [Component Architecture](#component-architecture)
 - [Data Flow](#data-flow)
 - [Technology Stack](#technology-stack)
+- [Frontend Architecture](#frontend-architecture)
+- [Backend Architecture](#backend-architecture)
 - [Agent Orchestration](#agent-orchestration)
 - [Integration Architecture](#integration-architecture)
 - [Deployment Architecture](#deployment-architecture)
@@ -30,28 +32,53 @@ The system provides two primary modes:
 - **First Run Mode**: Focused on current movies playing in theaters with real showtimes
 - **Casual Viewing Mode**: For exploring movies from any time period without theater information
 
-The system leverages CrewAI to coordinate multiple AI agents working together, processing natural language queries, searching for movie information, making recommendations, and finding relevant theater and showtime data.
+The system leverages CrewAI to coordinate multiple AI agents working together, processing natural language queries, searching for movie information, making recommendations, and finding relevant theater and showtime data. The frontend is built with React to provide a modern, responsive user experience.
 
 ## Architectural Patterns
 
 The application follows these architectural patterns:
 
-1. **Model-View-Controller (MVC)** - Implemented through Django's MTV (Model-Template-View) pattern
-2. **Microagent Architecture** - Using CrewAI to coordinate multiple specialized AI agents
-3. **Service-Oriented Architecture** - Integration with external APIs via service adapters
-4. **Repository Pattern** - Data access through Django's ORM
-5. **Cloud-Native Design** - Built for deployment to Cloud Foundry with service binding support
-6. **Feature Toggle Pattern** - Support for two distinct conversation modes (First Run/Casual Viewing)
-7. **Graceful Degradation** - Multiple fallback mechanisms for location detection and theater data
+1. **Model-View-Controller (MVC)** - Backend implemented through Django's MTV (Model-Template-View) pattern
+2. **Component-Based Architecture** - Frontend built with React functional components and hooks
+3. **Context Provider Pattern** - React context for state management
+4. **Microagent Architecture** - Using CrewAI to coordinate multiple specialized AI agents
+5. **Service-Oriented Architecture** - Integration with external APIs via service adapters
+6. **Repository Pattern** - Data access through Django's ORM
+7. **Cloud-Native Design** - Built for deployment to Cloud Foundry with service binding support
+8. **Feature Toggle Pattern** - Support for two distinct conversation modes (First Run/Casual Viewing)
+9. **Graceful Degradation** - Multiple fallback mechanisms for location detection and theater data
+10. **RESTful API Pattern** - Backend communication through RESTful endpoints
 
 ## Component Architecture
 
 ```mermaid
 graph TD
-    User[User] --> WebUI[Web UI]
-    WebUI --> Django[Django Web Framework]
-    Django --> ChatbotController[Chatbot Controller]
-    ChatbotController --> MovieCrewManager[Movie Crew Manager]
+    User[User] --> WebUI[React Web UI]
+    WebUI --> DjangoAPI[Django API Endpoints]
+    DjangoAPI --> MovieCrewManager[Movie Crew Manager]
+
+    subgraph "Frontend Architecture"
+        WebUI --> AppContext[AppContext Provider]
+        AppContext --> ChatComponents[Chat Components]
+        AppContext --> MovieComponents[Movie Components]
+        AppContext --> TheaterComponents[Theater Components]
+
+        ChatComponents --> ChatInterface[ChatInterface]
+        ChatInterface --> MessageList[MessageList]
+        ChatInterface --> InputArea[InputArea]
+        ChatInterface --> ProgressIndicator[ProgressIndicator]
+
+        MovieComponents --> MovieSection[MovieSection]
+        MovieSection --> MovieCard[MovieCard]
+        MovieSection --> MovieDetails[MovieDetails]
+
+        TheaterComponents --> TheaterSection[TheaterSection]
+        TheaterSection --> TheaterList[TheaterList]
+        TheaterSection --> ShowtimeDisplay[ShowtimeDisplay]
+
+        AppContext --> APIService[API Service]
+        APIService --> DjangoAPI
+    end
 
     subgraph "CrewAI Framework"
         MovieCrewManager --- ModularManager[Modular Implementation]
@@ -77,7 +104,7 @@ graph TD
         TheaterTool --> SerpAPI[SerpAPI Showtimes]
     end
 
-    ChatbotController --> DatabaseLayer[Database Layer]
+    DjangoAPI --> DatabaseLayer[Database Layer]
     DatabaseLayer --> Models[Data Models]
 
     LocationService --> BrowserGeo[Browser Geolocation]
@@ -96,29 +123,30 @@ graph TD
 
 ### Main Components
 
-1. **Web UI Layer**
-   - Django templates with Bootstrap styling
-   - JavaScript for asynchronous chat interactions
-   - AJAX for handling requests without page refresh
-   - Interactive progress feedback with contextual messages
-   - Automatic browser location detection
-   - Tab-based interface for switching between conversation modes
-   - Dynamic showtimes display with theater sorting
+1. **React Frontend Layer**
+   - Functional components with hooks
+   - React Context for state management
+   - React Query for data fetching and caching
+   - Suspense and lazy loading for performance
+   - Feature-organized component structure (Chat, Movies, Theaters)
+   - AJAX for asynchronous communication with backend
+   - Progressive loading feedback with state tracking
+   - Responsive design with Bootstrap
 
-2. **Django Application**
-   - URL routing and request handling
+2. **Django Backend Layer**
+   - RESTful API endpoints for chat interactions
    - Session management for multiple conversations
    - CSRF protection
-   - Template rendering
-   - IP detection for geolocation services
+   - JSON response handling
+   - Error handling and logging
    - Environment detection (Cloud Foundry vs. local)
 
 3. **Chatbot Controller**
-   - Manages conversation state for both modes
-   - Processes user input with robust error handling
-   - Delegates natural language processing to CrewAI
-   - Formats responses for the UI
-   - Handles theater and showtime data processing
+   - API endpoints for processing chat messages
+   - Mode-specific request handling (First Run vs. Casual)
+   - User session management
+   - Conversation history tracking
+   - CrewAI integration and orchestration
 
 4. **Movie Crew Manager**
    - Implements a wrapper around modular components
@@ -201,7 +229,9 @@ graph TD
 ```mermaid
 sequenceDiagram
     participant User
-    participant UI as Web UI
+    participant UI as React UI
+    participant Context as AppContext
+    participant API as API Service
     participant View as Django View
     participant Manager as Movie Crew Manager
     participant CrewAI as CrewAI Framework
@@ -210,10 +240,14 @@ sequenceDiagram
     participant DB as Database
 
     User->>UI: Selects conversation mode
+    UI->>Context: Updates activeTab state
     User->>UI: Enters movie query
     UI->>UI: Detect browser location (if First Run mode)
-    UI->>UI: Show progress indicator
-    UI->>View: POST /send-message/ (JSON with mode flag)
+    UI->>Context: Updates loading state (true)
+    Context->>UI: Renders progress indicator
+
+    UI->>API: sendMessage(query, mode)
+    API->>View: POST /send-message/ (JSON with mode flag)
     View->>View: Extract client IP
     View->>View: Get conversation based on mode
     View->>DB: Create user message
@@ -255,14 +289,16 @@ sequenceDiagram
     View->>DB: Store movie recommendations
     View->>DB: Store theaters & showtimes
 
-    View->>UI: JSON response with recommendations
-    UI->>UI: Update progress bar (100%)
-    UI->>UI: Update conversation display
+    View->>API: JSON response with recommendations
+    API->>Context: Update state with response data
+    Context->>Context: Update loading state (false)
+    Context->>UI: Update UI components with new data
 
     alt First Run Mode
-        UI->>UI: Show movies with theaters & showtimes
+        Context->>UI: Update MovieSection with current movies
+        Context->>UI: Update TheaterSection with theaters & showtimes
     else Casual Viewing Mode
-        UI->>UI: Show historical movie recommendations
+        Context->>UI: Update MovieSection with historical movies
     end
 
     UI->>User: Display complete response
@@ -271,10 +307,10 @@ sequenceDiagram
 ### Data Processing Flow
 
 1. **User Input & Mode Selection**
-   - User selects conversation mode (First Run or Casual Viewing)
+   - User selects conversation mode (First Run or Casual Viewing) via tab interface
    - User enters a text query in the selected mode's input field
    - If in First Run mode, browser attempts to get user's geolocation
-   - Frontend validates and sends data to backend via AJAX with mode flag
+   - React frontend validates and sends data to backend via API service
 
 2. **Request Processing**
    - Django view identifies the appropriate conversation based on mode
@@ -326,20 +362,20 @@ sequenceDiagram
 
 8. **Response Delivery**
    - JSON response is sent back to the frontend
-   - UI updates progress bar to 100% and hides it
+   - React Context updates state with the new data
+   - React components re-render with the updated state
    - In First Run mode:
-     - UI filters recommendations to show only current movies with theaters
-     - Date tabs are created for showtime navigation
+     - MovieSection component displays current movies
+     - TheaterSection component shows theaters and showtimes
    - In Casual Viewing mode:
-     - Historical movies are displayed without theater information
-   - UI displays the bot message and recommendations
-   - Showtimes are formatted in 24-hour format
+     - MovieSection component displays historical movies
+   - ChatInterface component displays the conversation history
 
 ## Technology Stack
 
 ### Backend
 
-- **Django 5.2**: Web framework for handling HTTP requests, routing, and templating
+- **Django 5.2**: Web framework for handling HTTP requests, routing, and API endpoints
 - **CrewAI 0.114.0**: Framework for coordinating multiple AI agents
 - **LangChain 0.3.22**: Framework for LLM application development
 - **LangChain-OpenAI 0.3.12**: OpenAI integration for LangChain
@@ -354,9 +390,14 @@ sequenceDiagram
 
 ### Frontend
 
-- **HTML/CSS/JavaScript**: Standard web technologies
+- **React 18**: JavaScript library for building user interfaces
+- **React Query**: Data fetching and state management library
+- **React Context API**: State management across components
+- **React Suspense**: Loading state management
 - **Bootstrap 5.3.0**: CSS framework for responsive design
 - **Bootstrap Icons 1.11.3**: Icon library
+- **Webpack**: Module bundler for JavaScript applications
+- **Babel**: JavaScript compiler for modern JavaScript features
 - **Fetch API**: For asynchronous requests
 - **Browser Geolocation API**: For user location detection
 
@@ -377,6 +418,418 @@ sequenceDiagram
 - **cfenv 0.5.3**: Library for Cloud Foundry environment parsing
 - **python-dotenv 1.1.0**: Environment variable management
 - **dj-database-url 2.3.0**: Database URL configuration
+
+## Frontend Architecture
+
+The frontend is built with modern React practices, focusing on component reusability, performance optimization, and maintainable code structure.
+
+### Component Organization
+
+The React components are organized by feature:
+
+```
+frontend/
+├── src/
+│   ├── components/
+│   │   ├── Chat/
+│   │   │   ├── ChatInterface.jsx
+│   │   │   ├── MessageList.jsx
+│   │   │   ├── MessageItem.jsx
+│   │   │   ├── InputArea.jsx
+│   │   │   └── LazyChatInterface.jsx
+│   │   ├── Movies/
+│   │   │   ├── MovieSection.jsx
+│   │   │   ├── MovieCard.jsx
+│   │   │   ├── MovieDetails.jsx
+│   │   │   └── MoviePlaceholder.jsx
+│   │   └── Theaters/
+│   │       ├── TheaterSection.jsx
+│   │       ├── TheaterList.jsx
+│   │       ├── ShowtimeDisplay.jsx
+│   │       └── LazyTheaterSection.jsx
+│   ├── context/
+│   │   └── AppContext.jsx
+│   ├── hooks/
+│   │   ├── useChat.js
+│   │   ├── useLocation.js
+│   │   └── useMovies.js
+│   ├── services/
+│   │   └── api.js
+│   ├── styles/
+│   │   ├── app.css
+│   │   └── skeleton.css
+│   ├── App.jsx
+│   └── index.js
+```
+
+### State Management
+
+The application uses React Context API for state management:
+
+```jsx
+// AppContext.jsx
+import React, { createContext, useContext, useState, useEffect } from 'react';
+
+const AppContext = createContext();
+
+export const useAppContext = () => useContext(AppContext);
+
+export const AppProvider = ({ children }) => {
+  // Tab state
+  const [activeTab, setActiveTab] = useState('first-run');
+
+  // First Run mode state
+  const [firstRunMessages, setFirstRunMessages] = useState([]);
+  const [firstRunMovies, setFirstRunMovies] = useState([]);
+  const [firstRunTheaters, setFirstRunTheaters] = useState([]);
+  const [selectedMovieId, setSelectedMovieId] = useState(null);
+
+  // Casual Viewing mode state
+  const [casualMessages, setCasualMessages] = useState([]);
+  const [casualMovies, setCasualMovies] = useState([]);
+
+  // Shared state
+  const [isLoading, setIsLoading] = useState(false);
+  const [location, setLocation] = useState('');
+
+  // Function to switch between tabs
+  const switchTab = (tab) => {
+    setActiveTab(tab);
+    setSelectedMovieId(null);
+  };
+
+  // Function to select a movie
+  const selectMovie = (id) => {
+    setSelectedMovieId(id);
+  };
+
+  // Context value
+  const value = {
+    activeTab,
+    switchTab,
+    firstRunMessages,
+    setFirstRunMessages,
+    firstRunMovies,
+    setFirstRunMovies,
+    firstRunTheaters,
+    setFirstRunTheaters,
+    casualMessages,
+    setCasualMessages,
+    casualMovies,
+    setCasualMovies,
+    isLoading,
+    setIsLoading,
+    location,
+    setLocation,
+    selectedMovieId,
+    selectMovie
+  };
+
+  return (
+    <AppContext.Provider value={value}>
+      {children}
+    </AppContext.Provider>
+  );
+};
+```
+
+### Performance Optimization
+
+The application uses several techniques to optimize performance:
+
+1. **Lazy Loading**: Components are loaded only when needed
+
+   ```jsx
+   // Lazy loading example
+   const ChatInterface = React.lazy(() => import('./components/Chat/LazyChatInterface'));
+   const MovieSection = React.lazy(() => import('./components/Movies/MovieSection'));
+   const TheaterSection = React.lazy(() => import('./components/Theaters/LazyTheaterSection'));
+   ```
+
+2. **Suspense**: Provides fallback content while components are loading
+
+   ```jsx
+   <Suspense fallback={<LoadingFallback />}>
+     <ChatInterface />
+   </Suspense>
+   ```
+
+3. **React Query**: Optimizes data fetching with caching and background updates
+
+   ```jsx
+   const queryClient = new QueryClient({
+     defaultOptions: {
+       queries: {
+         refetchOnWindowFocus: false,
+         staleTime: 5 * 60 * 1000, // 5 minutes
+       },
+     },
+   });
+   ```
+
+4. **Conditional Rendering**: Components render only when data is available
+
+   ```jsx
+   {movies.length > 0 ? (
+     <MovieSection movies={movies} />
+   ) : (
+     <MoviePlaceholder />
+   )}
+   ```
+
+### API Integration
+
+The frontend communicates with the backend through a centralized API service:
+
+```jsx
+// api.js
+import axios from 'axios';
+
+// Create an axios instance with CSRF token handling
+const api = axios.create({
+  headers: {
+    'Content-Type': 'application/json',
+  },
+  // Add timeout to prevent hanging requests
+  timeout: 30000, // 30 seconds
+});
+
+// Add CSRF token to requests
+api.interceptors.request.use(config => {
+  const csrfToken = getCookie('csrftoken');
+  if (csrfToken) {
+    config.headers['X-CSRFToken'] = csrfToken;
+  }
+  return config;
+});
+
+// API service functions
+export const chatApi = {
+  getMoviesTheatersAndShowtimes: async (message, location = '') => {
+    try {
+      console.log(`[First Run Mode] Getting movies, theaters, and showtimes for: "${message}" (Location: ${location})`);
+
+      const response = await api.post('/get-movies-theaters-and-showtimes/', {
+        message: message,
+        location,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        mode: 'first_run' // Explicitly set mode to first_run
+      });
+
+      if (!response.data || response.data.status !== 'success') {
+        throw new Error(response.data?.message || 'Failed to get movies and theaters');
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error getting movies and theaters:', error);
+      throw error;
+    }
+  },
+
+  getMovieRecommendations: async (message) => {
+    try {
+      console.log(`[Casual Mode] Getting movie recommendations for: "${message}"`);
+
+      const response = await api.post('/get-movie-recommendations/', {
+        message: message,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        mode: 'casual' // Explicitly set mode to casual
+      });
+
+      if (!response.data || response.data.status !== 'success') {
+        throw new Error(response.data?.message || 'Failed to get movie recommendations');
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error getting movie recommendations:', error);
+      throw error;
+    }
+  }
+};
+```
+
+## Backend Architecture
+
+The backend is built with Django, providing RESTful API endpoints for the React frontend.
+
+### API Endpoints
+
+```python
+# urls.py
+from django.urls import path
+from . import views
+
+urlpatterns = [
+    path('get-movies-theaters-and-showtimes/', views.first_run_message, name='first_run_message'),
+    path('get-movie-recommendations/', views.casual_message, name='casual_message'),
+    path('get-theaters/<int:movie_id>/', views.get_theaters, name='get_theaters'),
+    path('theater-status/<int:movie_id>/', views.theater_status, name='theater_status'),
+    path('reset/', views.reset_conversations, name='reset_conversations'),
+    path('health/', views.health_check, name='health_check'),
+]
+```
+
+### View Implementation
+
+```python
+# views.py
+@csrf_exempt
+def first_run_message(request):
+    """Process a message in the First Run conversation mode."""
+    if request.method != 'POST':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'This endpoint only accepts POST requests'
+        }, status=405)
+
+    try:
+        data = _parse_request_data(request)
+        message_text = data.get('message', '').strip()
+        location = data.get('location', '').strip()
+        client_ip = _get_client_ip(request)
+
+        # Get or create First Run conversation
+        conversation = _get_or_create_conversation(request, 'first_run')
+
+        # Create user message
+        user_message = Message.objects.create(
+            conversation=conversation,
+            content=message_text,
+            sender='user'
+        )
+
+        # Process the message with CrewAI
+        crew_manager = _get_crew_manager(location, client_ip)
+
+        # Get conversation history
+        history = _get_conversation_history(conversation)
+
+        # Process query with First Run mode
+        result = crew_manager.process_query(message_text, history, first_run_mode=True)
+
+        # Create bot message
+        bot_message = Message.objects.create(
+            conversation=conversation,
+            content=result['response'],
+            sender='bot'
+        )
+
+        # Store movie recommendations
+        _store_movie_recommendations(conversation, result['movies'])
+
+        return JsonResponse({
+            'status': 'success',
+            'message': result['response'],
+            'recommendations': result['movies']
+        })
+    except Exception as e:
+        logger.error(f"Error in first_run_message: {str(e)}")
+        return JsonResponse({
+            'status': 'error',
+            'message': 'An error occurred while processing your message'
+        }, status=500)
+```
+
+### Movie Crew Manager
+
+The Movie Crew Manager is the core component that orchestrates the AI agents:
+
+```python
+class MovieCrewManager:
+    """Manager for the movie recommendation crew."""
+
+    def __init__(
+        self,
+        api_key: str,
+        base_url: Optional[str] = None,
+        model: str = "gpt-4o-mini",
+        tmdb_api_key: Optional[str] = None,
+        user_location: Optional[str] = None,
+        user_ip: Optional[str] = None,
+        timezone: Optional[str] = None,
+        llm_provider: Optional[str] = None
+    ):
+        """Initialize the MovieCrewManager."""
+        self.api_key = api_key
+        self.base_url = base_url
+        self.model = model
+        self.tmdb_api_key = tmdb_api_key
+        self.user_location = user_location
+        self.user_ip = user_ip
+        self.timezone = timezone
+        self.llm_provider = llm_provider
+
+        # Configure TMDb API if key is provided
+        if tmdb_api_key:
+            tmdb.API_KEY = tmdb_api_key
+
+    def process_query(self, query: str, conversation_history: List[Dict[str, str]], first_run_mode: bool = True) -> Dict[str, Any]:
+        """Process a user query and return movie recommendations."""
+        # Create the LLM
+        llm = self.create_llm()
+
+        # Create the agents
+        movie_finder = MovieFinderAgent.create(llm)
+        recommender = RecommendationAgent.create(llm)
+        theater_finder = TheaterFinderAgent.create(llm)
+
+        # Create tools for each task, passing the mode
+        search_tool = SearchMoviesTool()
+        search_tool.first_run_mode = first_run_mode
+        analyze_tool = AnalyzePreferencesTool()
+        theater_finder_tool = FindTheatersTool(user_location=self.user_location)
+
+        # Create the tasks
+        find_movies_task = Task(
+            description=f"Find movies that match the user's criteria: '{query}'",
+            expected_output="A JSON list of relevant movies with title, overview, release date, and TMDb ID",
+            agent=movie_finder,
+            tools=[search_tool]
+        )
+
+        recommend_movies_task = Task(
+            description=f"Recommend the top {max_recommendations} movies from the list that best match the user's preferences",
+            expected_output=f"A JSON list of the top {max_recommendations} recommended movies with explanations",
+            agent=recommender,
+            tools=[analyze_tool]
+        )
+
+        find_theaters_task = Task(
+            description="Find theaters showing the recommended movies near the user's location",
+            expected_output="A JSON list of theaters showing the recommended movies with showtimes",
+            agent=theater_finder,
+            tools=[theater_finder_tool]
+        )
+
+        # Create the crew based on the mode
+        if first_run_mode:
+            # For First Run mode (theater-based recommendations), include all agents and tasks
+            crew = Crew(
+                agents=[movie_finder, recommender, theater_finder],
+                tasks=[find_movies_task, recommend_movies_task, find_theaters_task],
+                verbose=True
+            )
+        else:
+            # For Casual Viewing mode, skip the theater finder
+            crew = Crew(
+                agents=[movie_finder, recommender],
+                tasks=[find_movies_task, recommend_movies_task],
+                verbose=True
+            )
+
+        # Execute the crew
+        result = crew.kickoff()
+
+        # Process the results
+        # ... (processing logic)
+
+        return {
+            "response": response_message,
+            "movies": movies_with_theaters
+        }
+```
 
 ## Agent Orchestration
 
@@ -435,10 +888,26 @@ movie_finder = Agent(
 )
 
 # Recommendation Agent
-recommender = RecommendationAgent.create(llm)
+recommender = Agent(
+    role="Movie Recommender",
+    goal="Recommend the best movies based on user preferences",
+    backstory="""You are an expert movie critic with deep knowledge of cinema. Your job is to analyze
+              movie options and recommend the best ones based on user preferences. You consider factors
+              like genre match, ratings, popularity, and thematic elements to make personalized recommendations.""",
+    verbose=True,
+    llm=llm
+)
 
 # Theater Finder Agent
-theater_finder = TheaterFinderAgent.create(llm)
+theater_finder = Agent(
+    role="Theater Finder",
+    goal="Find theaters showing the recommended movies near the user",
+    backstory="""You are an expert at finding movie theaters and showtimes. Your job is to locate theaters
+              showing specific movies near the user's location. You use geolocation services and showtime
+              data to provide accurate and up-to-date information about where and when movies are playing.""",
+    verbose=True,
+    llm=llm
+)
 ```
 
 ### Task Definitions
@@ -467,27 +936,6 @@ find_theaters_task = Task(
     agent=theater_finder,
     tools=[theater_finder_tool]
 )
-```
-
-### Mode-Specific Crew Configuration
-
-The application creates different crews based on the conversation mode:
-
-```python
-# For First Run mode (theater-based recommendations), include all agents and tasks
-if first_run_mode:
-    crew = Crew(
-        agents=[movie_finder, recommender, theater_finder],
-        tasks=[find_movies_task, recommend_movies_task, find_theaters_task],
-        verbose=True
-    )
-else:
-    # For Casual Viewing mode, skip the theater finder
-    crew = Crew(
-        agents=[movie_finder, recommender],
-        tasks=[find_movies_task, recommend_movies_task],
-        verbose=True
-    )
 ```
 
 ### Tool Implementation
@@ -620,94 +1068,104 @@ The application uses multiple approaches to determine user location:
 1. **Browser Geolocation**
 
    ```javascript
-   if (navigator.geolocation) {
-       navigator.geolocation.getCurrentPosition(
-           function(position) {
-               const latitude = position.coords.latitude;
-               const longitude = position.coords.longitude;
+   // useLocation.js custom hook
+   export function useLocation() {
+     const [location, setLocation] = useState('');
+     const [isLoading, setIsLoading] = useState(false);
+     const [error, setError] = useState(null);
+
+     // Function to detect location using browser geolocation
+     const detectLocation = () => {
+       setIsLoading(true);
+       setError(null);
+
+       if (navigator.geolocation) {
+         navigator.geolocation.getCurrentPosition(
+           // Success callback
+           async (position) => {
+             try {
+               const { latitude, longitude } = position.coords;
 
                // Use reverse geocoding to get readable location
-               fetch(`https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`)
-                   .then(response => response.json())
-                   .then(data => {
-                       const locationName = data.display_name;
-                       locationInput.value = locationName;
-                   });
+               const response = await fetch(
+                 `https://nominatim.openstreetmap.org/reverse?format=json&lat=${latitude}&lon=${longitude}`
+               );
+
+               if (!response.ok) {
+                 throw new Error('Geocoding failed');
+               }
+
+               const data = await response.json();
+               const locationName = data.display_name;
+
+               setLocation(locationName);
+               setIsLoading(false);
+             } catch (err) {
+               setError('Failed to convert coordinates to address');
+               setIsLoading(false);
+             }
+           },
+           // Error callback
+           (error) => {
+             console.error('Geolocation error:', error);
+             setError('Unable to get your location. Please enter it manually.');
+             setIsLoading(false);
+
+             // Fall back to IP-based geolocation
+             gatherLocationDataFromIpApi();
            }
-       );
+         );
+       } else {
+         setError('Geolocation is not supported by your browser');
+         setIsLoading(false);
+
+         // Fall back to IP-based geolocation
+         gatherLocationDataFromIpApi();
+       }
+     };
+
+     return { location, setLocation, detectLocation, isLoading, error };
    }
    ```
 
 2. **ipapi.co Geolocation**
 
    ```javascript
-   // Function to gather location and timezone data from ipapi.co
-   function gatherLocationDataFromIpApi() {
-       console.log("Using ipapi.co for location and timezone detection");
+   // Function to gather location data from ipapi.co
+   const gatherLocationDataFromIpApi = async () => {
+     try {
+       const response = await fetch('https://ipapi.co/json/');
 
-       // Use ipapi.co - no API key needed
-       fetch('https://ipapi.co/json/')
-       .then(response => {
-           if (!response.ok) {
-               throw new Error(`HTTP error! status: ${response.status}`);
-           }
-           return response.json();
-       })
-       .then(data => {
-           console.log("Received ipapi.co response:", data);
+       if (!response.ok) {
+         throw new Error(`HTTP error! status: ${response.status}`);
+       }
 
-           // Check if location is in the US
-           if (!isLocationInUS(data.country_code)) {
-               console.log(`Detected non-US location: ${data.country_name || 'unknown'}`);
-               handleNonUSLocation();
-               return;
-           }
+       const data = await response.json();
 
-           // Capture timezone information
-           if (data.timezone) {
-               window.userTimezone = data.timezone;
-               console.log(`Captured user timezone: ${window.userTimezone}`);
-           }
+       // Check if location is in the US
+       if (data.country_code !== 'US') {
+         setError('Theater search requires a US location. Please enter a US city and state.');
+         return;
+       }
 
-           // Extract city and state for US locations
-           const city = data.city;
-           const state = data.region;
-           const country = data.country_name;
+       // Extract city and state for US locations
+       const { city, region, country_name } = data;
 
-           // If we have all values, use the standard "City, State, Country" format
-           if (city && state && country) {
-               const locationName = `${city}, ${state}, ${country}`;
-               console.log(`Setting location to: ${locationName}`);
-               locationInput.value = locationName;
-               return;
-           }
-       })
-   }
+       // Format location
+       if (city && region && country_name) {
+         const locationName = `${city}, ${region}, ${country_name}`;
+         setLocation(locationName);
+       }
+     } catch (err) {
+       console.error('Error fetching location from IP:', err);
+       setError('Could not detect your location. Please enter it manually.');
+     } finally {
+       setIsLoading(false);
+     }
+   };
    ```
 
-3. **Server-side IP Geolocation**
-
-   ```python
-   def get_location_from_ip(self, ip_address: str):
-       """Get user location from IP address."""
-       response = requests.get(f"https://ipinfo.io/{ip_address}/json")
-
-       if response.status_code == 200:
-           data = response.json()
-           if 'loc' in data:
-               lat, lon = data['loc'].split(',')
-               city = data.get('city', '')
-               region = data.get('region', '')
-               country = data.get('country', '')
-
-               return {
-                   "latitude": float(lat),
-                   "longitude": float(lon),
-                   "display_name": f"{city}, {region}, {country}"
-               }
-   ```
-
-4. **Theater Search with OpenStreetMap**
+3. **Theater Search with OpenStreetMap**
 
    ```python
    def search_theaters(self, latitude: float, longitude: float, radius_miles: float = 20):
@@ -768,6 +1226,7 @@ graph TD
 
 1. **Preparation**
    - Configure environment variables or create `.env` file
+   - Build frontend assets: `cd frontend && npm run build`
    - Collect static files: `python manage.py collectstatic --noinput`
 
 2. **Cloud Foundry Deployment**
@@ -829,10 +1288,11 @@ The application implements several error handling and resilience patterns:
    - Graceful error responses to users
    - Recovery strategies for common failure scenarios
 
-8. **Fallback Responses**
-   - Default responses when AI services fail
-   - Helpful error messages that maintain conversation flow
-   - Alternative search strategies when primary methods fail
+8. **React Error Boundaries**
+   - Component-level error catching
+   - Fallback UI for component failures
+   - Isolated error handling to prevent cascading failures
+   - Automatic error reporting
 
 9. **Extensive Logging**
    - Detailed logging with contextual information
@@ -856,7 +1316,7 @@ The application implements several error handling and resilience patterns:
 2. **Web Security**
    - CSRF protection for form submissions
    - Content-Security-Policy headers
-   - XSS prevention in templates
+   - XSS prevention in React components
    - Input validation and sanitization
 
 3. **Input Validation**
@@ -883,11 +1343,18 @@ The application implements several error handling and resilience patterns:
    - No personal user profiles are maintained
    - Location data is used transiently for theater search
 
+7. **React-Specific Security**
+   - Automatic escaping of user content
+   - Protection against injection attacks
+   - Secure state management
+   - Proper handling of user-generated content
+
 ## References & Resources
 
 ### Core Technologies
 
 - [Django](https://docs.djangoproject.com/)
+- [React](https://react.dev/)
 - [CrewAI](https://docs.crewai.com/)
 - [LangChain](https://python.langchain.com/docs/get_started/introduction)
 - [TMDb API](https://developer.themoviedb.org/docs/getting-started)
@@ -896,7 +1363,15 @@ The application implements several error handling and resilience patterns:
 - [Overpass API](https://wiki.openstreetmap.org/wiki/Overpass_API)
 - [Nominatim API](https://nominatim.org/release-docs/latest/api/Overview/)
 - [ipapi.co](https://ipapi.co/api/)
-- [IPInfo.io](https://ipinfo.io/developers)
+
+### React Libraries
+
+- [React Context API](https://react.dev/reference/react/createContext)
+- [React Query](https://tanstack.com/query/latest)
+- [React Suspense](https://react.dev/reference/react/Suspense)
+- [React Hooks](https://react.dev/reference/react/hooks)
+- [Axios](https://axios-http.com/docs/intro)
+- [Bootstrap React](https://react-bootstrap.github.io/)
 
 ### Cloud Foundry
 
@@ -910,4 +1385,5 @@ The application implements several error handling and resilience patterns:
 - [CrewAI Design Patterns](https://github.com/joaomdmoura/crewAI/tree/main/docs/examples)
 - [LangChain Chain Patterns](https://python.langchain.com/docs/modules/chains/)
 - [Django Design Patterns](https://djangopatterns.readthedocs.io/en/latest/)
+- [React Design Patterns](https://www.patterns.dev/react)
 - [Multi-agent AI Patterns](https://www.deeplearning.ai/short-courses/multi-agent-collaboration/)

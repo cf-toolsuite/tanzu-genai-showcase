@@ -9,6 +9,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 - [Location Detection Issues](#location-detection-issues)
 - [Movie Search Problems](#movie-search-problems)
 - [Theater and Showtime Issues](#theater-and-showtime-issues)
+- [React Frontend Issues](#react-frontend-issues)
 - [CrewAI and Agent Problems](#crewai-and-agent-problems)
 - [Database and Persistence Issues](#database-and-persistence-issues)
 - [Performance Optimization](#performance-optimization)
@@ -55,6 +56,49 @@ This document provides guidance on troubleshooting common issues with the Movie 
    # Cloud Foundry
    cf logs movie-chatbot --recent
    ```
+
+### React Frontend Fails to Start
+
+**Symptoms**:
+
+- Webpack dev server fails to start
+- "Module not found" errors
+- Blank page in browser
+
+**Solutions**:
+
+1. **Check Node.js and npm versions**:
+
+   ```bash
+   node -v  # Should be 18+
+   npm -v   # Should be compatible with Node version
+   ```
+
+2. **Reinstall dependencies**:
+
+   ```bash
+   cd frontend
+   rm -rf node_modules package-lock.json
+   npm install
+   ```
+
+3. **Check for syntax errors in React code**:
+
+   ```bash
+   cd frontend
+   npm run lint
+   ```
+
+4. **Examine webpack configuration**:
+
+   ```bash
+   # Check webpack.config.js for errors
+   # Verify proxy settings for API requests
+   ```
+
+5. **Check browser console for errors**:
+   - Open browser developer tools (F12)
+   - Look for errors in the Console tab
 
 ### Missing Dependencies
 
@@ -110,7 +154,7 @@ This document provides guidance on troubleshooting common issues with the Movie 
 
    ```bash
    cf services  # List services
-   cf service movie-booking-llm  # Check LLM service details
+   cf service movie-chatbot-llm  # Check LLM service details
    ```
 
 3. **Inspect code that handles credentials**:
@@ -209,6 +253,10 @@ This document provides guidance on troubleshooting common issues with the Movie 
    - Display a prompt explaining the need for location access
    - Provide visual cues for granting permissions
 
+5. **Check React location hook**:
+   - Verify the `useLocation` hook is working correctly
+   - Check for errors in the hook implementation
+
 ### ipapi.co Fallback Issues
 
 **Symptoms**:
@@ -301,6 +349,10 @@ This document provides guidance on troubleshooting common issues with the Movie 
    # Check logs for SearchMoviesTool execution
    ```
 
+5. **Check React state updates**:
+   - Verify that movie data is being properly stored in React context
+   - Check that components are re-rendering when data changes
+
 ### Incorrect Movie Recommendations
 
 **Symptoms**:
@@ -321,6 +373,10 @@ This document provides guidance on troubleshooting common issues with the Movie 
 3. **Implement feedback mechanism**:
    - Allow users to rate recommendations
    - Use feedback to improve future recommendations
+
+4. **Check React component rendering**:
+   - Verify that MovieSection component is receiving correct data
+   - Check that movie cards are displaying the right information
 
 ## Theater and Showtime Issues
 
@@ -367,6 +423,10 @@ This document provides guidance on troubleshooting common issues with the Movie 
    - Check Overpass API is accessible
    - Test theater search with explicit coordinates
 
+5. **Check React theater components**:
+   - Verify TheaterSection component is receiving data
+   - Check that theater data is being passed correctly to child components
+
 ### Incorrect Showtimes
 
 **Symptoms**:
@@ -394,6 +454,136 @@ This document provides guidance on troubleshooting common issues with the Movie 
    LOG_LEVEL=DEBUG
 
    # Check logs for raw showtime data vs. displayed data
+   ```
+
+4. **Check React showtime formatting**:
+   - Verify ShowtimeDisplay component is formatting times correctly
+   - Check that date filtering is working properly
+
+## React Frontend Issues
+
+### Component Rendering Problems
+
+**Symptoms**:
+- Blank or incomplete UI
+- Components not updating when data changes
+- React error messages in console
+
+**Solutions**:
+
+1. **Check React component hierarchy**:
+   - Verify parent-child relationships
+   - Ensure props are passed correctly
+
+2. **Inspect React state**:
+   - Use React DevTools to examine component state
+   - Verify context values are correct
+
+3. **Check for React key errors**:
+   - Ensure list items have unique keys
+   - Fix any "key" warnings in console
+
+4. **Test component isolation**:
+   - Render components in isolation to identify issues
+   - Use React Testing Library for component testing
+
+5. **Check for React hooks errors**:
+   - Verify hooks are used according to rules (only at top level)
+   - Check for dependency array issues in useEffect
+
+### Context API Issues
+
+**Symptoms**:
+- Components not receiving updated state
+- "Cannot read property of undefined" errors
+- Unexpected component behavior
+
+**Solutions**:
+
+1. **Verify context provider wrapping**:
+   - Ensure AppProvider wraps all components that need context
+   - Check for nested providers that might shadow values
+
+2. **Debug context values**:
+   ```jsx
+   // Add debugging in component
+   const context = useAppContext();
+   console.log('Context values:', context);
+   ```
+
+3. **Check context updates**:
+   - Verify state update functions are called correctly
+   - Ensure state updates trigger re-renders
+
+4. **Test with simplified context**:
+   - Create a minimal reproduction of the issue
+   - Isolate the specific context value causing problems
+
+### API Integration Issues
+
+**Symptoms**:
+- Network errors in console
+- "Failed to fetch" errors
+- Empty data despite successful API calls
+
+**Solutions**:
+
+1. **Check API service implementation**:
+   - Verify endpoint URLs are correct
+   - Ensure proper error handling
+
+2. **Inspect network requests**:
+   - Use browser Network tab to examine requests
+   - Check request/response format
+
+3. **Test CSRF token handling**:
+   - Verify CSRF token is included in requests
+   - Check for CSRF validation errors
+
+4. **Implement better error feedback**:
+   - Add user-friendly error messages
+   - Provide retry options for failed requests
+
+### Lazy Loading Issues
+
+**Symptoms**:
+- Components fail to load
+- "Loading chunk failed" errors
+- Blank areas where components should be
+
+**Solutions**:
+
+1. **Check Suspense implementation**:
+   - Verify Suspense components wrap lazy-loaded components
+   - Ensure fallback UI is provided
+
+2. **Debug chunk loading**:
+   - Check network tab for chunk loading errors
+   - Verify webpack configuration
+
+3. **Implement error boundaries**:
+   ```jsx
+   class ErrorBoundary extends React.Component {
+     state = { hasError: false };
+
+     static getDerivedStateFromError(error) {
+       return { hasError: true };
+     }
+
+     render() {
+       if (this.state.hasError) {
+         return <div>Something went wrong. Please try again.</div>;
+       }
+       return this.props.children;
+     }
+   }
+
+   // Usage
+   <ErrorBoundary>
+     <Suspense fallback={<LoadingFallback />}>
+       <LazyComponent />
+     </Suspense>
+   </ErrorBoundary>
    ```
 
 ## CrewAI and Agent Problems
@@ -445,6 +635,10 @@ This document provides guidance on troubleshooting common issues with the Movie 
    - Test tools directly outside of agent context
    - Check for exceptions in tool execution
 
+5. **Check CrewAI version compatibility**:
+   - Verify compatibility with LangChain version
+   - Check for breaking changes in CrewAI 0.114.0
+
 ### Response Parsing Issues
 
 **Symptoms**:
@@ -469,6 +663,70 @@ This document provides guidance on troubleshooting common issues with the Movie 
 
    - Use basic test queries to validate JSON parsing
    - Check for patterns in failing queries
+
+4. **Implement more resilient parsing**:
+   ```python
+   def parse_json_output(output_str: str) -> Any:
+       """Parse JSON output with multiple fallback strategies."""
+       # Try direct JSON parsing
+       try:
+           return json.loads(output_str)
+       except json.JSONDecodeError:
+           pass
+
+       # Try to extract JSON from markdown code blocks
+       json_match = re.search(r'```(?:json)?\s*([\s\S]*?)\s*```', output_str)
+       if json_match:
+           try:
+               return json.loads(json_match.group(1))
+           except json.JSONDecodeError:
+               pass
+
+       # Try to find JSON array/object patterns
+       json_pattern = re.search(r'(\[.*\]|\{.*\})', output_str, re.DOTALL)
+       if json_pattern:
+           try:
+               return json.loads(json_pattern.group(1))
+           except json.JSONDecodeError:
+               pass
+
+       # Return empty list as fallback
+       return []
+   ```
+
+### Tool Registration Issues
+
+**Symptoms**:
+- "KeyError: 'tool_name'" in logs
+- "Tool not found" errors
+- Agent fails to use tools
+
+**Solutions**:
+
+1. **Check tool registration**:
+   - Verify tool names are consistent
+   - Ensure tools are properly registered with agents
+
+2. **Implement tool compatibility patch**:
+   ```python
+   def _ensure_tool_compatibility(tools: List[Any]) -> None:
+       """Ensure tools have all necessary attributes for CrewAI compatibility."""
+       for tool in tools:
+           # Make sure the tool has a name attribute
+           if not hasattr(tool, 'name'):
+               tool_class_name = tool.__class__.__name__
+               derived_name = tool_class_name.lower().replace('tool', '_tool')
+               setattr(tool, 'name', derived_name)
+
+           # Pre-register tool with CrewAI's event tracking system
+           from crewai.utilities.events.utils.console_formatter import ConsoleFormatter
+           if hasattr(ConsoleFormatter, 'tool_usage_counts') and tool.name not in ConsoleFormatter.tool_usage_counts:
+               ConsoleFormatter.tool_usage_counts[tool.name] = 0
+   ```
+
+3. **Update tool implementation**:
+   - Ensure tools follow CrewAI 0.114.0 specifications
+   - Check for deprecated tool methods
 
 ## Database and Persistence Issues
 
@@ -499,6 +757,24 @@ This document provides guidance on troubleshooting common issues with the Movie 
 3. **Review conversation persistence**:
    - Check that Conversation model is properly saved
    - Verify session ID to conversation mapping
+
+4. **Implement local storage backup**:
+   ```javascript
+   // In React context
+   useEffect(() => {
+     // Save conversation state to localStorage
+     localStorage.setItem('firstRunMessages', JSON.stringify(firstRunMessages));
+   }, [firstRunMessages]);
+
+   // On initialization
+   useEffect(() => {
+     // Restore from localStorage if available
+     const savedMessages = localStorage.getItem('firstRunMessages');
+     if (savedMessages) {
+       setFirstRunMessages(JSON.parse(savedMessages));
+     }
+   }, []);
+   ```
 
 ### Database Migration Failures
 
@@ -572,6 +848,54 @@ This document provides guidance on troubleshooting common issues with the Movie 
    - Implement more granular progress updates
    - Display intermediate results when available
 
+5. **Optimize React rendering**:
+   - Use React.memo for expensive components
+   - Implement useMemo and useCallback for optimizations
+   - Use virtualized lists for long content
+
+### React Performance Issues
+
+**Symptoms**:
+- Slow UI updates
+- Laggy interactions
+- High CPU usage
+
+**Solutions**:
+
+1. **Identify performance bottlenecks**:
+   - Use React DevTools Profiler
+   - Check for unnecessary re-renders
+
+2. **Optimize component rendering**:
+   ```jsx
+   // Memoize expensive components
+   const MovieCard = React.memo(function MovieCard({ movie, onSelect }) {
+     return (
+       <div onClick={() => onSelect(movie.id)}>
+         {movie.title}
+       </div>
+     );
+   });
+
+   // Memoize callback functions
+   const handleSelect = useCallback((id) => {
+     selectMovie(id);
+   }, [selectMovie]);
+
+   // Memoize derived data
+   const sortedMovies = useMemo(() => {
+     return [...movies].sort((a, b) => a.title.localeCompare(b.title));
+   }, [movies]);
+   ```
+
+3. **Implement virtualization for long lists**:
+   - Use react-window or react-virtualized
+   - Only render visible items in long lists
+
+4. **Optimize context usage**:
+   - Split context into smaller, focused contexts
+   - Use context selectors to prevent unnecessary re-renders
+
 ### Memory Usage Issues
 
 **Symptoms**:
@@ -599,6 +923,18 @@ This document provides guidance on troubleshooting common issues with the Movie 
    ```bash
    # Increase memory allocation
    cf scale movie-chatbot -m 1G
+   ```
+
+4. **Implement React cleanup**:
+   ```jsx
+   useEffect(() => {
+     // Effect code here
+
+     // Cleanup function
+     return () => {
+       // Release resources, cancel subscriptions, etc.
+     };
+   }, [dependencies]);
    ```
 
 ## Deployment-Specific Issues
@@ -688,6 +1024,44 @@ Production systems should use appropriate logging levels, but for troubleshootin
    cf set-env movie-chatbot DEBUG True
    cf set-env movie-chatbot LOG_LEVEL DEBUG
    cf restage movie-chatbot
+   ```
+
+3. **View logs**:
+
+   ```bash
+   cf logs movie-chatbot --recent
+   ```
+
+### React Debugging
+
+1. **Enable React Developer Tools**:
+   - Install React Developer Tools browser extension
+   - Use Components tab to inspect component hierarchy
+   - Use Profiler tab to identify performance issues
+
+2. **Add React Query DevTools**:
+   ```jsx
+   // In development mode
+   import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
+
+   function App() {
+     return (
+       <QueryClientProvider client={queryClient}>
+         {/* Your app components */}
+         <ReactQueryDevtools initialIsOpen={false} />
+       </QueryClientProvider>
+     )
+   }
+   ```
+
+3. **Implement component-level logging**:
+   ```jsx
+   // Add logging to key components
+   function MovieSection({ movies }) {
+     console.log('MovieSection rendering with', movies.length, 'movies');
+
+     // Component implementation
+   }
    ```
 
 ### Monitoring Key Metrics
