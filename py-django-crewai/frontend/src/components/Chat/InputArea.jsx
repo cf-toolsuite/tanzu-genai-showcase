@@ -1,139 +1,82 @@
-import React, { forwardRef, useRef } from 'react';
-import { useAppContext } from '../../context/AppContext';
-import SampleInquiries from './SampleInquiries';
-import { useLocation } from '../../hooks/useLocation';
-import ProgressIndicator from './ProgressIndicator';
+import React, { forwardRef } from 'react';
 
 const InputArea = forwardRef(({
-  value,
+  value = '',
   onChange,
   onSend,
-  disabled,
-  placeholder,
+  disabled = false,
+  placeholder = 'Type your message...',
   sendButtonRef,
-  id,
-  sendButtonId
+  id = 'userInput',
+  sendButtonId = 'sendButton'
 }, ref) => {
-  const { location, setLocation, isLoadingLocation } = useAppContext();
-  const locationInputRef = useRef(null);
-  const detectLocation = useLocation();
-
-  // Clean and validate input
-  const validateAndCleanInput = (input) => {
-    if (typeof input !== 'string') {
-      console.warn('Invalid input type:', typeof input);
-      return '';
-    }
-    return input.trim();
-  };
-
-  // Handle input key press (Enter to send)
-  const handleKeyDown = (event) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      event.preventDefault();
-      const cleanedValue = validateAndCleanInput(value);
-      if (cleanedValue) {
-        console.log('Sending message (Enter):', cleanedValue);
-        onSend(cleanedValue);
-      }
-    }
+  
+  const handleInputChange = (e) => {
+    onChange(e.target.value);
   };
 
   const handleSendClick = () => {
-    const cleanedValue = validateAndCleanInput(value);
-    if (cleanedValue) {
-      console.log('Sending message (Click):', cleanedValue);
-      onSend(cleanedValue);
+    // Ensure value is a string and then trim it
+    const stringValue = typeof value === 'string' ? value : '';
+    const trimmedInput = stringValue.trim();
+
+    // Check if the trimmed input is not empty and not currently disabled
+    if (trimmedInput && !disabled) {
+      // Send the trimmed input
+      onSend(trimmedInput);
     }
   };
 
-  // Handle sample question click
-  const handleQuestionClick = (query) => {
-    const cleanedQuery = validateAndCleanInput(query);
-    if (cleanedQuery) {
-      console.log('Sending sample query:', cleanedQuery);
-      onSend(cleanedQuery);
+  const handleKeyPress = (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault(); // Prevent newline on Enter
+      handleSendClick();
     }
   };
 
-  // Handle location icon click
-  const handleLocationIconClick = () => {
-    // Only do something if there's no location value
-    if (!location.trim()) {
-      detectLocation();
+  // Helper function to safely check if the button should be disabled
+  const isButtonDisabled = () => {
+    try {
+      // First make sure value is a string
+      const stringValue = typeof value === 'string' ? value : '';
+      // Then check if it's empty after trimming
+      return disabled || !stringValue.trim();
+    } catch (e) {
+      // If any error occurs, default to disabled state for safety
+      console.error("Error checking button disabled state:", e);
+      return true;
     }
   };
 
   return (
-    <>
+    <div className="input-area">
       <div className="input-group">
-        <input
+        <textarea
           ref={ref}
           id={id}
-          type="text"
           className="form-control"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
+          rows="1"
           placeholder={placeholder}
+          value={value || ''} // Ensure value is never undefined
+          onChange={handleInputChange}
+          onKeyDown={handleKeyPress}
           disabled={disabled}
-          autoComplete="off"
         />
         <button
           ref={sendButtonRef}
           id={sendButtonId}
-          className="btn btn-red-carpet"
+          className="btn btn-red-carpet" // Updated to use the custom red carpet styling
           onClick={handleSendClick}
-          disabled={disabled}
+          disabled={isButtonDisabled()}
         >
-          <i className="bi bi-send-fill"></i>
+          {disabled ? (
+            <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true"></span>
+          ) : (
+            <i className="bi bi-send"></i>
+          )}
         </button>
       </div>
-
-      <div className="mt-3 d-flex justify-content-between align-items-center">
-        <SampleInquiries
-          isFirstRun={id === 'userInput'}
-          onQuestionClick={handleQuestionClick}
-        />
-        {id === 'userInput' && (
-          <div className="location-container ms-3">
-            {isLoadingLocation && (
-              <div className="location-loading-container mb-2">
-                <ProgressIndicator
-                  progress={50}
-                  message="Detecting your location..."
-                />
-              </div>
-            )}
-            <div className="input-group location-input-group">
-              <span
-                className={`input-group-text ${location.trim() ? 'location-icon-active' : 'location-icon-clickable'}`}
-                onClick={!location.trim() && !isLoadingLocation ? handleLocationIconClick : undefined}
-                style={{ cursor: !location.trim() && !isLoadingLocation ? 'pointer' : 'default' }}
-                title={!location.trim() ? (isLoadingLocation ? 'Detecting location...' : 'Obtain current location') : ''}
-              >
-                {isLoadingLocation ? (
-                  <i className="bi bi-arrow-repeat spin"></i>
-                ) : (
-                  <i className="bi bi-geo-alt-fill"></i>
-                )}
-              </span>
-              <input
-                ref={locationInputRef}
-                type="text"
-                id="locationInput"
-                className="form-control"
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder={isLoadingLocation ? "Detecting location..." : "Location..."}
-                disabled={disabled || isLoadingLocation}
-                autoComplete="off"
-              />
-            </div>
-          </div>
-        )}
-      </div>
-    </>
+    </div>
   );
 });
 

@@ -11,6 +11,8 @@ function SampleInquiries({ isFirstRun, onQuestionClick }) {
   const casualQuestions = [
     { text: 'Sci-Fi', query: 'Recommend some great sci-fi movies' },
     { text: 'Comedy', query: 'What are some great comedy movies from the last decade?' },
+    { text: 'Horror', query: 'What are some classic horror films I should watch?' },
+    { text: 'Thriller', query: 'Good psychological thrillers to watch', className: 'd-none d-md-inline-block' },
   ];
 
   const questions = isFirstRun ? firstRunQuestions : casualQuestions;

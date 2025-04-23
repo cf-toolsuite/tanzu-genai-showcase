@@ -3,6 +3,12 @@ import React, { lazy, Suspense } from 'react';
 const ChatInterface = lazy(() => import('./ChatInterface'));
 
 function LazyChatInterface(props) {
+  // Ensure we're passing valid props
+  const safeProps = {
+    ...props,
+    // Add any default values if needed
+  };
+
   return (
     <Suspense
       fallback={
@@ -20,7 +26,7 @@ function LazyChatInterface(props) {
         </div>
       }
     >
-      <ChatInterface {...props} />
+      <ChatInterface {...safeProps} />
     </Suspense>
   );
 }

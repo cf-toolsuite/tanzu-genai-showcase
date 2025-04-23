@@ -139,6 +139,9 @@ logs/
 .env.*
 !.env.example
 
-# Generated
+# NPM
 staticfiles/
+static/frontend/
+package-lock.json
+
 

@@ -1,14 +1,15 @@
-import { useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
 
 export function useLocation() {
   const { setLocation, setIsLoadingLocation } = useAppContext();
+  const [initialized, setInitialized] = useState(false);
 
   // Function to gather location data from ipapi.co
   const detectLocation = useCallback(() => {
     // Set loading state
     setIsLoadingLocation(true);
-    
+
     const gatherLocationDataFromIpApi = () => {
       console.log("Using ipapi.co for location detection");
 
@@ -41,6 +42,7 @@ export function useLocation() {
             console.log(`Setting location to: ${locationName}`);
             setLocation(locationName);
             setIsLoadingLocation(false);
+            setInitialized(true);
             return;
           }
 
@@ -58,8 +60,9 @@ export function useLocation() {
     // Function when we detect non-US location or can't detect location
     const handleNonUSLocation = () => {
       console.log("Location not in US or couldn't be determined");
-      setLocation(''); // Clear the value
+      setLocation('New York, NY, USA'); // Default location instead of empty value
       setIsLoadingLocation(false); // Clear loading state
+      setInitialized(true);
     };
 
     // First try to use browser's geolocation API
@@ -87,13 +90,10 @@ export function useLocation() {
       // Fall back to IP-based geolocation
       gatherLocationDataFromIpApi();
     }
-  }, [setLocation]);
-
-  // Run location detection once on mount
-  useEffect(() => {
-    detectLocation();
-  }, []); // Empty dependency array means this runs once on mount
+  }, [setLocation, setIsLoadingLocation, setInitialized]);
 
   // Return the detectLocation function so it can be called manually
   return detectLocation;
 }
+
+export default useLocation;

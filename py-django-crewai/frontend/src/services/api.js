@@ -91,14 +91,31 @@ const cache = {
 // API service functions
 export const chatApi = {
   getMoviesTheatersAndShowtimes: async (message, location = '') => {
+    // Validate message is a string
+    if (typeof message !== 'string') {
+      console.error('Invalid message type in getMoviesTheatersAndShowtimes:', typeof message, message);
+      return Promise.reject({
+        status: 'error',
+        message: 'Invalid message format'
+      });
+    }
+
+    if (!message) {
+      console.error('Empty message in getMoviesTheatersAndShowtimes');
+      return Promise.reject({
+        status: 'error',
+        message: 'Message cannot be empty'
+      });
+    }
+
     try {
       console.log(`[First Run Mode] Getting movies, theaters, and showtimes for: "${message}" (Location: ${location})`);
 
       const response = await api.post('/get-movies-theaters-and-showtimes/', {
-        message,
+        message: message,
         location,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        mode: 'first_run'
+        mode: 'first_run' // Explicitly set mode to first_run
       });
 
       if (!response.data || response.data.status !== 'success') {
@@ -127,13 +144,30 @@ export const chatApi = {
   },
 
   getMovieRecommendations: async (message) => {
+    // Validate message is a string
+    if (typeof message !== 'string') {
+      console.error('Invalid message type in getMovieRecommendations:', typeof message, message);
+      return Promise.reject({
+        status: 'error',
+        message: 'Invalid message format'
+      });
+    }
+
+    if (!message) {
+      console.error('Empty message in getMovieRecommendations');
+      return Promise.reject({
+        status: 'error',
+        message: 'Message cannot be empty'
+      });
+    }
+
     try {
       console.log(`[Casual Mode] Getting movie recommendations for: "${message}"`);
 
       const response = await api.post('/get-movie-recommendations/', {
-        message,
+        message: message,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
-        mode: 'casual'
+        mode: 'casual' // Explicitly set mode to casual
       });
 
       if (!response.data || response.data.status !== 'success') {
@@ -182,7 +216,7 @@ export const chatApi = {
     }
   },
 
-  // New method for polling theater status
+  // Method for polling theater status
   pollTheaterStatus: async (movieId) => {
     try {
       const response = await api.get(`/theater-status/${movieId}/`);
@@ -206,7 +240,7 @@ export const chatApi = {
       // Clear cache when resetting conversation
       cache.clear();
 
-      await api.get('/reset-conversation/');
+      await api.get('/reset/');
       return { status: 'success' };
     } catch (error) {
       console.error('Error resetting conversation:', error);

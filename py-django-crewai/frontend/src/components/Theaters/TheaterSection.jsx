@@ -206,7 +206,7 @@ function TheaterSection() {
   if (!selectedMovie) {
     return (
       <div className="content-wrapper">
-        <div className="section-header d-flex justify-content-between align-items-center">
+        <div className="section-header d-flex justify-content-between align-items-center mb-2">
           <h4 className="mb-0">Nearby Theaters</h4>
         </div>
         <div className="theaters-outer-wrapper">
@@ -223,7 +223,7 @@ function TheaterSection() {
   if (isLoadingTheaters) {
     return (
       <div className="content-wrapper">
-        <div className="section-header d-flex justify-content-between align-items-center">
+        <div className="section-header d-flex justify-content-between align-items-center mb-2">
           <h4 className="mb-0">Nearby Theaters</h4>
           <span className="text-muted small">Loading theaters...</span>
         </div>
@@ -241,7 +241,7 @@ function TheaterSection() {
   if (theaterError) {
     return (
       <div className="content-wrapper">
-        <div className="section-header d-flex justify-content-between align-items-center">
+        <div className="section-header d-flex justify-content-between align-items-center mb-2">
           <h4 className="mb-0">Nearby Theaters</h4>
           <button
             className="btn btn-sm btn-outline-danger"
@@ -265,7 +265,7 @@ function TheaterSection() {
   if (!selectedMovie.theaters || selectedMovie.theaters.length === 0) {
     return (
       <div className="content-wrapper">
-        <div className="section-header d-flex justify-content-between align-items-center">
+        <div className="section-header d-flex justify-content-between align-items-center mb-2">
           <h4 className="mb-0">Nearby Theaters</h4>
         </div>
         <div className="theaters-outer-wrapper">
@@ -283,7 +283,7 @@ function TheaterSection() {
 
   return (
     <div className="content-wrapper">
-      <div className="section-header d-flex justify-content-between align-items-center">
+      <div className="section-header d-flex justify-content-between align-items-center mb-2">
         <h4 className="mb-0">Nearby Theaters</h4>
         {selectedMovie?.theaters?.length > 0 && (
           <span className="text-muted small">

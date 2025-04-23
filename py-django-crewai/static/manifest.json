@@ -1,0 +1,21 @@
+{
+  "name": "Movie Chatbot",
+  "short_name": "MovieChat",
+  "description": "AI-powered chatbot for movie recommendations and theater information",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#f5f5f5",
+  "theme_color": "#e11d48",
+  "icons": [
+    {
+      "src": "/static/images/favicon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/static/images/apple-touch-icon.png",
+      "sizes": "180x180",
+      "type": "image/png"
+    }
+  ]
+}

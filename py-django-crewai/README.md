@@ -306,5 +306,5 @@ To enable debug logging:
 - [Architecture Guide](./docs/ARCHITECTURE.md)
 - [Developer Guide](./docs/DEVELOPMENT.md)
 - [Troubleshooting Guide](./docs/TROUBLESHOOTING.md)
-- [Deployment Guide](./docs/DEPLOYMENT-SCENARIOS.md)
+- [Deployment Guide](./docs/DEPLOYMENT.md)
 - [Contributing](./docs/CONTRIBUTING.md)

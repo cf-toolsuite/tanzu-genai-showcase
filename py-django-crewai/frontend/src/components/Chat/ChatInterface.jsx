@@ -5,11 +5,10 @@ import { useLocation } from '../../hooks/useLocation';
 import MessageList from './MessageList';
 import InputArea from './InputArea';
 import ProgressIndicator from './ProgressIndicator';
+import SampleInquiries from './SampleInquiries';
+import LocationDisplay from './LocationDisplay';
 
 function ChatInterface() {
-  // Initialize location detection for First Run mode
-  const detectLocation = activeTab === 'first-run' ? useLocation() : null;
-
   const {
     firstRunMessages, setFirstRunMessages,
     casualMessages, setCasualMessages,
@@ -21,6 +20,9 @@ function ChatInterface() {
     activeTab
   } = useAppContext();
 
+  // Always call hooks at the top level, unconditionally
+  const detectLocation = useLocation();
+
   const [inputValue, setInputValue] = useState('');
   const chatContainerRef = useRef(null);
   const inputRef = useRef(null);
@@ -29,6 +31,13 @@ function ChatInterface() {
   // Local state for retry logic and progress message
   const [retryCount, setRetryCount] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
+
+  // Run location detection only for First Run mode
+  useEffect(() => {
+    if (activeTab === 'first-run') {
+      detectLocation();
+    }
+  }, [activeTab, detectLocation]);
 
   // Effect to set up event listeners for external triggers
   useEffect(() => {
@@ -89,7 +98,7 @@ function ChatInterface() {
     return message;
   };
 
-  // Update effect for progress message (using memoized dependencies to avoid infinite loops)
+  // Update effect for progress message
   useEffect(() => {
     const newMessage = getProgressMessage(requestStage, progress);
     setProgressMessage(newMessage);
@@ -108,21 +117,35 @@ function ChatInterface() {
 
   // Handle sending a message
   const sendMessage = async (message) => {
-    // If we're loading or no message, don't proceed
-    if (loading || !message) {
-      console.log('Message rejected:', { loading, message });
+    // Debug log the message
+    console.log('sendMessage received:', message);
+    
+    // Safeguard against non-string messages
+    if (typeof message !== 'string') {
+      console.error('Invalid message type received:', typeof message);
       return;
     }
 
-    console.log('Processing message in ChatInterface:', { message, activeTab });
+    // Ensure message is trimmed and not empty
+    const trimmedMessage = message.trim();
+    
+    // If we're loading or message is empty, don't proceed
+    if (loading || !trimmedMessage) {
+      console.log('Message rejected:', { loading, message: trimmedMessage });
+      return;
+    }
 
-    const setMessages = activeTab === 'first-run' ? setFirstRunMessages : setCasualMessages;
-    const currentMessages = activeTab === 'first-run' ? firstRunMessages : casualMessages;
+    console.log('Processing message in ChatInterface:', { message: trimmedMessage, activeTab });
+
+    // Select the correct state setters based on the active tab
+    const isFirstRunMode = activeTab === 'first-run';
+    const setMessages = isFirstRunMode ? setFirstRunMessages : setCasualMessages;
+    const currentMessages = isFirstRunMode ? firstRunMessages : casualMessages;
 
     // Add user message
     const userMessage = {
       sender: 'user',
-      content: message,
+      content: trimmedMessage,
       created_at: new Date().toISOString()
     };
 
@@ -145,11 +168,16 @@ function ChatInterface() {
       let response;
 
       try {
-        if (activeTab === 'first-run') {
-          response = await chatApi.getMoviesTheatersAndShowtimes(message, location);
+        // Call the appropriate API based on the current tab
+        if (isFirstRunMode) {
+          console.log('Using First Run mode API with location:', location);
+          response = await chatApi.getMoviesTheatersAndShowtimes(trimmedMessage, location);
         } else {
-          response = await chatApi.getMovieRecommendations(message);
+          console.log('Using Casual Viewing mode API');
+          response = await chatApi.getMovieRecommendations(trimmedMessage);
         }
+        
+        console.log('API response:', response);
       } catch (error) {
         console.error('API call failed:', error);
         throw {
@@ -167,12 +195,15 @@ function ChatInterface() {
 
       // Format bot response with theater counts for first run movies
       let botContent = response.message;
-      if (activeTab === 'first-run' && response.recommendations) {
+      if (isFirstRunMode && response.recommendations) {
         const movieTheaterCounts = response.recommendations.map(movie => {
           const theaterCount = movie.theaters ? movie.theaters.length : 0;
           return `${movie.title}: Available at ${theaterCount} theater${theaterCount === 1 ? '' : 's'}`;
         }).join('\n');
-        botContent = `${response.message}\n\nTheater Availability:\n${movieTheaterCounts}`;
+        
+        if (movieTheaterCounts) {
+          botContent = `${response.message}\n\nTheater Availability:\n${movieTheaterCounts}`;
+        }
       }
 
       const botMessage = {
@@ -184,11 +215,11 @@ function ChatInterface() {
       setMessages([...currentMessages, userMessage, botMessage]);
 
       if (response.recommendations && response.recommendations.length > 0) {
-        setRequestStage(activeTab === 'first-run' ? 'theaters' : 'complete');
+        setRequestStage(isFirstRunMode ? 'theaters' : 'complete');
 
         // Update movies with a small delay
         setTimeout(() => {
-          if (activeTab === 'first-run') {
+          if (isFirstRunMode) {
             setFirstRunMovies(response.recommendations);
           } else {
             setCasualMovies(response.recommendations);
@@ -208,7 +239,7 @@ function ChatInterface() {
               setMessages([...currentMessages, userMessage]);
               setRetryCount(prev => prev + 1);
               setTimeout(() => {
-                sendMessage(message);
+                sendMessage(trimmedMessage);
               }, Math.min(1000 * Math.pow(2, retryCount), 10000));
             }}
           >
@@ -237,6 +268,13 @@ function ChatInterface() {
     }
   };
 
+  // Handler for sample inquiry click
+  const handleSampleInquiryClick = (query) => {
+    setInputValue(query);
+    sendMessage(query);
+  };
+
+  // Get current messages based on active tab
   const currentMessages = activeTab === 'first-run' ? firstRunMessages : casualMessages;
 
   return (
@@ -265,6 +303,22 @@ function ChatInterface() {
         id={activeTab === 'first-run' ? 'userInput' : 'casualUserInput'}
         sendButtonId={activeTab === 'first-run' ? 'sendButton' : 'casualSendButton'}
       />
+      
+      {/* Bottom row with Sample Inquiries and Location Display */}
+      <div className="bottom-row">
+        <div className="sample-inquiries-container">
+          <SampleInquiries 
+            isFirstRun={activeTab === 'first-run'} 
+            onQuestionClick={handleSampleInquiryClick} 
+          />
+        </div>
+        
+        {activeTab === 'first-run' && (
+          <div className="location-display-container">
+            <LocationDisplay />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

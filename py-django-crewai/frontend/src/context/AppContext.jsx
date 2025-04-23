@@ -49,20 +49,29 @@ export function AppProvider({ children }) {
 
     // Find the movie in our state
     const movie = firstRunMovies.find(m => m.id === movieId);
-    if (!movie) return;
+    if (!movie) {
+      console.log(`Movie with ID ${movieId} not found in firstRunMovies`);
+      return;
+    }
 
     // If movie already has theaters, no need to fetch
-    if (movie.theaters && movie.theaters.length > 0) return;
+    if (movie.theaters && movie.theaters.length > 0) {
+      console.log(`Movie ${movie.title} already has theaters, skipping fetch`);
+      return;
+    }
 
     try {
+      console.log(`Fetching theaters for movie: ${movie.title} (ID: ${movieId})`);
       setIsLoadingTheaters(true);
       setTheaterError(null);
 
       // Fetch theaters from API
       const response = await chatApi.getTheaters(movieId);
+      console.log('Theater API response:', response);
 
       // Update the movie with theaters
       if (response.status === 'success' && response.theaters) {
+        console.log(`Found ${response.theaters.length} theaters for movie: ${movie.title}`);
         setFirstRunMovies(prevMovies =>
           prevMovies.map(m =>
             m.id === movieId
@@ -70,6 +79,51 @@ export function AppProvider({ children }) {
               : m
           )
         );
+      } else if (response.status === 'processing') {
+        // If theaters are still being processed, poll for updates
+        console.log('Theaters are still being processed, starting polling');
+        let attempts = 0;
+        const maxAttempts = 10;
+        const pollInterval = 2000; // 2 seconds
+
+        const poll = async () => {
+          if (attempts >= maxAttempts) {
+            console.log('Max polling attempts reached');
+            setTheaterError('Unable to retrieve theater information. Please try again later.');
+            return;
+          }
+
+          attempts++;
+          console.log(`Polling attempt ${attempts}/${maxAttempts}`);
+
+          try {
+            const pollResponse = await chatApi.pollTheaterStatus(movieId);
+
+            if (pollResponse.status === 'success' && pollResponse.theaters) {
+              console.log(`Polling successful, found ${pollResponse.theaters.length} theaters`);
+              setFirstRunMovies(prevMovies =>
+                prevMovies.map(m =>
+                  m.id === movieId
+                    ? { ...m, theaters: pollResponse.theaters }
+                    : m
+                )
+              );
+              return; // Exit polling once we get results
+            } else if (pollResponse.status === 'processing') {
+              // Continue polling
+              setTimeout(poll, pollInterval);
+            } else {
+              console.log('Polling returned unexpected status:', pollResponse.status);
+              setTheaterError('Failed to load theaters. Please try again.');
+            }
+          } catch (pollError) {
+            console.error('Error while polling for theaters:', pollError);
+            setTheaterError('Failed to load theaters. Please try again.');
+          }
+        };
+
+        // Start polling
+        setTimeout(poll, pollInterval);
       }
     } catch (error) {
       console.error('Error fetching theaters:', error);
@@ -80,15 +134,30 @@ export function AppProvider({ children }) {
   }, [firstRunMovies]);
 
   const resetMovieSelection = useCallback(() => {
+    console.log('Resetting movie selection');
     setSelectedMovieId(null);
     setSelectedDateIndex(0);
   }, []);
 
   // Switch between tabs
   const switchTab = useCallback((tab) => {
+    if (tab === activeTab) {
+      console.log(`Already on ${tab} tab, no switch needed`);
+      return;
+    }
+
+    console.log(`Switching tab from ${activeTab} to ${tab}`);
     setActiveTab(tab);
     resetMovieSelection();
-  }, [resetMovieSelection]);
+
+    // Cancel any ongoing loading state when switching tabs
+    if (loading) {
+      console.log('Canceling ongoing loading state due to tab switch');
+      setLoading(false);
+      setProgress(0);
+      setRequestStage('idle');
+    }
+  }, [resetMovieSelection, activeTab, loading]);
 
   // Helper to convert UI tab name to backend mode
   const getBackendMode = useCallback((tab) => {
@@ -99,20 +168,28 @@ export function AppProvider({ children }) {
   useEffect(() => {
     // Initialize with first-run tab
     setActiveTab('first-run');
+    console.log('AppContext initialized with first-run tab');
   }, []);
 
   // Effect to fetch theaters when movie is selected
   useEffect(() => {
     if (activeTab === 'first-run' && selectedMovieId) {
+      console.log(`Effect triggered: activeTab=${activeTab}, selectedMovieId=${selectedMovieId}`);
       fetchTheatersForMovie(selectedMovieId);
     }
   }, [activeTab, selectedMovieId, fetchTheatersForMovie]);
+
+  // Effect to log tab changes for debugging
+  useEffect(() => {
+    console.log(`Active tab changed to: ${activeTab}`);
+  }, [activeTab]);
 
   // Return the context provider
   return (
     <AppContext.Provider value={{
       // Tab state
       activeTab, switchTab,
+      getBackendMode, // Add this to explicitly export the helper function
 
       // Message state
       firstRunMessages, setFirstRunMessages,

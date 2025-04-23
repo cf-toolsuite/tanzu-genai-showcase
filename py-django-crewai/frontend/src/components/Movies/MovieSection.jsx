@@ -25,7 +25,7 @@ function MovieSection({ isFirstRun }) {
   return (
     <div className="content-wrapper">
       <div className="section-header d-flex justify-content-between align-items-center mb-2">
-        <h4 className="mb-0">
+        <h4 className="mb-0 ps-0">
           {isFirstRun ? 'Now Playing' : 'Recommended Movies'}
         </h4>
 
@@ -65,7 +65,7 @@ function MovieSection({ isFirstRun }) {
 
         {/* Genre selection for Casual Viewing mode */}
         {!isFirstRun && !isLoading && (
-          <div className="mt-4">
+          <div className="mt-3">
             <GenreSelector
               onSubgenreClick={useCallback((query) => {
                 // Create a custom event that the ChatInterface will listen for
