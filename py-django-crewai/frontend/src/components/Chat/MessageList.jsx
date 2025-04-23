@@ -3,6 +3,11 @@ import React from 'react';
 function MessageList({ messages }) {
   // Format message text with special handling for bot messages
   const formatMessageText = (text) => {
+    // If content is not a string (e.g., a React element), return it as is
+    if (typeof text !== 'string') {
+      return text;
+    }
+    
     // Replace ** with bold tags
     text = text.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
 
@@ -36,11 +41,15 @@ function MessageList({ messages }) {
     <>
       {messages.map((message, index) => (
         <React.Fragment key={index}>
-          <div className={`message ${message.sender === 'user' ? 'user-message' : 'bot-message'}`}>
+          <div className={`message ${message.sender}`}>
             {message.sender === 'bot' ? (
-              <div dangerouslySetInnerHTML={{
-                __html: formatMessageText(message.content)
-              }} />
+              typeof message.content === 'string' ? (
+                <div dangerouslySetInnerHTML={{
+                  __html: formatMessageText(message.content)
+                }} />
+              ) : (
+                message.content
+              )
             ) : (
               message.content
             )}

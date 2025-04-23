@@ -24,8 +24,6 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     // Global variables
-    window.selectedMovieId = null;
-    window.selectedMovieTitle = null;
     window.userTimezone = null; // Store user timezone
 
     // Casual viewing elements
@@ -256,6 +254,53 @@ document.addEventListener('DOMContentLoaded', function() {
         targetContainer.scrollTop = targetContainer.scrollHeight;
     }
 
+    // Function to prepare theaters container based on the current state
+    function prepareTheatersContainer(state, message = '') {
+        const theatersContainer = document.getElementById('theatersContainer');
+        if (!theatersContainer) return;
+
+        switch (state) {
+            case 'no-movie':
+                theatersContainer.innerHTML = `
+                    <p class="text-center text-muted mt-3">
+                        <i class="bi bi-hand-index-thumb"></i>
+                        Click on a movie above to see available theaters and showtimes
+                    </p>
+                `;
+                break;
+            case 'no-date':
+                // We have a movie but need a date selection
+                theatersContainer.innerHTML = `
+                    <p class="text-center text-muted mt-3">
+                        <i class="bi bi-calendar3"></i>
+                        Please select a date to see showtimes for "${MovieManager.getSelectedMovieTitle()}"
+                    </p>
+                `;
+                break;
+            case 'no-theaters':
+                theatersContainer.innerHTML = `
+                    <p class="text-muted">
+                        No theaters are currently showing "${MovieManager.getSelectedMovieTitle()}".
+                        Please check back later or select a different movie.
+                    </p>
+                `;
+                break;
+            case 'no-showtimes':
+                theatersContainer.innerHTML = `
+                    <p class="text-muted">
+                        No showtimes available for "${MovieManager.getSelectedMovieTitle()}"
+                        ${message ? 'on ' + message : 'in the next few days'}.
+                    </p>
+                `;
+                break;
+            case 'custom':
+                theatersContainer.innerHTML = message;
+                break;
+            default:
+                theatersContainer.innerHTML = '';
+        }
+    }
+
     // Movie grid functions - using TMDB-style grid view
     window.updateMovieGrid = function(movies) {
         // First try to enhance movie posters with high-quality versions
@@ -282,11 +327,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const theatersContainer = document.getElementById('theatersContainer');
         const dateTabsContainer = document.getElementById('dateTabs');
         const showtimesSection = document.getElementById('showtimesSection');
-
-        // Reset selected movie when getting new recommendations
-        window.selectedMovieId = null;
-        window.selectedMovieTitle = null;
-        window.selectedMovie = null;
 
         console.log("========= UPDATING SHOWTIMES SECTION =========");
         console.log("Raw movies received:", movies);
@@ -320,14 +360,12 @@ document.addEventListener('DOMContentLoaded', function() {
             movie.theaters.length > 0
         );
 
-        // Store movies in global variable so they can be accessed by the handleMovieClick function
-        window.currentMovies = currentMovies;
+        // Store movies in MovieManager instead of global variable
+        MovieManager.setMovies(currentMovies);
 
-        // Debug log the movies we're storing globally
-        console.log(`Storing ${currentMovies.length} movies in window.currentMovies:`);
-        currentMovies.forEach(movie => {
-            console.log(`- ${movie.title} (ID: ${movie.id || movie.tmdb_id}) - ${movie.theaters?.length || 0} theaters`);
-        });
+        // Debug log the movies we're storing
+        console.log(`Stored ${currentMovies.length} movies in MovieManager:`);
+        MovieManager.debugMovies();
 
         // Log information for debugging
         console.log(`Total movies: ${movies.length}`);
@@ -384,35 +422,32 @@ document.addEventListener('DOMContentLoaded', function() {
                     this.classList.add('active');
 
                     // Update showtimes display for this date
-                    displayShowtimesForDate([window.selectedMovie], parseInt(this.getAttribute('data-date-index')));
+                    displayShowtimesForDate(parseInt(this.getAttribute('data-date-index')));
                 });
 
                 dateTabsContainer.appendChild(tabButton);
             }
 
             // Ensure we're not showing any theaters until a movie is selected
-            if (!window.selectedMovieId) {
+            if (!MovieManager.getSelectedMovieId()) {
                 theatersContainer.innerHTML = '<p class="text-center text-muted mt-3"><i class="bi bi-hand-index-thumb"></i> Click on a movie above to see available theaters and showtimes</p>';
             }
         }
     }
 
     // Display showtimes for a specific date
-    function displayShowtimesForDate(movies, dateIndex) {
-        const theatersContainer = document.getElementById('theatersContainer');
-        theatersContainer.innerHTML = '';
+    function displayShowtimesForDate(dateIndex) {
+        // Store this date selection in MovieManager
+        MovieManager.selectDate(dateIndex);
+
+        // Get the selected movie from MovieManager
+        const movie = MovieManager.getSelectedMovie();
 
         // Ensure we have a selected movie
-        if (!window.selectedMovie) {
-            theatersContainer.innerHTML = `
-                <p class="text-center text-muted mt-3"><i class="bi bi-hand-index-thumb"></i> Click on a movie above to see available theaters and showtimes</p>
-            `;
+        if (!movie) {
+            prepareTheatersContainer('no-movie');
             return;
         }
-
-        // Always use the current window.selectedMovie rather than the passed in movies parameter
-        // This ensures we're always using the latest selected movie
-        const movie = window.selectedMovie;
 
         console.log(`displayShowtimesForDate for movie: ${movie.title} and date index: ${dateIndex}`);
 
@@ -420,9 +455,7 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(`Processing theaters for selected movie: ${movie.title}`, movie);
 
         if (!movie.theaters || movie.theaters.length === 0) {
-            theatersContainer.innerHTML = `
-                <p class="text-muted">No theaters are currently showing "${movie.title}". Please check back later or select a different movie.</p>
-            `;
+            prepareTheatersContainer('no-theaters');
             return;
         }
 
@@ -484,11 +517,15 @@ document.addEventListener('DOMContentLoaded', function() {
 
         // If no theaters found for the selected date
         if (theatersArray.length === 0) {
-            theatersContainer.innerHTML = `
-                <p class="text-muted">No theaters are showing "${movie.title}" on this date.</p>
-            `;
+            // Format the date for display
+            const dateStr = selectedDate.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+            prepareTheatersContainer('no-showtimes', dateStr);
             return;
         }
+
+        // Clear theaters container before adding content
+        const theatersContainer = document.getElementById('theatersContainer');
+        theatersContainer.innerHTML = '';
 
         // Display each theater with showtimes
         theatersArray.forEach(theater => {
@@ -565,10 +602,10 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log(`Movie clicked: ${movieTitle} (ID: ${movieId})`);
 
         // Debug log to trace what's happening
-        console.log(`Previous selected movie: ${window.selectedMovieTitle} (ID: ${window.selectedMovieId})`);
+        console.log(`Previous selected movie ID: ${MovieManager.getSelectedMovieId()}`);
 
         // If this is the same movie already selected, don't do anything
-        if (window.selectedMovieId === movieId) {
+        if (MovieManager.getSelectedMovieId() === String(movieId)) {
             console.log("Same movie clicked - no update needed");
             return;
         }
@@ -583,42 +620,34 @@ document.addEventListener('DOMContentLoaded', function() {
             card.classList.add('selected');
         });
 
-        // Store the selected movie ID and title
-        window.selectedMovieId = movieId;
-        window.selectedMovieTitle = movieTitle;
+        // Reset any previous date selection
+        MovieManager.resetDateSelection();
 
-        // Improved movie finding - convert IDs to strings for reliable comparison
-        const stringMovieId = String(movieId);
-        console.log(`Looking for movie with stringified ID: ${stringMovieId}`);
-
-        // Log all movies and their IDs to debug the matching issue
-        window.currentMovies.forEach(movie => {
-            console.log(`Checking movie: ${movie.title} - id: ${movie.id}, tmdb_id: ${movie.tmdb_id}`);
-        });
-
-        // Find movie with more robust ID matching
-        const selectedMovie = window.currentMovies.find(movie =>
-            String(movie.id) === stringMovieId ||
-            String(movie.tmdb_id) === stringMovieId
-        );
-
-        if (!selectedMovie) {
-            console.error(`Movie with ID ${movieId} not found in current movies`);
+        // Select the movie in our MovieManager
+        if (!MovieManager.selectMovie(movieId)) {
+            console.error(`Movie with ID ${movieId} not found in MovieManager`);
             return;
         }
 
-        // Create a fresh copy of the selected movie to avoid reference issues
-        window.selectedMovie = JSON.parse(JSON.stringify(selectedMovie));
-
-        console.log(`New selected movie: ${window.selectedMovie.title}`, window.selectedMovie);
+        const selectedMovie = MovieManager.getSelectedMovie();
+        console.log(`New selected movie: ${selectedMovie.title}`, selectedMovie);
 
         // Check if the movie has theaters
         if (!selectedMovie.theaters || selectedMovie.theaters.length === 0) {
             // No theaters available for this movie
-            const theatersContainer = document.getElementById('theatersContainer');
-            theatersContainer.innerHTML = `
-                <p class="text-muted">No theaters are currently showing "${movieTitle}". Please check back later or select a different movie.</p>
-            `;
+            prepareTheatersContainer('no-theaters');
+
+            // Hide date tabs
+            const dateTabs = document.getElementById('dateTabs');
+            if (dateTabs) {
+                dateTabs.style.display = 'none';
+            }
+            return;
+        }
+
+        // Check if the movie has any showtimes across all dates
+        if (!MovieManager.hasAnyShowtimes()) {
+            prepareTheatersContainer('no-showtimes');
 
             // Hide date tabs
             const dateTabs = document.getElementById('dateTabs');
@@ -631,8 +660,8 @@ document.addEventListener('DOMContentLoaded', function() {
         // Always rebuild date tabs to ensure fresh event listeners that reference the current selected movie
         rebuildDateTabs();
 
-        // Display theaters for the selected movie and first date (Today)
-        displayShowtimesForDate(null, 0); // Pass null to force using window.selectedMovie
+        // Show the "please select a date" message instead of immediately showing theaters
+        prepareTheatersContainer('no-date');
     };
 
     // Function to rebuild date tabs with fresh event listeners
@@ -676,11 +705,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     // Add active class to clicked tab
                     this.classList.add('active');
 
-                    console.log(`Date tab clicked: ${dateIndex} for movie: ${window.selectedMovieTitle}`);
+                    console.log(`Date tab clicked: ${dateIndex} for movie: ${MovieManager.getSelectedMovieTitle()}`);
 
                     // Update showtimes display for this date
-                    // Pass null to force using the current window.selectedMovie
-                    displayShowtimesForDate(null, dateIndex);
+                    displayShowtimesForDate(dateIndex);
                 });
             })(i);
 

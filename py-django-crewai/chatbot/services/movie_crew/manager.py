@@ -198,7 +198,7 @@ class MovieCrewManager:
         theater_finder_tool.timezone = self.timezone
 
         logger.info(f"Created SearchMoviesTool with first_run_mode: {first_run_mode}")
-        
+
         # Ensure tool compatibility with CrewAI 0.114.0
         self._ensure_tool_compatibility([search_tool, analyze_tool, theater_finder_tool])
 
@@ -262,7 +262,7 @@ class MovieCrewManager:
 
             # Add patch for CrewAI tool event tracking issue
             self._patch_crewai_event_tracking()
-            
+
             start_time = datetime.now()
             result = crew.kickoff()
             end_time = datetime.now()
@@ -467,7 +467,7 @@ class MovieCrewManager:
     def _ensure_tool_compatibility(self, tools: List[Any]) -> None:
         """
         Ensure tools have all necessary attributes for CrewAI 0.114.0 compatibility.
-        
+
         Args:
             tools: List of tools to check and enhance
         """
@@ -480,7 +480,7 @@ class MovieCrewManager:
                     derived_name = tool_class_name.lower().replace('tool', '_tool')
                     setattr(tool, 'name', derived_name)
                     logger.info(f"Added missing name '{derived_name}' to tool of type {tool_class_name}")
-                
+
                 # Ensure tool name is registered with CrewAI's event tracking system
                 # This prevents the KeyError: 'search_movies_tool' issue
                 from crewai.utilities.events.utils.console_formatter import ConsoleFormatter
@@ -489,7 +489,7 @@ class MovieCrewManager:
                     logger.info(f"Pre-registered tool '{tool.name}' with CrewAI event tracking")
             except Exception as e:
                 logger.warning(f"Error ensuring tool compatibility for {tool.__class__.__name__}: {e}")
-                
+
     def _process_current_releases(self, recommendations: List[Dict[str, Any]]) -> None:
         """
         Process recommendations to identify current releases.
@@ -534,24 +534,24 @@ class MovieCrewManager:
             # Import necessary modules from CrewAI
             from crewai.utilities.events.utils.console_formatter import ConsoleFormatter
             from crewai.utilities.events.event_listener import CrewAgentEventListener
-            
+
             # Store original handle_tool_usage_finished method
             original_handle = ConsoleFormatter.handle_tool_usage_finished
-            
+
             # Define patched method with error handling
             def patched_handle_tool_usage_finished(self, event):
                 try:
                     # First try to initialize tool_usage_counts if it doesn't exist
                     if not hasattr(self, 'tool_usage_counts'):
                         self.tool_usage_counts = {}
-                    
+
                     # Get tool name safely
                     tool_name = getattr(event, 'tool_name', 'unknown_tool')
-                    
+
                     # Initialize counter for this tool if not already done
                     if tool_name not in self.tool_usage_counts:
                         self.tool_usage_counts[tool_name] = 0
-                    
+
                     # Now call the original method which should work
                     return original_handle(self, event)
                 except KeyError as e:
@@ -565,15 +565,15 @@ class MovieCrewManager:
                     # Log other errors but don't crash
                     logger.error(f"Error in CrewAI event tracking: {e}")
                     return None
-            
+
             # Apply the patch
             ConsoleFormatter.handle_tool_usage_finished = patched_handle_tool_usage_finished
             logger.info("Successfully patched CrewAI event tracking")
-            
+
         except Exception as e:
             # If patching fails, log but continue
             logger.warning(f"Failed to patch CrewAI event tracking: {e}")
-    
+
     def _combine_movies_and_theaters(self,
                                     recommendations: List[Dict[str, Any]],
                                     theaters_data: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

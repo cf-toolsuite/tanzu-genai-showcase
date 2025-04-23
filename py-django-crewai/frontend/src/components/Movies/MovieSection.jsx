@@ -1,14 +1,16 @@
 import React, { Suspense, useCallback } from 'react';
 import { useAppContext } from '../../context/AppContext';
-import MovieGrid from './MovieGrid';
+import LazyMovieGrid from './LazyMovieGrid';
 import MovieGridSkeleton from './MovieGridSkeleton';
 import GenreSelector from './GenreSelector';
+import ProgressIndicator from '../Chat/ProgressIndicator';
 
 function MovieSection({ isFirstRun }) {
   const {
     firstRunMovies,
     casualMovies,
     loading,
+    progress,
     requestStage
   } = useAppContext();
 
@@ -16,6 +18,9 @@ function MovieSection({ isFirstRun }) {
 
   // Show loading skeleton when initially loading movies
   const isLoading = loading && (requestStage === 'searching' || requestStage === 'analyzing');
+
+  // Show progress indicator when loading but only in certain stages
+  const showProgress = loading && ['searching', 'analyzing', 'theaters'].includes(requestStage);
 
   return (
     <div className="content-wrapper">
@@ -32,11 +37,26 @@ function MovieSection({ isFirstRun }) {
       </div>
 
       <div className="movie-section">
+        {showProgress && (
+          <ProgressIndicator
+            progress={progress}
+            message={isFirstRun
+              ? requestStage === 'searching'
+                ? "Searching for movies in theaters..."
+                : requestStage === 'analyzing'
+                  ? "Analyzing movie options and preferences..."
+                  : "Finding theaters near you..."
+              : requestStage === 'searching'
+                ? "Finding movie recommendations for you..."
+                : "Preparing your personalized recommendations..."}
+          />
+        )}
+
         {isLoading ? (
           <MovieGridSkeleton />
         ) : (
           <Suspense fallback={<MovieGridSkeleton />}>
-            <MovieGrid
+            <LazyMovieGrid
               movies={movies}
               isFirstRun={isFirstRun}
             />

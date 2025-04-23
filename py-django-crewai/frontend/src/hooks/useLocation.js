@@ -2,10 +2,13 @@ import { useEffect, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
 
 export function useLocation() {
-  const { setLocation } = useAppContext();
+  const { setLocation, setIsLoadingLocation } = useAppContext();
 
   // Function to gather location data from ipapi.co
   const detectLocation = useCallback(() => {
+    // Set loading state
+    setIsLoadingLocation(true);
+    
     const gatherLocationDataFromIpApi = () => {
       console.log("Using ipapi.co for location detection");
 
@@ -37,6 +40,7 @@ export function useLocation() {
             const locationName = `${city}, ${state}, ${country}`;
             console.log(`Setting location to: ${locationName}`);
             setLocation(locationName);
+            setIsLoadingLocation(false);
             return;
           }
 
@@ -47,6 +51,7 @@ export function useLocation() {
         .catch(error => {
           console.error("Error with ipapi.co:", error);
           handleNonUSLocation();
+          setIsLoadingLocation(false);
         });
     };
 
@@ -54,6 +59,7 @@ export function useLocation() {
     const handleNonUSLocation = () => {
       console.log("Location not in US or couldn't be determined");
       setLocation(''); // Clear the value
+      setIsLoadingLocation(false); // Clear loading state
     };
 
     // First try to use browser's geolocation API

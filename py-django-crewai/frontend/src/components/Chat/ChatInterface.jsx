@@ -6,9 +6,9 @@ import MessageList from './MessageList';
 import InputArea from './InputArea';
 import ProgressIndicator from './ProgressIndicator';
 
-function ChatInterface({ isFirstRun }) {
+function ChatInterface() {
   // Initialize location detection for First Run mode
-  const detectLocation = isFirstRun ? useLocation() : null;
+  const detectLocation = activeTab === 'first-run' ? useLocation() : null;
 
   const {
     firstRunMessages, setFirstRunMessages,
@@ -16,7 +16,9 @@ function ChatInterface({ isFirstRun }) {
     setFirstRunMovies, setCasualMovies,
     loading, setLoading,
     progress, setProgress,
-    location
+    location,
+    requestStage, setRequestStage,
+    activeTab
   } = useAppContext();
 
   const [inputValue, setInputValue] = useState('');
@@ -24,8 +26,7 @@ function ChatInterface({ isFirstRun }) {
   const inputRef = useRef(null);
   const sendButtonRef = useRef(null);
 
-  // State for tracking API request stages and progress
-  const [requestStage, setRequestStage] = useState('idle'); // idle, sending, searching, analyzing, theaters, complete
+  // Local state for retry logic and progress message
   const [retryCount, setRetryCount] = useState(0);
   const [progressMessage, setProgressMessage] = useState('');
 
@@ -48,11 +49,11 @@ function ChatInterface({ isFirstRun }) {
     }
   }, [firstRunMessages, casualMessages]);
 
-  // Update progress message based on stage and progress
-  const updateProgressMessage = (currentProgress) => {
+  // Get appropriate message based on stage and progress
+  const getProgressMessage = (stage, currentProgress) => {
     let message = '';
 
-    switch (requestStage) {
+    switch (stage) {
       case 'sending':
         message = 'Sending your request...';
         break;
@@ -63,7 +64,7 @@ function ChatInterface({ isFirstRun }) {
         message = 'Analyzing movie options and preferences...';
         break;
       case 'theaters':
-        message = isFirstRun
+        message = activeTab === 'first-run'
           ? 'Finding theaters and showtimes near you...'
           : 'Preparing your recommendations...';
         break;
@@ -77,7 +78,7 @@ function ChatInterface({ isFirstRun }) {
         } else if (currentProgress < 60) {
           message = 'Analyzing movie options...';
         } else if (currentProgress < 90) {
-          message = isFirstRun
+          message = activeTab === 'first-run'
             ? 'Finding theaters near you...'
             : 'Preparing recommendations...';
         } else {
@@ -85,8 +86,14 @@ function ChatInterface({ isFirstRun }) {
         }
     }
 
-    setProgressMessage(message);
+    return message;
   };
+
+  // Update effect for progress message (using memoized dependencies to avoid infinite loops)
+  useEffect(() => {
+    const newMessage = getProgressMessage(requestStage, progress);
+    setProgressMessage(newMessage);
+  }, [requestStage, progress, activeTab]);
 
   // Progress simulation with stage-based messages
   const startProgressSimulation = () => {
@@ -94,25 +101,28 @@ function ChatInterface({ isFirstRun }) {
     return setInterval(() => {
       setProgress(prev => {
         if (prev >= 90) return prev;
-        const newProgress = prev + 5;
-        updateProgressMessage(newProgress);
-        return newProgress;
+        return prev + 5;
       });
     }, 500);
   };
 
   // Handle sending a message
-  const sendMessage = async (manualQuery = null) => {
-    const messageToSend = manualQuery || inputValue;
-    if (!messageToSend.trim() || loading) return;
+  const sendMessage = async (message) => {
+    // If we're loading or no message, don't proceed
+    if (loading || !message) {
+      console.log('Message rejected:', { loading, message });
+      return;
+    }
 
-    const setMessages = isFirstRun ? setFirstRunMessages : setCasualMessages;
-    const currentMessages = isFirstRun ? firstRunMessages : casualMessages;
+    console.log('Processing message in ChatInterface:', { message, activeTab });
+
+    const setMessages = activeTab === 'first-run' ? setFirstRunMessages : setCasualMessages;
+    const currentMessages = activeTab === 'first-run' ? firstRunMessages : casualMessages;
 
     // Add user message
     const userMessage = {
       sender: 'user',
-      content: messageToSend,
+      content: message,
       created_at: new Date().toISOString()
     };
 
@@ -132,48 +142,58 @@ function ChatInterface({ isFirstRun }) {
       await new Promise(resolve => setTimeout(resolve, 1000));
 
       setRequestStage('analyzing');
-      const response = await chatApi.sendMessage(
-        messageToSend,
-        isFirstRun,
-        isFirstRun ? location : ''
-      );
+      let response;
 
-      if (response.status === 'success') {
-        // Format bot response with theater counts for first run movies
-        let botContent = response.message;
-        if (isFirstRun && response.recommendations) {
-          const movieTheaterCounts = response.recommendations.map(movie => {
-            const theaterCount = movie.theaters ? movie.theaters.length : 0;
-            return `${movie.title}: Available at ${theaterCount} theater${theaterCount === 1 ? '' : 's'}`;
-          }).join('\n');
-          botContent = `${response.message}\n\nTheater Availability:\n${movieTheaterCounts}`;
+      try {
+        if (activeTab === 'first-run') {
+          response = await chatApi.getMoviesTheatersAndShowtimes(message, location);
+        } else {
+          response = await chatApi.getMovieRecommendations(message);
         }
-
-        const botMessage = {
-          sender: 'bot',
-          content: botContent,
-          created_at: new Date().toISOString()
-        };
-
-        setMessages([...currentMessages, userMessage, botMessage]);
-
-        if (response.recommendations && response.recommendations.length > 0) {
-          setRequestStage(isFirstRun ? 'theaters' : 'complete');
-
-          // Update movies with a small delay
-          setTimeout(() => {
-            if (isFirstRun) {
-              setFirstRunMovies(response.recommendations);
-            } else {
-              setCasualMovies(response.recommendations);
-            }
-          }, 100);
-        }
-      } else {
+      } catch (error) {
+        console.error('API call failed:', error);
         throw {
           status: 'error',
-          message: response.message || 'An error occurred while processing your request.'
+          message: 'Failed to get movie recommendations. Please try again.'
         };
+      }
+
+      if (!response || response.status !== 'success') {
+        throw {
+          status: 'error',
+          message: response?.message || 'Failed to process your request. Please try again.'
+        };
+      }
+
+      // Format bot response with theater counts for first run movies
+      let botContent = response.message;
+      if (activeTab === 'first-run' && response.recommendations) {
+        const movieTheaterCounts = response.recommendations.map(movie => {
+          const theaterCount = movie.theaters ? movie.theaters.length : 0;
+          return `${movie.title}: Available at ${theaterCount} theater${theaterCount === 1 ? '' : 's'}`;
+        }).join('\n');
+        botContent = `${response.message}\n\nTheater Availability:\n${movieTheaterCounts}`;
+      }
+
+      const botMessage = {
+        sender: 'bot',
+        content: botContent,
+        created_at: new Date().toISOString()
+      };
+
+      setMessages([...currentMessages, userMessage, botMessage]);
+
+      if (response.recommendations && response.recommendations.length > 0) {
+        setRequestStage(activeTab === 'first-run' ? 'theaters' : 'complete');
+
+        // Update movies with a small delay
+        setTimeout(() => {
+          if (activeTab === 'first-run') {
+            setFirstRunMovies(response.recommendations);
+          } else {
+            setCasualMovies(response.recommendations);
+          }
+        }, 100);
       }
     } catch (error) {
       console.error('Error sending message:', error);
@@ -188,7 +208,7 @@ function ChatInterface({ isFirstRun }) {
               setMessages([...currentMessages, userMessage]);
               setRetryCount(prev => prev + 1);
               setTimeout(() => {
-                sendMessage(messageToSend);
+                sendMessage(message);
               }, Math.min(1000 * Math.pow(2, retryCount), 10000));
             }}
           >
@@ -217,7 +237,7 @@ function ChatInterface({ isFirstRun }) {
     }
   };
 
-  const currentMessages = isFirstRun ? firstRunMessages : casualMessages;
+  const currentMessages = activeTab === 'first-run' ? firstRunMessages : casualMessages;
 
   return (
     <div className="content-wrapper">
@@ -238,12 +258,12 @@ function ChatInterface({ isFirstRun }) {
         onChange={setInputValue}
         onSend={sendMessage}
         disabled={loading}
-        placeholder={isFirstRun
+        placeholder={activeTab === 'first-run'
           ? "Ask me about movies in theaters..."
           : "Ask me for movie recommendations..."}
         sendButtonRef={sendButtonRef}
-        id={isFirstRun ? 'userInput' : 'casualUserInput'}
-        sendButtonId={isFirstRun ? 'sendButton' : 'casualSendButton'}
+        id={activeTab === 'first-run' ? 'userInput' : 'casualUserInput'}
+        sendButtonId={activeTab === 'first-run' ? 'sendButton' : 'casualSendButton'}
       />
     </div>
   );

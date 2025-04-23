@@ -23,6 +23,8 @@ export function AppProvider({ children }) {
   const [loading, setLoading] = useState(false);
   const [progress, setProgress] = useState(0);
   const [location, setLocation] = useState('');
+  const [requestStage, setRequestStage] = useState('idle'); // idle, sending, searching, analyzing, theaters, complete
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
 
   // Loading states
   const [isLoadingTheaters, setIsLoadingTheaters] = useState(false);
@@ -88,6 +90,11 @@ export function AppProvider({ children }) {
     resetMovieSelection();
   }, [resetMovieSelection]);
 
+  // Helper to convert UI tab name to backend mode
+  const getBackendMode = useCallback((tab) => {
+    return tab === 'casual-viewing' ? 'casual' : 'first_run';
+  }, []);
+
   // Effect to initialize state
   useEffect(() => {
     // Initialize with first-run tab
@@ -119,14 +126,16 @@ export function AppProvider({ children }) {
       resetMovieSelection,
 
       // Theater state
-      isLoadingTheaters,
-      theaterError,
+      isLoadingTheaters, setIsLoadingTheaters,
+      theaterError, setTheaterError,
       fetchTheatersForMovie,
 
       // UI state
       loading, setLoading,
       progress, setProgress,
-      location, setLocation
+      location, setLocation,
+      requestStage, setRequestStage,
+      isLoadingLocation, setIsLoadingLocation
     }}>
       {children}
     </AppContext.Provider>

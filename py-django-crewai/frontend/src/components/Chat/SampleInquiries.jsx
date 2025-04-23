@@ -21,7 +21,10 @@ function SampleInquiries({ isFirstRun, onQuestionClick }) {
         <button
           key={index}
           className={`btn btn-sample ${question.className || ''}`}
-          onClick={() => onQuestionClick(question.query)}
+          onClick={() => {
+            console.log('Sample question clicked:', question.query);
+            onQuestionClick(question.query);
+          }}
         >
           {question.text}
         </button>

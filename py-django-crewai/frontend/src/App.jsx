@@ -1,11 +1,29 @@
-import React from 'react';
+import React, { Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { AppProvider, useAppContext } from './context/AppContext';
-import ChatInterface from './components/Chat/ChatInterface';
-import MovieSection from './components/Movies/MovieSection';
-import TheaterSection from './components/Theaters/TheaterSection';
 import './styles/skeleton.css';
 import './styles/app.css';
+
+// Lazy load components
+const ChatInterface = React.lazy(() => import('./components/Chat/LazyChatInterface'));
+const MovieSection = React.lazy(() => import('./components/Movies/MovieSection'));
+const TheaterSection = React.lazy(() => import('./components/Theaters/LazyTheaterSection'));
+
+// Loading fallback component
+const LoadingFallback = () => (
+  <div className="processing-container">
+    <div className="progress mb-2">
+      <div
+        className="progress-bar progress-bar-striped progress-bar-animated"
+        role="progressbar"
+        style={{ width: '100%' }}
+      />
+    </div>
+    <div className="text-center text-muted">
+      Loading...
+    </div>
+  </div>
+);
 
 // Create a client for React Query
 const queryClient = new QueryClient({
@@ -67,13 +85,19 @@ function AppContent() {
         <div className={`tab-pane fade ${activeTab === 'first-run' ? 'show active' : ''}`}>
           <div className="row">
             <div className="col-lg-8 mb-4 mb-lg-0">
-              <ChatInterface isFirstRun={true} />
+              <Suspense fallback={<LoadingFallback />}>
+                <ChatInterface />
+              </Suspense>
             </div>
 
             <div className="col-lg-4">
               <div className="d-flex flex-column">
-                <MovieSection isFirstRun={true} />
-                <TheaterSection />
+                <Suspense fallback={<LoadingFallback />}>
+                  <MovieSection isFirstRun={true} />
+                </Suspense>
+                <Suspense fallback={<LoadingFallback />}>
+                  <TheaterSection />
+                </Suspense>
               </div>
             </div>
           </div>
@@ -83,11 +107,15 @@ function AppContent() {
         <div className={`tab-pane fade ${activeTab === 'casual-viewing' ? 'show active' : ''}`}>
           <div className="row">
             <div className="col-lg-8 mb-4 mb-lg-0">
-              <ChatInterface isFirstRun={false} />
+              <Suspense fallback={<LoadingFallback />}>
+                <ChatInterface />
+              </Suspense>
             </div>
 
             <div className="col-lg-4">
-              <MovieSection isFirstRun={false} />
+              <Suspense fallback={<LoadingFallback />}>
+                <MovieSection isFirstRun={false} />
+              </Suspense>
             </div>
           </div>
         </div>

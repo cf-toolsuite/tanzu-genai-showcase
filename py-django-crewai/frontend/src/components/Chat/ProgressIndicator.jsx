@@ -13,8 +13,12 @@ function ProgressIndicator({ progress, message }) {
           aria-valuemax="100"
         />
       </div>
-      <div className="text-center text-muted">
+      <div className="text-center text-muted mb-1">
         {message}
+      </div>
+      <div className="text-center text-muted small">
+        <i className="bi bi-hourglass-split me-1"></i>
+        {progress < 100 ? 'Processing your request...' : 'Almost done!'}
       </div>
     </div>
   );

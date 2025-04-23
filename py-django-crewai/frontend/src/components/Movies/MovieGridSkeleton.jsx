@@ -19,8 +19,10 @@ function MovieGridSkeleton() {
   ));
 
   return (
-    <div className="movie-grid">
-      {skeletonItems}
+    <div className="movie-grid-container position-relative">
+      <div className="movie-grid">
+        {skeletonItems}
+      </div>
     </div>
   );
 }

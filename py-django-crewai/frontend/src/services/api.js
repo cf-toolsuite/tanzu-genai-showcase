@@ -6,7 +6,7 @@ const api = axios.create({
     'Content-Type': 'application/json',
   },
   // Add timeout to prevent hanging requests
-  timeout: 60000, // 60 seconds
+  timeout: 30000, // 30 seconds
 });
 
 // Add CSRF token to requests
@@ -90,23 +90,25 @@ const cache = {
 
 // API service functions
 export const chatApi = {
-  sendMessage: async (message, isFirstRun, location = '') => {
+  getMoviesTheatersAndShowtimes: async (message, location = '') => {
     try {
-      console.log(`Sending message: "${message}" (First Run: ${isFirstRun}, Location: ${location})`);
+      console.log(`[First Run Mode] Getting movies, theaters, and showtimes for: "${message}" (Location: ${location})`);
 
-      const response = await api.post('/send-message/', {
+      const response = await api.post('/get-movies-theaters-and-showtimes/', {
         message,
-        first_run_filter: isFirstRun,
         location,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        mode: 'first_run'
       });
 
-      // If this is a successful response with recommendations, cache theaters
+      if (!response.data || response.data.status !== 'success') {
+        throw new Error(response.data?.message || 'Failed to get movies and theaters');
+      }
+
+      // Cache theaters for each movie if they exist
       if (response.data.status === 'success' &&
           response.data.recommendations &&
           response.data.recommendations.length > 0) {
-
-        // Cache theaters for each movie if they exist
         response.data.recommendations.forEach(movie => {
           if (movie.theaters && movie.theaters.length > 0) {
             cache.set(movie.id, {
@@ -119,7 +121,28 @@ export const chatApi = {
 
       return response.data;
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Error getting movies and theaters:', error);
+      throw error;
+    }
+  },
+
+  getMovieRecommendations: async (message) => {
+    try {
+      console.log(`[Casual Mode] Getting movie recommendations for: "${message}"`);
+
+      const response = await api.post('/get-movie-recommendations/', {
+        message,
+        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        mode: 'casual'
+      });
+
+      if (!response.data || response.data.status !== 'success') {
+        throw new Error(response.data?.message || 'Failed to get movie recommendations');
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error getting movie recommendations:', error);
       throw error;
     }
   },
@@ -135,10 +158,19 @@ export const chatApi = {
         return cachedData;
       }
 
-      // If not in cache, fetch from API
+      // If not in cache, make initial request to fetch or start processing
       const response = await api.get(`/get-theaters/${movieId}/`);
 
-      // Cache the response
+      // If response contains a status of "processing", start polling
+      if (response.data.status === 'processing') {
+        console.log('Theaters are being processed, will start polling...');
+        return {
+          status: 'processing',
+          message: 'Fetching theaters and showtimes...'
+        };
+      }
+
+      // If we got a direct success response, cache it
       if (response.data.status === 'success' && response.data.theaters) {
         cache.set(movieId, response.data);
       }
@@ -146,6 +178,23 @@ export const chatApi = {
       return response.data;
     } catch (error) {
       console.error('Error fetching theaters:', error);
+      throw error;
+    }
+  },
+
+  // New method for polling theater status
+  pollTheaterStatus: async (movieId) => {
+    try {
+      const response = await api.get(`/theater-status/${movieId}/`);
+
+      // If the processing is complete, cache the results
+      if (response.data.status === 'success' && response.data.theaters) {
+        cache.set(movieId, response.data);
+      }
+
+      return response.data;
+    } catch (error) {
+      console.error('Error polling theater status:', error);
       throw error;
     }
   },
