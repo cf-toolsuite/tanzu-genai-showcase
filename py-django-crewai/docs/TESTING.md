@@ -819,7 +819,7 @@ jobs:
         pytest --cov=chatbot
 
     - name: Set up Node.js
-      uses: actions/setup-node@v2
+      uses: actions/setup-node@v4
       with:
         node-version: '18'
 
