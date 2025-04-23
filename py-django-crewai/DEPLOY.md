@@ -8,6 +8,7 @@ This document provides comprehensive deployment instructions for the Movie Chatb
 - [Deployment Options](#deployment-options)
   - [Standard Deployment](#standard-deployment)
   - [Vendor Dependency Approach](#vendor-dependency-approach)
+- [CI/CD Integration](#cicd-integration)
 - [GenAI Service Integration](#genai-service-integration)
 - [Database Service Integration](#database-service-integration)
 - [High Availability Configuration](#high-availability-configuration)
@@ -117,6 +118,80 @@ The vendor approach pre-packages the essential dependencies for deployment, whic
    ```bash
    cf start movie-chatbot
    ```
+
+## CI/CD Integration
+
+The application includes CI/CD configurations for multiple platforms to automate building, testing, and deploying the application. These configurations handle both backend (Python/Django) and frontend (React) components.
+
+### GitHub Actions
+
+The GitHub Actions workflow (`.github/workflows/py-django-crewai.yml`) automates:
+- Backend testing with Django test framework
+- Frontend building with Node.js and npm
+- Static file collection
+- Package creation
+- Artifact upload
+
+The workflow is triggered on pushes and pull requests that affect the py-django-crewai project files.
+
+For deployment via GitHub Actions, use the on-demand Cloud Foundry deployment workflow described in the repository's main DEPLOY.md.
+
+### GitLab CI
+
+The GitLab CI configuration (`ci/gitlab/.gitlab-ci.yml`) provides:
+- Backend testing
+- Frontend building
+- Static file collection
+- Package creation
+- Optional Cloud Foundry deployment
+
+The pipeline is organized into stages: install, test, build, package, and deploy.
+
+To enable automatic deployment, set the following CI/CD variables in GitLab:
+- `CF_API`: Cloud Foundry API endpoint
+- `CF_USERNAME`: Cloud Foundry username
+- `CF_PASSWORD`: Cloud Foundry password
+- `CF_ORG`: Cloud Foundry organization
+- `CF_SPACE`: Cloud Foundry space
+- `CF_DEPLOY`: Set to "true" to enable deployment
+
+### Jenkins
+
+The Jenkins pipeline (`ci/jenkins/Jenkinsfile`) includes:
+- Backend testing
+- Frontend building
+- Static file collection
+- Package creation
+- Optional Cloud Foundry deployment
+
+The pipeline uses Jenkins' built-in caching mechanisms to speed up builds.
+
+To enable automatic deployment, set the following environment variables in Jenkins:
+- `CF_API`: Cloud Foundry API endpoint (as a Jenkins credential)
+- `CF_USERNAME`: Cloud Foundry username (as a Jenkins credential)
+- `CF_PASSWORD`: Cloud Foundry password (as a Jenkins credential)
+- `CF_ORG`: Cloud Foundry organization (as a Jenkins credential)
+- `CF_SPACE`: Cloud Foundry space (as a Jenkins credential)
+- `CF_DEPLOY`: Set to "true" to enable deployment
+
+### Bitbucket Pipelines
+
+The Bitbucket Pipelines configuration (`ci/bitbucket/bitbucket-pipelines.yml`) provides:
+- Backend testing
+- Frontend building
+- Static file collection
+- Package creation
+- Artifact upload
+- Manual Cloud Foundry deployment
+
+The pipeline uses parallel steps to speed up the build process.
+
+To enable deployment, set the following repository variables in Bitbucket:
+- `CF_API`: Cloud Foundry API endpoint
+- `CF_USERNAME`: Cloud Foundry username
+- `CF_PASSWORD`: Cloud Foundry password
+- `CF_ORG`: Cloud Foundry organization
+- `CF_SPACE`: Cloud Foundry space
 
 ## GenAI Service Integration
 

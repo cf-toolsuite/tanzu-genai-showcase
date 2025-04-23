@@ -6,50 +6,116 @@ image: python:3.12
 definitions:
   caches:
     pip: ~/.cache/pip
+    npm: frontend/node_modules
 
 pipelines:
   default:
+    - parallel:
+        - step:
+            name: Backend Test
+            caches:
+              - pip
+            script:
+              - cd py-django-crewai
+              - python -m pip install --upgrade pip
+              - pip install -r requirements.txt
+              - python manage.py test || echo "No tests run"
+
+        - step:
+            name: Frontend Build
+            image: node:18
+            caches:
+              - npm
+            script:
+              - cd py-django-crewai/frontend
+              - npm ci
+              - npm run build
+            artifacts:
+              - py-django-crewai/frontend/dist/**
+
     - step:
-        name: Build and Test
+        name: Collect Static
         caches:
           - pip
         script:
           - cd py-django-crewai
           - python -m pip install --upgrade pip
           - pip install -r requirements.txt
-          - python manage.py test || echo "No tests run"
           - python manage.py collectstatic --noinput || echo "Static collection skipped"
+        artifacts:
+          - py-django-crewai/static/**
 
   branches:
     main:
+      - parallel:
+          - step:
+              name: Backend Test
+              caches:
+                - pip
+              script:
+                - cd py-django-crewai
+                - python -m pip install --upgrade pip
+                - pip install -r requirements.txt
+                - python manage.py test || echo "No tests run"
+
+          - step:
+              name: Frontend Build
+              image: node:18
+              caches:
+                - npm
+              script:
+                - cd py-django-crewai/frontend
+                - npm ci
+                - npm run build
+              artifacts:
+                - py-django-crewai/frontend/dist/**
+
       - step:
-          name: Build and Test
+          name: Collect Static
           caches:
             - pip
           script:
             - cd py-django-crewai
             - python -m pip install --upgrade pip
             - pip install -r requirements.txt
-            - python manage.py test || echo "No tests run"
             - python manage.py collectstatic --noinput || echo "Static collection skipped"
           artifacts:
-            - py-django-crewai/**
+            - py-django-crewai/static/**
+
       - step:
           name: Package and Upload
-          deployment: production
           script:
             - cd py-django-crewai
             - mkdir -p dist
-            - zip -r dist/py-django-crewai.zip . -x "*.git*" "*.env*" "*.pyc" "__pycache__/*" "*.github/*" "dist/*"
+            - zip -r dist/py-django-crewai.zip . -x "*.git*" "*.env*" "*.pyc" "__pycache__/*" "*.github/*" "dist/*" "frontend/node_modules/*"
             - pipe: atlassian/bitbucket-upload-file:0.3.2
               variables:
                 BITBUCKET_USERNAME: $BITBUCKET_USERNAME
                 BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
                 FILENAME: 'dist/py-django-crewai.zip'
                 TARGET: 'artifacts/py-django-crewai-${BITBUCKET_BUILD_NUMBER}.zip'
+          artifacts:
+            - py-django-crewai/dist/**
+
+      - step:
+          name: Deploy to Cloud Foundry
+          deployment: production
+          trigger: manual
+          script:
+            - apt-get update && apt-get install -y wget apt-transport-https
+            - wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | apt-key add -
+            - echo "deb https://packages.cloudfoundry.org/debian stable main" | tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+            - apt-get update && apt-get install -y cf-cli
+            - cd py-django-crewai
+            - if [ -n "$CF_API" ] && [ -n "$CF_USERNAME" ] && [ -n "$CF_PASSWORD" ] && [ -n "$CF_ORG" ] && [ -n "$CF_SPACE" ]; then
+            -   cf login -a $CF_API -u $CF_USERNAME -p $CF_PASSWORD -o $CF_ORG -s $CF_SPACE
+            -   ./deploy-on-tp4cf.sh
+            - else
+            -   echo "Skipping deployment - missing CF credentials"
+            - fi
 
 clone:
   depth: full
 
 options:
-  max-time: 20
+  max-time: 30

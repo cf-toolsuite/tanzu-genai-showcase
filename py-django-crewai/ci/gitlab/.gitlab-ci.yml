@@ -7,8 +7,9 @@ image: python:3.12
 stages:
   - install
   - test
+  - build
   - package
-  - upload
+  - deploy
 
 # Cache dependencies between pipeline jobs
 cache:
@@ -16,6 +17,7 @@ cache:
   paths:
     - .pip/
     - venv/
+    - py-django-crewai/frontend/node_modules/
 
 # Run CI only when changes in the project files or CI configuration
 workflow:
@@ -38,40 +40,69 @@ install:
     - python -m venv venv
     - source venv/bin/activate
     - pip install -r requirements.txt
+  artifacts:
+    paths:
+      - py-django-crewai/venv/
 
-# Run tests
-test:
+# Run backend tests
+backend-test:
   stage: test
   script:
     - cd py-django-crewai
-    - python -m venv venv
     - source venv/bin/activate
     - python manage.py test || echo "No tests run"
-    - python manage.py collectstatic --noinput || echo "Static collection skipped"
   needs:
     - install
+
+# Build frontend
+frontend-build:
+  stage: build
+  image: node:18
+  script:
+    - cd py-django-crewai
+    - cd frontend
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - py-django-crewai/frontend/dist/
+  needs:
+    - install
+
+# Collect static files and prepare for deployment
+collect-static:
+  stage: build
+  script:
+    - cd py-django-crewai
+    - source venv/bin/activate
+    - python manage.py collectstatic --noinput || echo "Static collection skipped"
+  artifacts:
+    paths:
+      - py-django-crewai/static/
+  needs:
+    - frontend-build
 
 # Create package
 package:
   stage: package
   script:
     - cd py-django-crewai
-    - python -m venv venv
     - source venv/bin/activate
     - mkdir -p dist
-    - zip -r dist/py-django-crewai.zip . -x "*.git*" "*.env*" "*.pyc" "__pycache__/*" "*.github/*" "dist/*" "venv/*"
+    - zip -r dist/py-django-crewai.zip . -x "*.git*" "*.env*" "*.pyc" "__pycache__/*" "*.github/*" "dist/*" "venv/*" "frontend/node_modules/*"
   artifacts:
     paths:
       - py-django-crewai/dist/
     expire_in: 1 week
   needs:
-    - test
+    - backend-test
+    - collect-static
   rules:
     - if: $CI_COMMIT_BRANCH == "main"
 
 # Upload artifacts - only on main branch
 upload:
-  stage: upload
+  stage: package
   script:
     - echo "Uploading artifacts to GitLab Package Registry"
     - |
@@ -89,3 +120,25 @@ upload:
     - if: $CI_COMMIT_BRANCH == "main"
   needs:
     - package
+
+# Deploy to Cloud Foundry (optional)
+deploy:
+  stage: deploy
+  script:
+    - apt-get update && apt-get install -y wget
+    - wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | apt-key add -
+    - echo "deb https://packages.cloudfoundry.org/debian stable main" | tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+    - apt-get update && apt-get install -y cf-cli
+    - cd py-django-crewai
+    - |
+      if [ -n "$CF_API" ] && [ -n "$CF_USERNAME" ] && [ -n "$CF_PASSWORD" ] && [ -n "$CF_ORG" ] && [ -n "$CF_SPACE" ]; then
+        cf login -a $CF_API -u $CF_USERNAME -p $CF_PASSWORD -o $CF_ORG -s $CF_SPACE
+        ./deploy-on-tp4cf.sh
+      else
+        echo "Skipping deployment - missing CF credentials"
+      fi
+  needs:
+    - package
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main" && $CF_DEPLOY == "true"
+  when: manual

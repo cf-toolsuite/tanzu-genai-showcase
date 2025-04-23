@@ -37,7 +37,6 @@ on:
         description: 'GenAI Service Plan Name (if needed by app)'
         required: false
         type: string
-        default: 'standard' # Assuming a common plan name exists
       db_service_type:
         description: 'Database Service Type (e.g., postgresql, mysql, if needed)'
         required: false
@@ -47,7 +46,6 @@ on:
         description: 'Database Service Plan Name (if needed by app)'
         required: false
         type: string
-        default: 'small-11' # Example plan, adjust as needed
 
 jobs:
   deploy:
