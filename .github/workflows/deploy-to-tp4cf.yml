@@ -262,8 +262,8 @@ jobs:
 
       - name: Create User Provided Service (if needed by java-spring-ai-mcp/server)
         # This requires the AVIATION_STACK_ACCESS_KEY secret
-        if: inputs.project == 'java-spring-ai-mcp/server' && "${{ secrets.AVIATION_STACK_ACCESS_KEY }}" != ''
-        run: |
+        if: inputs.project == 'java-spring-ai-mcp/server' && 'secrets.AVIATION_STACK_ACCESS_KEY' != ''
+\        run: |
           if ! cf service aviation-stack-service-credentials; then
             echo "Creating user-provided service: aviation-stack-service-credentials"
             cf create-user-provided-service aviation-stack-service-credentials -p '{"access_key":"${{ secrets.AVIATION_STACK_ACCESS_KEY }}"}' || echo "UPS creation might have failed or already exists"
