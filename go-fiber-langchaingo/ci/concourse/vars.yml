@@ -1,0 +1,21 @@
+# Variables for go-fiber-langchaingo Concourse Pipeline
+# Replace these values with your actual configuration
+
+# Git Repository Configuration
+git_repo_url: https://github.com/your-org/tanzu-genai-showcase.git
+git_branch: main
+
+# Artifact Storage Configuration
+artifact_bucket: your-artifact-bucket
+aws_region: us-west-2
+# aws_access_key and aws_secret_key should be provided via credentials manager
+# or through a separate credentials file
+
+# Cloud Foundry Configuration
+cf_api: https://api.your-cf-instance.com
+# cf_username and cf_password should be provided via credentials manager
+cf_org: your-cf-org
+cf_space: your-cf-space
+
+# Application Configuration
+# openai_api_key should be provided via credentials manager

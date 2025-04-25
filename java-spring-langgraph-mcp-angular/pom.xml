@@ -7,7 +7,7 @@
     <parent>
         <groupId>org.springframework.boot</groupId>
         <artifactId>spring-boot-starter-parent</artifactId>
-        <version>3.2.4</version>
+        <version>3.4.5</version>
         <relativePath/>
     </parent>
 
@@ -24,15 +24,15 @@
     </modules>
 
     <properties>
-        <java.version>17</java.version>
+        <java.version>21</java.version>
         <maven.compiler.source>${java.version}</maven.compiler.source>
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <spring-boot.version>3.2.4</spring-boot.version>
+        <spring-boot.version>3.4.5</spring-boot.version>
         <spring-ai.version>1.0.0-SNAPSHOT</spring-ai.version>
-        <langchain4j.version>0.31.0</langchain4j.version>
-        <langgraph4j.version>1.5.1</langgraph4j.version>
-        <node.version>v20.13.0</node.version>
+        <langchain4j.version>0.36.2</langchain4j.version>
+        <langgraph4j.version>1.5.7</langgraph4j.version>
+        <node.version>v22.11.0</node.version>
         <npm.version>10.7.0</npm.version>
     </properties>
 

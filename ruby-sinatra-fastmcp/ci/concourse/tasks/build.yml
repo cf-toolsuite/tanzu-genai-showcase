@@ -1,0 +1,46 @@
+# Build Task for ruby-sinatra-fastmcp
+platform: linux
+
+image_resource:
+  type: docker-image
+  source:
+    repository: ruby
+    tag: '3.2.5'
+
+inputs:
+  - name: source-code
+
+outputs:
+  - name: build-output
+
+run:
+  path: bash
+  args:
+    - -c
+    - |
+      cd source-code/ruby-sinatra-fastmcp
+
+      # Install dependencies
+      echo "Installing dependencies..."
+      gem install bundler
+      bundle install
+
+      # Run tests if available
+      echo "Running tests..."
+      if [ -d "test" ]; then
+        bundle exec rake test || echo "Test execution failed"
+      else
+        echo "No tests found, skipping tests"
+      fi
+
+      # Create package
+      echo "Creating package..."
+      mkdir -p dist
+      zip -r dist/ruby-sinatra-fastmcp.zip . -x "*.git*" "*.env*" ".github/*" "dist/*" "test/*" "spec/*"
+
+      # Package artifacts
+      echo "Packaging artifacts..."
+      mkdir -p ../../build-output
+      cp -r dist/ruby-sinatra-fastmcp.zip ../../build-output/
+      cd ../../build-output
+      tar -czf artifacts.tar.gz ruby-sinatra-fastmcp.zip

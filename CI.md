@@ -6,6 +6,7 @@ This repository contains CI/CD configurations for multiple CI providers:
 - GitLab CI/CD
 - Bitbucket Pipelines
 - Jenkins
+- Concourse CI
 
 Each project contains its own CI configuration files in its respective `ci` subdirectory.
 
@@ -161,6 +162,55 @@ If using the Blue Ocean interface, the badge URL would be:
 
 Replace `your-jenkins-server.com` and `job-name` with your specific values.
 
+### Concourse CI
+
+Concourse CI pipeline definitions are located in each project's `ci/concourse` directory.
+
+#### Setup Instructions
+
+1. Install the [Fly CLI](https://concourse-ci.org/fly.html) and authenticate with your Concourse server:
+   ```bash
+   fly -t your-target login -c https://your-concourse-server.com
+   ```
+
+2. Configure variables:
+   - Edit the `vars.yml` file in the project's `ci/concourse` directory with your configuration values.
+   - Copy `credentials-template.yml` to `credentials.yml` and fill in your credentials.
+   - **IMPORTANT**: Do not commit `credentials.yml` to version control!
+
+3. Set up the pipeline:
+   ```bash
+   fly -t your-target set-pipeline -p project-name -c project-name/ci/concourse/pipeline.yml -l project-name/ci/concourse/vars.yml -l project-name/ci/concourse/credentials.yml
+   ```
+
+4. Unpause the pipeline:
+   ```bash
+   fly -t your-target unpause-pipeline -p project-name
+   ```
+
+#### Usage Notes
+
+- Pipelines are defined in `pipeline.yml` files with task configurations in the `tasks` directory.
+- Build and deployment scripts are located in the `tasks/scripts` directory.
+- Artifacts are stored in an S3 bucket or other configured storage.
+
+#### Concourse CI Status Badges
+
+To add Concourse CI status badges to your project READMEs:
+
+1. Use the Concourse CI badge endpoint:
+   ```
+   https://your-concourse-server.com/api/v1/teams/main/pipelines/pipeline-name/badge
+   ```
+
+2. Add the badge to your README.md files:
+
+```markdown
+![Concourse CI Status](https://your-concourse-server.com/api/v1/teams/main/pipelines/pipeline-name/badge)
+```
+
+Replace `your-concourse-server.com` and `pipeline-name` with your specific values.
+
 ## Common CI Tasks
 
 ### Adding New Environment Variables
@@ -184,6 +234,7 @@ Each CI configuration includes caching mechanisms to speed up builds:
 - GitLab CI/CD: Uses the `cache` directive
 - Bitbucket Pipelines: Uses the `caches` directive
 - Jenkins: Uses a custom cache step
+- Concourse CI: Uses resource caching
 
 ## Project-Specific Build Instructions
 
@@ -263,3 +314,4 @@ For specific issues with each CI provider, refer to their respective documentati
 - [GitLab CI/CD Documentation](https://docs.gitlab.com/ee/ci/)
 - [Bitbucket Pipelines Documentation](https://support.atlassian.com/bitbucket-cloud/docs/bitbucket-pipelines-configuration-reference/)
 - [Jenkins Pipeline Documentation](https://www.jenkins.io/doc/book/pipeline/)
+- [Concourse CI Documentation](https://concourse-ci.org/docs.html)

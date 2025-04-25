@@ -1,0 +1,45 @@
+# Build Task for dotnet-extensions-ai
+platform: linux
+
+image_resource:
+  type: docker-image
+  source:
+    repository: mcr.microsoft.com/dotnet/sdk
+    tag: latest
+
+inputs:
+  - name: source-code
+
+outputs:
+  - name: build-output
+
+run:
+  path: bash
+  args:
+    - -c
+    - |
+      cd source-code/dotnet-extensions-ai
+
+      # Setup .NET from global.json
+      dotnet --info
+
+      # Restore dependencies
+      echo "Restoring dependencies..."
+      dotnet restore
+
+      # Build
+      echo "Building project..."
+      dotnet build --no-restore
+
+      # Test
+      echo "Running tests..."
+      dotnet test --no-build --verbosity normal
+
+      # Publish
+      echo "Publishing application..."
+      dotnet publish -c Release -o ./publish
+
+      # Package artifacts
+      echo "Packaging artifacts..."
+      mkdir -p ../../build-output
+      tar -czf ../../build-output/artifacts.tar.gz publish

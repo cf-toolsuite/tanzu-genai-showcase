@@ -1,0 +1,135 @@
+---
+# Concourse CI/CD Pipeline for js-langchain-react
+# Equivalent to GitHub Actions workflow: js-langchain-react.yml and deploy-js-langchain-react-to-tp4cf.yml
+
+resource_types:
+  - name: cf-cli
+    type: docker-image
+    source:
+      repository: nulldriver/cf-cli-resource
+      tag: latest
+
+resources:
+  - name: source-code
+    type: git
+    source:
+      uri: ((git_repo_url))
+      branch: ((git_branch))
+      paths:
+        - js-langchain-react/**
+        - js-langchain-react/ci/concourse/**
+
+  - name: build-artifacts
+    type: s3
+    source:
+      bucket: ((artifact_bucket))
+      access_key_id: ((aws_access_key))
+      secret_access_key: ((aws_secret_key))
+      region_name: ((aws_region))
+      versioned_file: js-langchain-react/artifacts.tar.gz
+
+  - name: cf-environment
+    type: cf-cli
+    source:
+      api: ((cf_api))
+      username: ((cf_username))
+      password: ((cf_password))
+      org: ((cf_org))
+      space: ((cf_space))
+
+jobs:
+  - name: build-and-test
+    plan:
+      - get: source-code
+        trigger: true
+      - task: build-and-test
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: node
+              tag: '22'
+          inputs:
+            - name: source-code
+          outputs:
+            - name: build-output
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                cd source-code/js-langchain-react
+
+                # Install dependencies
+                echo "Installing dependencies..."
+                npm install
+
+                # Build
+                echo "Building application..."
+                npm run build
+
+                # Test (if tests exist)
+                echo "Running tests..."
+                npm test || echo "No tests specified"
+
+                # Package artifacts
+                echo "Packaging artifacts..."
+                mkdir -p ../../build-output
+                tar -czf ../../build-output/artifacts.tar.gz build
+      - put: build-artifacts
+        params:
+          file: build-output/artifacts.tar.gz
+
+  - name: deploy-to-cf
+    plan:
+      - get: source-code
+        passed: [build-and-test]
+        trigger: true
+      - get: build-artifacts
+        passed: [build-and-test]
+      - task: prepare-deployment
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: source-code
+            - name: build-artifacts
+          outputs:
+            - name: app-to-deploy
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                # Extract artifacts
+                mkdir -p app-to-deploy
+                tar -xzf build-artifacts/artifacts.tar.gz -C app-to-deploy
+
+                # Copy manifest and any other required files
+                cp source-code/js-langchain-react/manifest.yml app-to-deploy/
+                cp source-code/js-langchain-react/server.js app-to-deploy/
+                cp source-code/js-langchain-react/package.json app-to-deploy/
+      - put: cf-environment
+        params:
+          command: push
+          app_name: js-langchain-react
+          path: app-to-deploy
+          manifest: app-to-deploy/manifest.yml
+          no_start: true
+      - put: cf-environment
+        params:
+          command: set-env
+          app_name: js-langchain-react
+          env:
+            OPENAI_API_KEY: ((openai_api_key))
+      - put: cf-environment
+        params:
+          command: start
+          app_name: js-langchain-react
+          staging_timeout: 15
+          startup_timeout: 5

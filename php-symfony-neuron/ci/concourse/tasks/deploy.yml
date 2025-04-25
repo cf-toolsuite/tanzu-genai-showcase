@@ -1,0 +1,38 @@
+# Deploy Task for php-symfony-neuron
+platform: linux
+
+image_resource:
+  type: docker-image
+  source:
+    repository: governmentpaas/cf-cli
+    tag: latest
+
+inputs:
+  - name: source-code
+  - name: build-artifacts
+
+outputs:
+  - name: app-to-deploy
+
+run:
+  path: bash
+  args:
+    - -c
+    - |
+      # Extract artifacts
+      mkdir -p app-to-deploy
+      tar -xzf build-artifacts/artifacts.tar.gz -C app-to-deploy
+      cd app-to-deploy
+      unzip php-symfony-neuron.zip -d php-symfony-neuron
+
+      # Copy manifest and any other required files
+      cp -f ../source-code/php-symfony-neuron/manifest.yml php-symfony-neuron/
+
+params:
+  CF_API: ((cf_api))
+  CF_USERNAME: ((cf_username))
+  CF_PASSWORD: ((cf_password))
+  CF_ORG: ((cf_org))
+  CF_SPACE: ((cf_space))
+  APP_ENV: prod
+  APP_SECRET: ((app_secret))

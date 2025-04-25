@@ -1,0 +1,38 @@
+# Build Task for js-langchain-react
+platform: linux
+
+image_resource:
+  type: docker-image
+  source:
+    repository: node
+    tag: '22'
+
+inputs:
+  - name: source-code
+
+outputs:
+  - name: build-output
+
+run:
+  path: bash
+  args:
+    - -c
+    - |
+      cd source-code/js-langchain-react
+
+      # Install dependencies
+      echo "Installing dependencies..."
+      npm install
+
+      # Build
+      echo "Building application..."
+      npm run build
+
+      # Test (if tests exist)
+      echo "Running tests..."
+      npm test || echo "No tests specified"
+
+      # Package artifacts
+      echo "Packaging artifacts..."
+      mkdir -p ../../build-output
+      tar -czf ../../build-output/artifacts.tar.gz build

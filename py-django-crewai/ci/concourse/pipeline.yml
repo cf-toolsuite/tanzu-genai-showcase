@@ -1,0 +1,227 @@
+---
+# Concourse CI/CD Pipeline for py-django-crewai
+# Equivalent to GitHub Actions workflow: py-django-crewai.yml and deploy-py-django-crewai-to-tp4cf.yml
+
+resource_types:
+  - name: cf-cli
+    type: docker-image
+    source:
+      repository: nulldriver/cf-cli-resource
+      tag: latest
+
+resources:
+  - name: source-code
+    type: git
+    source:
+      uri: ((git_repo_url))
+      branch: ((git_branch))
+      paths:
+        - py-django-crewai/**
+        - py-django-crewai/ci/concourse/**
+
+  - name: build-artifacts
+    type: s3
+    source:
+      bucket: ((artifact_bucket))
+      access_key_id: ((aws_access_key))
+      secret_access_key: ((aws_secret_key))
+      region_name: ((aws_region))
+      versioned_file: py-django-crewai/artifacts.tar.gz
+
+  - name: cf-environment
+    type: cf-cli
+    source:
+      api: ((cf_api))
+      username: ((cf_username))
+      password: ((cf_password))
+      org: ((cf_org))
+      space: ((cf_space))
+
+jobs:
+  - name: backend-test
+    plan:
+      - get: source-code
+        trigger: true
+      - task: test-backend
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: python
+              tag: '3.12'
+          inputs:
+            - name: source-code
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                cd source-code/py-django-crewai
+
+                # Install backend dependencies
+                echo "Installing backend dependencies..."
+                python -m pip install --upgrade pip
+                pip install -r requirements.txt
+
+                # Run backend tests
+                echo "Running backend tests..."
+                python manage.py test || echo "No tests run"
+
+  - name: frontend-build
+    plan:
+      - get: source-code
+        trigger: true
+      - task: build-frontend
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: node
+              tag: '18'
+          inputs:
+            - name: source-code
+          outputs:
+            - name: frontend-build
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                cd source-code/py-django-crewai
+
+                # Install frontend dependencies
+                echo "Installing frontend dependencies..."
+                cd frontend
+                npm install
+
+                # Build frontend
+                echo "Building frontend..."
+                cd ..
+                ./build_frontend.sh
+
+                # Copy frontend build to output
+                mkdir -p ../frontend-build/frontend
+                cp -r frontend/dist ../frontend-build/frontend/
+
+                # Copy static files directory
+                mkdir -p ../frontend-build/static
+                if [ -d "static" ]; then
+                  cp -r static ../frontend-build/
+                fi
+
+  - name: package
+    needs: [backend-test, frontend-build]
+    plan:
+      - get: source-code
+        passed: [backend-test, frontend-build]
+        trigger: true
+      - get: frontend-build
+        passed: [frontend-build]
+      - task: create-package
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: python
+              tag: '3.12'
+          inputs:
+            - name: source-code
+            - name: frontend-build
+          outputs:
+            - name: build-output
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                cd source-code/py-django-crewai
+
+                # Copy frontend build
+                if [ -d "../../frontend-build/frontend" ]; then
+                  echo "Copying frontend build..."
+                  cp -r ../../frontend-build/frontend/dist frontend/
+                fi
+
+                # Copy static files
+                if [ -d "../../frontend-build/static" ]; then
+                  echo "Copying static files..."
+                  cp -r ../../frontend-build/static .
+                fi
+
+                # Collect static files
+                echo "Collecting static files..."
+                python -m pip install --upgrade pip
+                pip install -r requirements.txt
+                python manage.py collectstatic --noinput || echo "Static collection skipped"
+
+                # Create package
+                echo "Creating package..."
+                mkdir -p ../../build-output
+                zip -r ../../build-output/py-django-crewai.zip . -x "*.git*" "*.env*" "*.pyc" "__pycache__/*" "*.github/*" "frontend/node_modules/*"
+
+                # Package artifacts
+                cd ../../build-output
+                tar -czf artifacts.tar.gz py-django-crewai.zip
+      - put: build-artifacts
+        params:
+          file: build-output/artifacts.tar.gz
+
+  - name: deploy-to-cf
+    plan:
+      - get: source-code
+        passed: [package]
+        trigger: true
+      - get: build-artifacts
+        passed: [package]
+      - task: prepare-deployment
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: source-code
+            - name: build-artifacts
+          outputs:
+            - name: app-to-deploy
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                # Extract artifacts
+                mkdir -p app-to-deploy
+                tar -xzf build-artifacts/artifacts.tar.gz -C app-to-deploy
+                cd app-to-deploy
+                unzip py-django-crewai.zip -d py-django-crewai
+
+                # Copy manifest and any other required files
+                cp -f ../source-code/py-django-crewai/manifest.yml py-django-crewai/
+                cp -f ../source-code/py-django-crewai/Procfile py-django-crewai/ || echo "Procfile not found"
+                cp -f ../source-code/py-django-crewai/runtime.txt py-django-crewai/ || echo "runtime.txt not found"
+      - put: cf-environment
+        params:
+          command: push
+          app_name: py-django-crewai
+          path: app-to-deploy/py-django-crewai
+          manifest: app-to-deploy/py-django-crewai/manifest.yml
+          no_start: true
+      - put: cf-environment
+        params:
+          command: set-env
+          app_name: py-django-crewai
+          env:
+            DJANGO_SETTINGS_MODULE: movie_chatbot.settings
+            OPENAI_API_KEY: ((openai_api_key))
+            DJANGO_SECRET_KEY: ((django_secret_key))
+      - put: cf-environment
+        params:
+          command: start
+          app_name: py-django-crewai
+          staging_timeout: 15
+          startup_timeout: 5

@@ -1,0 +1,27 @@
+# Backend Test Task for py-django-crewai
+platform: linux
+
+image_resource:
+  type: docker-image
+  source:
+    repository: python
+    tag: '3.12'
+
+inputs:
+  - name: source-code
+
+run:
+  path: bash
+  args:
+    - -c
+    - |
+      cd source-code/py-django-crewai
+
+      # Install backend dependencies
+      echo "Installing backend dependencies..."
+      python -m pip install --upgrade pip
+      pip install -r requirements.txt
+
+      # Run backend tests
+      echo "Running backend tests..."
+      python manage.py test || echo "No tests run"

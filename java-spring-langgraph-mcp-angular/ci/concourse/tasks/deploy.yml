@@ -1,0 +1,33 @@
+# Deploy Task for java-spring-langgraph-mcp-angular
+platform: linux
+
+image_resource:
+  type: docker-image
+  source:
+    repository: governmentpaas/cf-cli
+    tag: latest
+
+inputs:
+  - name: source-code
+  - name: build-artifacts
+
+outputs:
+  - name: app-to-deploy
+
+run:
+  path: bash
+  args:
+    - -c
+    - |
+      # Extract artifacts
+      mkdir -p app-to-deploy
+      tar -xzf build-artifacts/artifacts.tar.gz -C app-to-deploy
+
+params:
+  CF_API: ((cf_api))
+  CF_USERNAME: ((cf_username))
+  CF_PASSWORD: ((cf_password))
+  CF_ORG: ((cf_org))
+  CF_SPACE: ((cf_space))
+  SPRING_PROFILES_ACTIVE: cloud
+  OPENAI_API_KEY: ((openai_api_key))

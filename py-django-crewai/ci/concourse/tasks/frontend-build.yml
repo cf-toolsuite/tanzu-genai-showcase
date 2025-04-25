@@ -1,0 +1,41 @@
+# Frontend Build Task for py-django-crewai
+platform: linux
+
+image_resource:
+  type: docker-image
+  source:
+    repository: node
+    tag: '18'
+
+inputs:
+  - name: source-code
+
+outputs:
+  - name: frontend-build
+
+run:
+  path: bash
+  args:
+    - -c
+    - |
+      cd source-code/py-django-crewai
+
+      # Install frontend dependencies
+      echo "Installing frontend dependencies..."
+      cd frontend
+      npm install
+
+      # Build frontend
+      echo "Building frontend..."
+      cd ..
+      ./build_frontend.sh
+
+      # Copy frontend build to output
+      mkdir -p ../frontend-build/frontend
+      cp -r frontend/dist ../frontend-build/frontend/
+
+      # Copy static files directory
+      mkdir -p ../frontend-build/static
+      if [ -d "static" ]; then
+        cp -r static ../frontend-build/
+      fi

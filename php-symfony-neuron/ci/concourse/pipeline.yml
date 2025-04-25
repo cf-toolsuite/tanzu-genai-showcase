@@ -1,0 +1,147 @@
+---
+# Concourse CI/CD Pipeline for php-symfony-neuron
+# Equivalent to GitHub Actions workflow: php-symfony-neuron.yml and deploy-php-symfony-neuron-to-tp4cf.yml
+
+resource_types:
+  - name: cf-cli
+    type: docker-image
+    source:
+      repository: nulldriver/cf-cli-resource
+      tag: latest
+
+resources:
+  - name: source-code
+    type: git
+    source:
+      uri: ((git_repo_url))
+      branch: ((git_branch))
+      paths:
+        - php-symfony-neuron/**
+        - php-symfony-neuron/ci/concourse/**
+
+  - name: build-artifacts
+    type: s3
+    source:
+      bucket: ((artifact_bucket))
+      access_key_id: ((aws_access_key))
+      secret_access_key: ((aws_secret_key))
+      region_name: ((aws_region))
+      versioned_file: php-symfony-neuron/artifacts.tar.gz
+
+  - name: cf-environment
+    type: cf-cli
+    source:
+      api: ((cf_api))
+      username: ((cf_username))
+      password: ((cf_password))
+      org: ((cf_org))
+      space: ((cf_space))
+
+jobs:
+  - name: build-and-test
+    plan:
+      - get: source-code
+        trigger: true
+      - task: build-and-test
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: shivammathur/php
+              tag: '8.3'
+          inputs:
+            - name: source-code
+          outputs:
+            - name: build-output
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                cd source-code/php-symfony-neuron
+
+                # Validate composer files
+                echo "Validating composer.json and composer.lock..."
+                composer validate --strict
+
+                # Install dependencies
+                echo "Installing dependencies..."
+                composer install --prefer-dist --no-progress
+
+                # Run tests if available
+                echo "Running tests..."
+                if [ -d "tests" ]; then
+                  vendor/bin/phpunit
+                else
+                  echo "No tests directory found, skipping tests"
+                fi
+
+                # Create package
+                echo "Creating package..."
+                mkdir -p build
+                composer dump-autoload --optimize --no-dev
+                mkdir -p ../../build-output
+                zip -r ../../build-output/php-symfony-neuron.zip . -x ".git/*" "tests/*" ".env*" ".github/*" "build/*"
+
+                # Package artifacts
+                echo "Packaging artifacts..."
+                cd ../../build-output
+                tar -czf artifacts.tar.gz php-symfony-neuron.zip
+      - put: build-artifacts
+        params:
+          file: build-output/artifacts.tar.gz
+
+  - name: deploy-to-cf
+    plan:
+      - get: source-code
+        passed: [build-and-test]
+        trigger: true
+      - get: build-artifacts
+        passed: [build-and-test]
+      - task: prepare-deployment
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: source-code
+            - name: build-artifacts
+          outputs:
+            - name: app-to-deploy
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                # Extract artifacts
+                mkdir -p app-to-deploy
+                tar -xzf build-artifacts/artifacts.tar.gz -C app-to-deploy
+                cd app-to-deploy
+                unzip php-symfony-neuron.zip -d php-symfony-neuron
+
+                # Copy manifest and any other required files
+                cp -f ../source-code/php-symfony-neuron/manifest.yml php-symfony-neuron/
+      - put: cf-environment
+        params:
+          command: push
+          app_name: php-symfony-neuron
+          path: app-to-deploy/php-symfony-neuron
+          manifest: app-to-deploy/php-symfony-neuron/manifest.yml
+          no_start: true
+      - put: cf-environment
+        params:
+          command: set-env
+          app_name: php-symfony-neuron
+          env:
+            APP_ENV: prod
+            APP_SECRET: ((app_secret))
+      - put: cf-environment
+        params:
+          command: start
+          app_name: php-symfony-neuron
+          staging_timeout: 15
+          startup_timeout: 5

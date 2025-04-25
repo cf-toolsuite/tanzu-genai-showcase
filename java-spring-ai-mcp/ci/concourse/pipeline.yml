@@ -1,0 +1,204 @@
+---
+# Concourse CI/CD Pipeline for java-spring-ai-mcp
+# Equivalent to GitHub Actions workflow: java-spring-ai-mcp.yml and deploy-java-spring-ai-mcp-to-tp4cf.yml
+
+resource_types:
+  - name: cf-cli
+    type: docker-image
+    source:
+      repository: nulldriver/cf-cli-resource
+      tag: latest
+
+resources:
+  - name: source-code
+    type: git
+    source:
+      uri: ((git_repo_url))
+      branch: ((git_branch))
+      paths:
+        - java-spring-ai-mcp/**
+        - java-spring-ai-mcp/ci/concourse/**
+
+  - name: build-artifacts
+    type: s3
+    source:
+      bucket: ((artifact_bucket))
+      access_key_id: ((aws_access_key))
+      secret_access_key: ((aws_secret_key))
+      region_name: ((aws_region))
+      versioned_file: java-spring-ai-mcp/artifacts.tar.gz
+
+  - name: cf-environment
+    type: cf-cli
+    source:
+      api: ((cf_api))
+      username: ((cf_username))
+      password: ((cf_password))
+      org: ((cf_org))
+      space: ((cf_space))
+
+jobs:
+  - name: build-and-test
+    plan:
+      - get: source-code
+        trigger: true
+      - task: build-and-test
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: maven
+              tag: '3.9-eclipse-temurin-17'
+          inputs:
+            - name: source-code
+          outputs:
+            - name: build-output
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                cd source-code/java-spring-ai-mcp
+
+                # Build with Maven
+                echo "Building with Maven..."
+                mvn -B clean package
+
+                # Package artifacts
+                echo "Packaging artifacts..."
+                mkdir -p ../../build-output
+                cp api/target/*.jar ../../build-output/ || echo "No API JAR found"
+                cp client/target/*.jar ../../build-output/ || echo "No client JAR found"
+                cp server/target/*.jar ../../build-output/ || echo "No server JAR found"
+
+                # Create a tarball of all artifacts
+                cd ../../build-output
+                tar -czf artifacts.tar.gz *.jar
+      - put: build-artifacts
+        params:
+          file: build-output/artifacts.tar.gz
+
+  - name: deploy-client-to-cf
+    plan:
+      - get: source-code
+        passed: [build-and-test]
+        trigger: true
+      - get: build-artifacts
+        passed: [build-and-test]
+      - task: prepare-client-deployment
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: source-code
+            - name: build-artifacts
+          outputs:
+            - name: app-to-deploy
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                # Extract artifacts
+                mkdir -p app-to-deploy
+                tar -xzf build-artifacts/artifacts.tar.gz -C app-to-deploy
+
+                # Copy manifest
+                cp source-code/java-spring-ai-mcp/client/manifest.yml app-to-deploy/
+
+                # Find the client JAR
+                CLIENT_JAR=$(find app-to-deploy -name "*client*.jar" | head -1)
+                if [ -z "$CLIENT_JAR" ]; then
+                  echo "Client JAR not found!"
+                  exit 1
+                fi
+
+                # Rename to app.jar for Cloud Foundry
+                cp "$CLIENT_JAR" app-to-deploy/app.jar
+      - put: cf-environment
+        params:
+          command: push
+          app_name: java-spring-ai-mcp-client
+          path: app-to-deploy
+          manifest: app-to-deploy/manifest.yml
+          no_start: true
+      - put: cf-environment
+        params:
+          command: set-env
+          app_name: java-spring-ai-mcp-client
+          env:
+            SPRING_PROFILES_ACTIVE: cloud
+            OPENAI_API_KEY: ((openai_api_key))
+      - put: cf-environment
+        params:
+          command: start
+          app_name: java-spring-ai-mcp-client
+          staging_timeout: 15
+          startup_timeout: 5
+
+  - name: deploy-server-to-cf
+    plan:
+      - get: source-code
+        passed: [build-and-test]
+        trigger: true
+      - get: build-artifacts
+        passed: [build-and-test]
+      - task: prepare-server-deployment
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: source-code
+            - name: build-artifacts
+          outputs:
+            - name: app-to-deploy
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                # Extract artifacts
+                mkdir -p app-to-deploy
+                tar -xzf build-artifacts/artifacts.tar.gz -C app-to-deploy
+
+                # Copy manifest
+                cp source-code/java-spring-ai-mcp/server/manifest.yml app-to-deploy/
+
+                # Find the server JAR
+                SERVER_JAR=$(find app-to-deploy -name "*server*.jar" | head -1)
+                if [ -z "$SERVER_JAR" ]; then
+                  echo "Server JAR not found!"
+                  exit 1
+                fi
+
+                # Rename to app.jar for Cloud Foundry
+                cp "$SERVER_JAR" app-to-deploy/app.jar
+      - put: cf-environment
+        params:
+          command: push
+          app_name: java-spring-ai-mcp-server
+          path: app-to-deploy
+          manifest: app-to-deploy/manifest.yml
+          no_start: true
+      - put: cf-environment
+        params:
+          command: set-env
+          app_name: java-spring-ai-mcp-server
+          env:
+            SPRING_PROFILES_ACTIVE: cloud
+            OPENAI_API_KEY: ((openai_api_key))
+      - put: cf-environment
+        params:
+          command: start
+          app_name: java-spring-ai-mcp-server
+          staging_timeout: 15
+          startup_timeout: 5

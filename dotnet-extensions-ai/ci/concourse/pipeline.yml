@@ -1,0 +1,147 @@
+---
+# Concourse CI/CD Pipeline for dotnet-extensions-ai
+# Equivalent to GitHub Actions workflow: dotnet-extensions-ai.yml and deploy-dotnet-extensions-ai-to-tp4cf.yml
+
+resource_types:
+  - name: cf-cli
+    type: docker-image
+    source:
+      repository: nulldriver/cf-cli-resource
+      tag: latest
+
+resources:
+  - name: source-code
+    type: git
+    source:
+      uri: ((git_repo_url))
+      branch: ((git_branch))
+      paths:
+        - dotnet-extensions-ai/**
+        - dotnet-extensions-ai/ci/concourse/**
+
+  - name: build-artifacts
+    type: s3
+    source:
+      bucket: ((artifact_bucket))
+      access_key_id: ((aws_access_key))
+      secret_access_key: ((aws_secret_key))
+      region_name: ((aws_region))
+      versioned_file: dotnet-extensions-ai/artifacts.tar.gz
+
+  - name: cf-environment
+    type: cf-cli
+    source:
+      api: ((cf_api))
+      username: ((cf_username))
+      password: ((cf_password))
+      org: ((cf_org))
+      space: ((cf_space))
+
+jobs:
+  - name: build-and-test
+    plan:
+      - get: source-code
+        trigger: true
+      - task: build-and-test
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: mcr.microsoft.com/dotnet/sdk
+              tag: latest
+          inputs:
+            - name: source-code
+          outputs:
+            - name: build-output
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                cd source-code/dotnet-extensions-ai
+                # Setup .NET from global.json
+                dotnet --info
+
+                # Restore dependencies
+                echo "Restoring dependencies..."
+                dotnet restore
+
+                # Build
+                echo "Building project..."
+                dotnet build --no-restore
+
+                # Test
+                echo "Running tests..."
+                dotnet test --no-build --verbosity normal
+
+                # Publish
+                echo "Publishing application..."
+                dotnet publish -c Release -o ./publish
+
+                # Package artifacts
+                echo "Packaging artifacts..."
+                mkdir -p ../../build-output
+                tar -czf ../../build-output/artifacts.tar.gz publish
+      - put: build-artifacts
+        params:
+          file: build-output/artifacts.tar.gz
+
+  - name: deploy-to-cf
+    plan:
+      - get: source-code
+        passed: [build-and-test]
+        trigger: true
+      - get: build-artifacts
+        passed: [build-and-test]
+      - task: prepare-deployment
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: source-code
+            - name: build-artifacts
+          outputs:
+            - name: app-to-deploy
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                # Extract artifacts
+                mkdir -p app-to-deploy
+                tar -xzf build-artifacts/artifacts.tar.gz -C app-to-deploy
+
+                # Copy manifest and any other required files
+                cp source-code/dotnet-extensions-ai/manifest.yml app-to-deploy/
+      - put: cf-environment
+        params:
+          command: create-service
+          service: genai
+          plan: ((genai_plan))
+          service_instance: travel-advisor-llm
+          timeout: 300
+          wait_for_service: true
+      - put: cf-environment
+        params:
+          command: push
+          app_name: dotnet-extensions-ai
+          path: app-to-deploy
+          manifest: app-to-deploy/manifest.yml
+          no_start: true
+      - put: cf-environment
+        params:
+          command: set-env
+          app_name: dotnet-extensions-ai
+          env:
+            GOOGLEMAPS__APIKEY: ((googlemaps_api_key))
+      - put: cf-environment
+        params:
+          command: start
+          app_name: dotnet-extensions-ai
+          staging_timeout: 15
+          startup_timeout: 5

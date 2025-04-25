@@ -1,0 +1,138 @@
+---
+# Concourse CI/CD Pipeline for go-fiber-langchaingo
+# Equivalent to GitHub Actions workflow: go-fiber-langchaingo.yml and deploy-go-fiber-langchaingo-to-tp4cf.yml
+
+resource_types:
+  - name: cf-cli
+    type: docker-image
+    source:
+      repository: nulldriver/cf-cli-resource
+      tag: latest
+
+resources:
+  - name: source-code
+    type: git
+    source:
+      uri: ((git_repo_url))
+      branch: ((git_branch))
+      paths:
+        - go-fiber-langchaingo/**
+        - go-fiber-langchaingo/ci/concourse/**
+
+  - name: build-artifacts
+    type: s3
+    source:
+      bucket: ((artifact_bucket))
+      access_key_id: ((aws_access_key))
+      secret_access_key: ((aws_secret_key))
+      region_name: ((aws_region))
+      versioned_file: go-fiber-langchaingo/artifacts.tar.gz
+
+  - name: cf-environment
+    type: cf-cli
+    source:
+      api: ((cf_api))
+      username: ((cf_username))
+      password: ((cf_password))
+      org: ((cf_org))
+      space: ((cf_space))
+
+jobs:
+  - name: build-and-test
+    plan:
+      - get: source-code
+        trigger: true
+      - task: build-and-test
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: golang
+              tag: latest
+          inputs:
+            - name: source-code
+          outputs:
+            - name: build-output
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                cd source-code/go-fiber-langchaingo
+
+                # Set up Go environment
+                export GOPATH=$PWD/gopath
+                export PATH=$GOPATH/bin:$PATH
+                mkdir -p $GOPATH/src
+
+                # Build using Makefile if available, otherwise use go build
+                echo "Building application..."
+                if [ -f "Makefile" ]; then
+                  make build
+                else
+                  go build -o ./bin/app ./cmd/server
+                fi
+
+                # Run tests
+                echo "Running tests..."
+                go test ./... -v
+
+                # Package artifacts
+                echo "Packaging artifacts..."
+                mkdir -p ../../build-output
+                tar -czf ../../build-output/artifacts.tar.gz bin
+      - put: build-artifacts
+        params:
+          file: build-output/artifacts.tar.gz
+
+  - name: deploy-to-cf
+    plan:
+      - get: source-code
+        passed: [build-and-test]
+        trigger: true
+      - get: build-artifacts
+        passed: [build-and-test]
+      - task: prepare-deployment
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source:
+              repository: ubuntu
+              tag: latest
+          inputs:
+            - name: source-code
+            - name: build-artifacts
+          outputs:
+            - name: app-to-deploy
+          run:
+            path: bash
+            args:
+              - -c
+              - |
+                # Extract artifacts
+                mkdir -p app-to-deploy
+                tar -xzf build-artifacts/artifacts.tar.gz -C app-to-deploy
+
+                # Copy manifest and any other required files
+                cp source-code/go-fiber-langchaingo/manifest.yml app-to-deploy/
+      - put: cf-environment
+        params:
+          command: push
+          app_name: go-fiber-langchaingo
+          path: app-to-deploy
+          manifest: app-to-deploy/manifest.yml
+          no_start: true
+      - put: cf-environment
+        params:
+          command: set-env
+          app_name: go-fiber-langchaingo
+          env:
+            OPENAI_API_KEY: ((openai_api_key))
+      - put: cf-environment
+        params:
+          command: start
+          app_name: go-fiber-langchaingo
+          staging_timeout: 15
+          startup_timeout: 5

@@ -1,0 +1,36 @@
+# Build Task for java-spring-ai-mcp
+platform: linux
+
+image_resource:
+  type: docker-image
+  source:
+    repository: maven
+    tag: '3.9-eclipse-temurin-17'
+
+inputs:
+  - name: source-code
+
+outputs:
+  - name: build-output
+
+run:
+  path: bash
+  args:
+    - -c
+    - |
+      cd source-code/java-spring-ai-mcp
+
+      # Build with Maven
+      echo "Building with Maven..."
+      mvn -B clean package
+
+      # Package artifacts
+      echo "Packaging artifacts..."
+      mkdir -p ../../build-output
+      cp api/target/*.jar ../../build-output/ || echo "No API JAR found"
+      cp client/target/*.jar ../../build-output/ || echo "No client JAR found"
+      cp server/target/*.jar ../../build-output/ || echo "No server JAR found"
+
+      # Create a tarball of all artifacts
+      cd ../../build-output
+      tar -czf artifacts.tar.gz *.jar

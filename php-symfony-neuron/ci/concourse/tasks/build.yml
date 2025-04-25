@@ -1,0 +1,49 @@
+# Build Task for php-symfony-neuron
+platform: linux
+
+image_resource:
+  type: docker-image
+  source:
+    repository: shivammathur/php
+    tag: '8.3'
+
+inputs:
+  - name: source-code
+
+outputs:
+  - name: build-output
+
+run:
+  path: bash
+  args:
+    - -c
+    - |
+      cd source-code/php-symfony-neuron
+
+      # Validate composer files
+      echo "Validating composer.json and composer.lock..."
+      composer validate --strict
+
+      # Install dependencies
+      echo "Installing dependencies..."
+      composer install --prefer-dist --no-progress
+
+      # Run tests if available
+      echo "Running tests..."
+      if [ -d "tests" ]; then
+        vendor/bin/phpunit
+      else
+        echo "No tests directory found, skipping tests"
+      fi
+
+      # Create package
+      echo "Creating package..."
+      mkdir -p build
+      composer dump-autoload --optimize --no-dev
+      mkdir -p ../../build-output
+      zip -r ../../build-output/php-symfony-neuron.zip . -x ".git/*" "tests/*" ".env*" ".github/*" "build/*"
+
+      # Package artifacts
+      echo "Packaging artifacts..."
+      cd ../../build-output
+      tar -czf artifacts.tar.gz php-symfony-neuron.zip
