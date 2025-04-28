@@ -94,21 +94,15 @@ With API Tools disabled (for general knowledge questions):
 
 ## How to Run on Cloud Foundry
 
-### 1. Build the application
+
+### 1. Push to Cloud Foundry
 
 ```bash
-go build -o congress-chatbot cmd/server/main.go
-```
-
-### 2. Push to Cloud Foundry
-
-```bash
-source .env
 cf push --no-start
 cf set-env congress-chatbot CONGRESS_API_KEY ${CONGRESS_API_KEY}
 ```
 
-### 3. Bind to LLM Service
+### 2. Bind to LLM Service
 
 ```bash
 # List available plans for the GenAI service offering
