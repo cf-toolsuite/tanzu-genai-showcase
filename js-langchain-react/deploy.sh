@@ -50,7 +50,7 @@ echo -e "${GREEN}Pushing application to Cloud Foundry...${NC}"
 cf push --no-start
 
 # 4. Bind service if not already bound
-BINDING_EXISTS=$(cf services | grep news-aggregator-llm | grep news-aggregator || echo "")
+BINDING_EXISTS=$(cf services | grep news-aggregator-llm | grep "news-aggregator " || echo "")
 if [ -z "$BINDING_EXISTS" ]; then
   echo -e "${GREEN}Binding GenAI service to application...${NC}"
   cf bind-service news-aggregator news-aggregator-llm
