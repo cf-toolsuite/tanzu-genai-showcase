@@ -203,7 +203,22 @@ Each mode maintains its own conversation history and movie recommendations for a
 
 ## Building for Production
 
-1. Create a production-ready build:
+1. Switch to frontend directory
+
+   ```bash
+   cd frontend
+   ```
+
+2. Set up .env file as described in Local Development instructions.
+
+3. Ensure webpack and Django are installed.
+
+   ```bash
+   npm install --save-dev clean-webpack-plugin
+   pip3 install Django
+   ```
+
+4. Create a production-ready build:
 
    ```bash
    cd frontend
@@ -212,7 +227,7 @@ Each mode maintains its own conversation history and movie recommendations for a
    python manage.py collectstatic --noinput
    ```
 
-2. Set up database:
+5. Set up database:
 
    - For local testing, SQLite is fine
    - For production, configure a PostgreSQL database via DATABASE_URL
