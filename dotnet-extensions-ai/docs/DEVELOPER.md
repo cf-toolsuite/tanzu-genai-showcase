@@ -36,7 +36,7 @@ cp src/TravelAdvisor.Web/.env.example src/TravelAdvisor.Web/.env
 
 Edit the `.env` file to include:
 
-```
+```bash
 GENAI__APIKEY=your_llm_api_key
 GENAI__APIURL=your_llm_api_url
 GENAI__MODEL=your_llm_model_name
@@ -68,9 +68,12 @@ dotnet run --project src/TravelAdvisor.Web
 
 ### GenAI Integration
 
-The application uses the Semantic Kernel library to interact with LLMs. The main integration is in:
+The application uses Microsoft.Extensions.AI to interact with LLMs. The main integration is in:
 
 - `TravelAdvisorService.cs`: Handles communication with the LLM to process queries and generate recommendations
+- `AIClientFactory.cs`: Creates appropriate AI clients based on configuration
+- `AzureOpenAIClientAdapter.cs`: Adapter for Azure OpenAI
+- `CustomEndpointChatClient.cs`: Client for custom OpenAI-compatible endpoints
 
 ### Google Maps Integration
 
@@ -150,6 +153,6 @@ The application uses Tailwind CSS for styling. When making UI changes:
 
 - [.NET 9 Documentation](https://learn.microsoft.com/en-us/dotnet)
 - [Blazor Documentation](https://learn.microsoft.com/en-us/aspnet/core/blazor)
-- [Semantic Kernel Documentation](https://learn.microsoft.com/en-us/semantic-kernel/overview/)
+- [Microsoft.Extensions.AI Documentation](https://learn.microsoft.com/en-us/dotnet/ai/)
 - [Steeltoe Documentation](https://docs.steeltoe.io)
 - [Tailwind CSS Documentation](https://tailwindcss.com/docs)
