@@ -907,7 +907,10 @@ namespace TravelAdvisor.Infrastructure.Services
                 }
 
                 // Clean up the text content by removing markdown code blocks if present
-                return CleanMarkdownCodeBlocks(textContent);
+                textContent = CleanMarkdownCodeBlocks(textContent);
+
+                // Replace verbose function call messages with minimal emoji
+                return ReplaceVerboseFunctionCallMessages(textContent);
             }
             catch (Exception ex)
             {
@@ -977,6 +980,38 @@ namespace TravelAdvisor.Infrastructure.Services
 7. Phone battery: Ensure your phone is fully charged for emergencies.
 
 Would you like more specific information about any of these considerations?";
+        }
+
+        /// <summary>
+        /// Replaces verbose function call messages with minimal emoji
+        /// </summary>
+        private string ReplaceVerboseFunctionCallMessages(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            // Pattern for "no function calls were necessary" message
+            if (text.Contains("No function calls were necessary") ||
+                text.Contains("all information provided was internally generated"))
+            {
+                // Remove the entire note
+                text = System.Text.RegularExpressions.Regex.Replace(
+                    text,
+                    @"\s*\(Note:.*?function calls.*?data\.\)\s*$",
+                    " 🧠");
+            }
+            // Pattern for "function calls were used" message
+            else if (text.Contains("function call") ||
+                     text.Contains("tool was used"))
+            {
+                // Remove the entire note
+                text = System.Text.RegularExpressions.Regex.Replace(
+                    text,
+                    @"\s*\(Note:.*?function.*?used.*?\)\s*$",
+                    " 🛠️");
+            }
+
+            return text;
         }
 
         /// <summary>
