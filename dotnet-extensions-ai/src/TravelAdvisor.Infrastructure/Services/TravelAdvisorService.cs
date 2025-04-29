@@ -104,7 +104,8 @@ namespace TravelAdvisor.Infrastructure.Services
                     }
                 }
 
-                var jsonResponse = ChatMessageContentBuilder.GetContentFromResponse(response);
+                // Extract content from the response
+                var jsonResponse = GetContentFromResponse(response);
 
                 // Parse the JSON response
                 if (string.IsNullOrEmpty(jsonResponse))
@@ -310,7 +311,7 @@ namespace TravelAdvisor.Infrastructure.Services
                 // Get response from AI
                 var response = await _chatClient.GetResponseAsync(history, new ChatOptions { Temperature = 0.7f });
 
-                return ChatMessageContentBuilder.GetContentFromResponse(response) ??
+                return GetContentFromResponse(response) ??
                        "I'm sorry, I couldn't generate a detailed explanation for this recommendation.";
             }
             catch (Exception ex)
@@ -382,7 +383,7 @@ namespace TravelAdvisor.Infrastructure.Services
                     }
                 }
 
-                var content = ChatMessageContentBuilder.GetContentFromResponse(response);
+                var content = GetContentFromResponse(response);
 
                 // Check if the response is empty or contains an error message
                 if (string.IsNullOrEmpty(content))
@@ -839,5 +840,32 @@ namespace TravelAdvisor.Infrastructure.Services
         }
 
         #endregion
+
+        /// <summary>
+        /// Helper method to extract content from a ChatResponse
+        /// </summary>
+        private string? GetContentFromResponse(ChatResponse response)
+        {
+            try
+            {
+                // Check if the response has any messages
+                if (response.Messages.Count == 0)
+                {
+                    _logger.LogWarning("Response contains no messages");
+                    return null;
+                }
+
+                // Get the last message (usually the assistant's response)
+                var lastMessage = response.Messages[response.Messages.Count - 1];
+
+                // Return the text content
+                return lastMessage.Text;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error extracting content from response");
+                return null;
+            }
+        }
     }
 }

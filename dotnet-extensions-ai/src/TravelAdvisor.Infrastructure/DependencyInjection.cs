@@ -32,14 +32,18 @@ namespace TravelAdvisor.Infrastructure
             this IServiceCollection services,
             IConfiguration configuration)
         {
-            // Add Cloud Foundry service bindings
-            services.AddCloudFoundryServices(configuration);
-
             // Configure HTTP client
             services.AddHttpClient();
 
             // Check if mock data is enabled
             bool useMockData = IsMockDataEnabled();
+
+            // IMPORTANT: Configure GenAIOptions from configuration BEFORE adding Cloud Foundry services
+            // This ensures that the default values from appsettings.json are loaded first
+            services.Configure<GenAIOptions>(configuration.GetSection("GenAI"));
+
+            // Add Cloud Foundry service bindings - this will override the GenAIOptions if service bindings exist
+            services.AddCloudFoundryServices(configuration);
 
             // Register services based on environment configuration (real or mock)
             RegisterServices(services, configuration, useMockData);
@@ -114,8 +118,61 @@ namespace TravelAdvisor.Infrastructure
 
             try
             {
-                // Configure GenAIOptions from configuration
-                services.Configure<GenAIOptions>(configuration.GetSection("GenAI"));
+                // Get a logger for debugging
+                ILogger? logger = null;
+                var serviceProvider = services.BuildServiceProvider();
+                try
+                {
+                    var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
+                    if (loggerFactory != null)
+                    {
+                        logger = loggerFactory.CreateLogger("DependencyInjection");
+                    }
+                }
+                catch
+                {
+                    // If we can't get a logger, just continue without it
+                }
+
+                // Log the current configuration values for debugging
+                if (logger != null)
+                {
+                    var apiKey = configuration["GenAI:ApiKey"];
+                    var apiUrl = configuration["GenAI:ApiUrl"];
+                    var model = configuration["GenAI:Model"];
+
+                    logger.LogInformation("Configuration values from appsettings.json:");
+                    logger.LogInformation($"GenAI:ApiKey: {(string.IsNullOrEmpty(apiKey) ? "Not set" : apiKey.Substring(0, Math.Min(5, apiKey.Length)) + "...")}");
+                    logger.LogInformation($"GenAI:ApiUrl: {apiUrl}");
+                    logger.LogInformation($"GenAI:Model: {model}");
+
+                    // Also log environment variables
+                    var envApiKey = Environment.GetEnvironmentVariable("GENAI__APIKEY");
+                    var envApiUrl = Environment.GetEnvironmentVariable("GENAI__APIURL");
+                    var envModel = Environment.GetEnvironmentVariable("GENAI__MODEL");
+
+                    logger.LogInformation("Environment variables:");
+                    logger.LogInformation($"GENAI__APIKEY: {(string.IsNullOrEmpty(envApiKey) ? "Not set" : "Set (value hidden)")}");
+                    logger.LogInformation($"GENAI__APIURL: {envApiUrl}");
+                    logger.LogInformation($"GENAI__MODEL: {envModel}");
+
+                    // Get the current GenAIOptions from the service provider to see what was actually configured
+                    try {
+                        var optionsSnapshot = serviceProvider.GetService<IOptionsSnapshot<GenAIOptions>>();
+                        if (optionsSnapshot != null)
+                        {
+                            var options = optionsSnapshot.Value;
+                            logger.LogInformation("Actual GenAIOptions after service binding:");
+                            logger.LogInformation($"ApiKey: {(string.IsNullOrEmpty(options.ApiKey) ? "Not set" : options.ApiKey.Substring(0, Math.Min(5, options.ApiKey.Length)) + "...")}");
+                            logger.LogInformation($"ApiUrl: {options.ApiUrl}");
+                            logger.LogInformation($"Model: {options.Model}");
+                            logger.LogInformation($"ServiceName: {options.ServiceName}");
+                        }
+                    }
+                    catch (Exception ex) {
+                        logger.LogWarning($"Could not retrieve configured GenAIOptions: {ex.Message}");
+                    }
+                }
 
                 // Register the AI client factory
                 services.AddSingleton<IAIClientFactory, AIClientFactory>();
@@ -125,9 +182,16 @@ namespace TravelAdvisor.Infrastructure
                     var factory = sp.GetRequiredService<IAIClientFactory>();
                     var options = sp.GetRequiredService<IOptions<GenAIOptions>>().Value;
                     var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-                    var logger = loggerFactory.CreateLogger("AIClient");
+                    var clientLogger = loggerFactory.CreateLogger("AIClient");
 
-                    return factory.CreateClient(options, logger);
+                    // Log the options that will be used to create the client
+                    clientLogger.LogInformation("Creating AI client with options:");
+                    clientLogger.LogInformation($"ApiKey: {(string.IsNullOrEmpty(options.ApiKey) ? "Not set" : options.ApiKey.Substring(0, Math.Min(5, options.ApiKey.Length)) + "...")}");
+                    clientLogger.LogInformation($"ApiUrl: {options.ApiUrl}");
+                    clientLogger.LogInformation($"Model: {options.Model}");
+                    clientLogger.LogInformation($"ServiceName: {options.ServiceName}");
+
+                    return factory.CreateClient(options, clientLogger);
                 });
 
                 // Register the PromptFactory

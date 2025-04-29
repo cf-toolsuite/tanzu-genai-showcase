@@ -28,15 +28,25 @@ builder.WebHost.ConfigureKestrel(options => {
 // Initialize environment variables
 try
 {
-    // Look for .env file in the current directory or the src directory
-    string envPath = ".env";
-    if (!File.Exists(envPath))
-    {
-        envPath = Path.Combine("src", ".env");
-    }
+    // Look for .env file in various possible locations
+    string[] possiblePaths = new[] {
+        ".env",                                  // Current directory
+        Path.Combine("src", ".env"),             // src subdirectory
+        Path.Combine("src", "TravelAdvisor.Web", ".env"), // Web project directory
+        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ".env") // Application base directory
+    };
+
+    string envPath = possiblePaths.FirstOrDefault(File.Exists) ?? ".env";
 
     Console.WriteLine($"Initializing environment variables from {envPath}");
+    Console.WriteLine($"Current directory: {Directory.GetCurrentDirectory()}");
     EnvironmentVariables.Initialize(envPath, builder.Configuration);
+
+    // Log loaded environment variables for debugging
+    Console.WriteLine("Loaded environment variables:");
+    Console.WriteLine($"GENAI__APIKEY: {(string.IsNullOrEmpty(Environment.GetEnvironmentVariable("GENAI__APIKEY")) ? "Not set" : "Set (value hidden)")}");
+    Console.WriteLine($"GENAI__APIURL: {Environment.GetEnvironmentVariable("GENAI__APIURL")}");
+    Console.WriteLine($"GENAI__MODEL: {Environment.GetEnvironmentVariable("GENAI__MODEL")}");
 }
 catch (Exception ex)
 {

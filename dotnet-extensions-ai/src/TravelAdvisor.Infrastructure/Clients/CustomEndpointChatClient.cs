@@ -146,6 +146,19 @@ namespace TravelAdvisor.Infrastructure.Clients
 
             try
             {
+                // Log the raw response for debugging
+                _logger.LogDebug($"Raw API response: {responseContent}");
+
+                // Check if the response is not a valid JSON (starts with non-JSON character)
+                if (string.IsNullOrEmpty(responseContent) ||
+                    (responseContent.Length > 0 && !"{[\"".Contains(responseContent[0])))
+                {
+                    _logger.LogWarning($"Response is not valid JSON: {responseContent}");
+                    chatResponse.Messages.Add(new ChatMessage(Microsoft.Extensions.AI.ChatRole.Assistant,
+                        $"Error: Received non-JSON response from API. Please try again later."));
+                    return chatResponse;
+                }
+
                 using var jsonDoc = JsonDocument.Parse(responseContent);
                 var root = jsonDoc.RootElement;
 
@@ -156,38 +169,104 @@ namespace TravelAdvisor.Infrastructure.Clients
                     message.TryGetProperty("content", out var contentElement))
                 {
                     var content = contentElement.GetString() ?? "";
-                    var role = ChatRole.Assistant;
+                    var role = Microsoft.Extensions.AI.ChatRole.Assistant; // Default role
 
                     // Try to get the role
                     if (message.TryGetProperty("role", out var roleElement))
                     {
                         var roleStr = roleElement.GetString();
-                        if (!string.IsNullOrEmpty(roleStr) &&
-                            Enum.TryParse<ChatRole>(roleStr, true, out var parsedRole))
+                        if (!string.IsNullOrEmpty(roleStr))
                         {
-                            role = parsedRole;
+                            // Handle role mapping manually instead of using Enum.TryParse
+                            if (roleStr.Equals("assistant", StringComparison.OrdinalIgnoreCase))
+                            {
+                                role = Microsoft.Extensions.AI.ChatRole.Assistant;
+                            }
+                            else if (roleStr.Equals("user", StringComparison.OrdinalIgnoreCase))
+                            {
+                                role = Microsoft.Extensions.AI.ChatRole.User;
+                            }
+                            else if (roleStr.Equals("system", StringComparison.OrdinalIgnoreCase))
+                            {
+                                role = Microsoft.Extensions.AI.ChatRole.System;
+                            }
+                            else
+                            {
+                                _logger.LogWarning($"Unknown role value: {roleStr}, defaulting to Assistant");
+                            }
                         }
                     }
 
                     // Add the message to the response
                     chatResponse.Messages.Add(new ChatMessage(role, content));
+                    _logger.LogInformation($"Successfully extracted content from API response. Role: {role}, Content length: {content.Length}");
                     return chatResponse;
                 }
                 else
                 {
                     // If we can't find the expected structure, use the raw response
-                    _logger.LogWarning("Could not extract content from standard response structure");
-                    chatResponse.Messages.Add(new ChatMessage(ChatRole.Assistant, responseContent));
+                    _logger.LogWarning("Could not extract content from standard response structure. Response type: {ResponseType}", typeof(ChatResponse).FullName);
+
+                    // Log the JSON structure for debugging
+                    _logger.LogDebug("JSON structure: {Structure}", GetJsonStructure(root));
+
+                    chatResponse.Messages.Add(new ChatMessage(Microsoft.Extensions.AI.ChatRole.Assistant,
+                        "Error: Could not extract content from API response. Please try again later."));
                     return chatResponse;
                 }
+            }
+            catch (JsonException ex)
+            {
+                _logger.LogError(ex, "JSON parsing error in API response");
+                chatResponse.Messages.Add(new ChatMessage(Microsoft.Extensions.AI.ChatRole.Assistant,
+                    $"Error parsing API response: Invalid JSON format. Please try again later."));
+                return chatResponse;
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error parsing API response");
-                chatResponse.Messages.Add(new ChatMessage(ChatRole.Assistant,
+                _logger.LogError("Response type: {ResponseType}", typeof(ChatResponse).FullName);
+                chatResponse.Messages.Add(new ChatMessage(Microsoft.Extensions.AI.ChatRole.Assistant,
                     $"Error parsing API response: {ex.Message}"));
                 return chatResponse;
             }
+        }
+
+        /// <summary>
+        /// Helper method to get a string representation of the JSON structure for debugging
+        /// </summary>
+        private string GetJsonStructure(JsonElement element, int depth = 0)
+        {
+            var indent = new string(' ', depth * 2);
+            var result = "";
+
+            switch (element.ValueKind)
+            {
+                case JsonValueKind.Object:
+                    result += "{\n";
+                    foreach (var property in element.EnumerateObject())
+                    {
+                        result += $"{indent}  \"{property.Name}\": {GetJsonStructure(property.Value, depth + 1)},\n";
+                    }
+                    result += $"{indent}}}";
+                    break;
+                case JsonValueKind.Array:
+                    result += "[\n";
+                    foreach (var item in element.EnumerateArray())
+                    {
+                        result += $"{indent}  {GetJsonStructure(item, depth + 1)},\n";
+                    }
+                    result += $"{indent}]";
+                    break;
+                case JsonValueKind.String:
+                    result += $"\"{element.GetString()}\"";
+                    break;
+                default:
+                    result += element.ToString();
+                    break;
+            }
+
+            return result;
         }
 
         /// <summary>
