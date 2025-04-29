@@ -88,6 +88,11 @@ namespace TravelAdvisor.Infrastructure.CloudFoundry
                                             credhubCredentials.GetValue<string>("url") ??
                                             credhubCredentials.GetValue<string>("endpoint") ??
                                             credhubCredentials.GetValue<string>("openai_api_base") ?? "";
+                            // Ensure ApiUrl has a trailing slash for correct HttpClient BaseAddress behavior
+                            if (!string.IsNullOrEmpty(options.ApiUrl) && !options.ApiUrl.EndsWith("/"))
+                            {
+                                options.ApiUrl += "/";
+                            }
 
                             options.Model = credhubCredentials.GetValue<string>("model_name") ??
                                            credhubCredentials.GetValue<string>("modelName") ??
@@ -134,6 +139,11 @@ namespace TravelAdvisor.Infrastructure.CloudFoundry
                                         credentialsSection.GetValue<string>("url") ??
                                         credentialsSection.GetValue<string>("endpoint") ??
                                         credentialsSection.GetValue<string>("openai_api_base") ?? "";
+                        // Ensure ApiUrl has a trailing slash for correct HttpClient BaseAddress behavior
+                        if (!string.IsNullOrEmpty(options.ApiUrl) && !options.ApiUrl.EndsWith("/"))
+                        {
+                            options.ApiUrl += "/";
+                        }
 
                         // Try different possible field names for model
                         options.Model = credentialsSection.GetValue<string>("model_name") ??
@@ -174,6 +184,11 @@ namespace TravelAdvisor.Infrastructure.CloudFoundry
                         LogMessage(logger, "Using GenAI configuration from environment variables.", Console.WriteLine);
                         options.ApiKey = envApiKey;
                         options.ApiUrl = envApiUrl;
+                        // Ensure ApiUrl has a trailing slash for correct HttpClient BaseAddress behavior
+                        if (!string.IsNullOrEmpty(options.ApiUrl) && !options.ApiUrl.EndsWith("/"))
+                        {
+                            options.ApiUrl += "/";
+                        }
                         options.Model = envModel ?? configuration["GenAI:Model"] ?? "gpt-4o-mini"; // Default model if not specified
                         options.ServiceName = configuration["GenAI:ServiceName"] ?? "travel-advisor-llm";
                         credentialsFound = true;
@@ -197,6 +212,11 @@ namespace TravelAdvisor.Infrastructure.CloudFoundry
                         LogMessage(logger, "Using GenAI configuration from appsettings.json.", Console.WriteLine);
                         options.ApiKey = configApiKey;
                         options.ApiUrl = configApiUrl;
+                        // Ensure ApiUrl has a trailing slash for correct HttpClient BaseAddress behavior
+                        if (!string.IsNullOrEmpty(options.ApiUrl) && !options.ApiUrl.EndsWith("/"))
+                        {
+                            options.ApiUrl += "/";
+                        }
                         options.Model = configuration["GenAI:Model"] ?? "gpt-4o-mini"; // Default model if not specified
                         options.ServiceName = configuration["GenAI:ServiceName"] ?? "travel-advisor-llm";
                         credentialsFound = true;
