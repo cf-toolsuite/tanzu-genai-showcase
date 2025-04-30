@@ -42,6 +42,8 @@ try:
     from .static import * # noqa
     from .logging_config import * # noqa
     from .external_apis import * # noqa
+    from .cf_service_config import * # noqa Import Cloud Foundry service configuration
+    from .config_loader import * # noqa Import configuration loader
     from .app_config import * # noqa
     from .llm import * # noqa
 except ImportError as e:

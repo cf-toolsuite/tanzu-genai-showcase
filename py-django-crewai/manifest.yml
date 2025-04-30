@@ -1,4 +1,16 @@
 ---
+# Movie Chatbot Cloud Foundry Manifest
+#
+# Configuration Options:
+# 1. Service Bindings (highest priority)
+#    - GenAI tile service bindings for LLM configuration
+#    - User-defined services for other required/optional configuration
+# 2. Environment Variables (second priority)
+#    - Set via cf set-env or in this manifest
+# 3. config.json (third priority)
+#    - Used as a fallback when neither service bindings nor environment variables are available
+#
+# For detailed deployment instructions, see docs/CLOUD_FOUNDRY.md
 applications:
 - name: movie-chatbot
   memory: 512M
@@ -9,6 +21,22 @@ applications:
   command: python manage.py makemigrations chatbot && python manage.py migrate && gunicorn movie_chatbot.wsgi --log-file -
   path: .
   env:
+    # Django Configuration
     DJANGO_SETTINGS_MODULE: movie_chatbot.settings
     DJANGO_DEBUG: False
     DISABLE_COLLECTSTATIC: 1
+
+    # Required Configuration (uncomment and set values if not using service bindings)
+    # DJANGO_SECRET_KEY: your_django_secret_key
+    # TMDB_API_KEY: your_tmdb_api_key
+
+    # LLM Configuration (uncomment and set values if not using GenAI service binding)
+    # OPENAI_API_KEY: your_openai_api_key
+    # LLM_BASE_URL: https://api.openai.com/v1
+    # LLM_MODEL: gpt-4o-mini
+
+    # Optional Configuration (uncomment and set values to override defaults)
+    # SERPAPI_API_KEY: your_serpapi_api_key
+    # MOVIE_RESULTS_LIMIT: 5
+    # MAX_RECOMMENDATIONS: 3
+    # THEATER_SEARCH_RADIUS_MILES: 15

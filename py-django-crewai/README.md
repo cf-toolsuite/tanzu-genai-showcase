@@ -421,6 +421,7 @@ To enable debug logging:
 * [Developer Guide](./docs/DEVELOPMENT.md)
 * [Troubleshooting Guide](./docs/TROUBLESHOOTING.md)
 * [Deployment Guide](DEPLOY.md)
+   * [Cloud Foundry Deployment Guide](./docs/CLOUD_FOUNDRY.md)
    * [Scenarios Guide](./docs/DEPLOYMENT_SCENARIOS.md)
 * [API Documentation](./docs/API.md)
 * [Testing Guide](./docs/TESTING.md)

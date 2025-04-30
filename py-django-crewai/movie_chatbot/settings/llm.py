@@ -5,12 +5,9 @@ import json
 import logging
 import cfenv
 from .base import DEBUG
+from . import config_loader, cf_service_config
 
 logger = logging.getLogger(__name__)
-
-# --- Cloud Foundry Environment Setup ---
-cf_env = cfenv.AppEnv()
-logger.info("Initialized cfenv.AppEnv() for LLM config.")
 
 # --- GenAI Service Processor ---
 class GenAIChatProcessor:
@@ -65,43 +62,57 @@ class GenAIChatProcessor:
 
         return config
 
-# --- LLM Configuration Function ---
+# --- LLM Configuration Functions ---
 def get_llm_config():
-    processor = GenAIChatProcessor()
+    """
+    Get LLM configuration with priority:
+    1. GenAI service binding
+    2. User-provided service
+    3. Environment variables
+    4. config.json
 
-    # Try to find GenAI service
+    Returns:
+        Dictionary with LLM configuration
+    """
+    # Initialize processor for GenAI services
+    processor = GenAIChatProcessor()
+    cf_env = cfenv.AppEnv()
+
+    # 1. Try to find GenAI service
     for service in cf_env.services:
         if processor.accept(service):
             logger.info(f"LLM Config: Found GenAI chat service: {service.name}")
             config = processor.process(service.credentials)
             if config:
-                logger.info(f"LLM Config: Successfully extracted configuration")
+                logger.info(f"LLM Config: Successfully extracted configuration from GenAI service")
                 return config
 
-    # Fallback: Try finding by specific labels
+    # 2. Fallback: Try finding by specific labels
     try:
         genai_service = cf_env.get_service(label='genai')
         if genai_service:
             logger.info(f"LLM Config: Found service binding with label 'genai': {genai_service.name}")
             config = processor.process(genai_service.credentials)
             if config:
+                logger.info(f"LLM Config: Successfully extracted configuration from 'genai' service")
                 return config
     except Exception as e:
-        logger.error(f"LLM Config: Error getting service with label 'genai': {e}", exc_info=True)
+        logger.debug(f"LLM Config: Error getting service with label 'genai': {e}")
 
-    # Fallback: Try finding by name
+    # 3. Fallback: Try finding by name
     try:
         genai_service = cf_env.get_service(name='movie-chatbot-llm')
         if genai_service:
             logger.info(f"LLM Config: Found service binding with name 'movie-chatbot-llm'")
             config = processor.process(genai_service.credentials)
             if config:
+                logger.info(f"LLM Config: Successfully extracted configuration from 'movie-chatbot-llm' service")
                 return config
     except Exception as e:
-        logger.error(f"LLM Config: Error getting service with name 'movie-chatbot-llm': {e}", exc_info=True)
+        logger.debug(f"LLM Config: Error getting service with name 'movie-chatbot-llm': {e}")
 
-    # Fallback to environment variables
-    model_str = os.getenv('LLM_MODEL', 'gpt-4o-mini')
+    # 4. Fallback to environment variables or config.json
+    model_str = config_loader.get_config('LLM_MODEL', 'gpt-4o-mini')
     provider = None
 
     # Extract provider from model string if present (format: "provider/model")
@@ -112,12 +123,12 @@ def get_llm_config():
             logger.info(f"Detected provider in model string: {provider}/{model_name}")
     else:
         # Check if there's an explicit provider setting
-        provider = os.getenv('LLM_PROVIDER', 'openai')
-        logger.info(f"Using provider from environment: {provider}")
+        provider = config_loader.get_config('LLM_PROVIDER', 'openai')
+        logger.info(f"Using provider from configuration: {provider}")
 
     config = {
-        'api_key': os.getenv('OPENAI_API_KEY') or os.getenv('LLM_API_KEY'),
-        'base_url': os.getenv('LLM_BASE_URL') or os.getenv('OPENAI_BASE_URL'),
+        'api_key': config_loader.get_config('OPENAI_API_KEY') or config_loader.get_config('LLM_API_KEY'),
+        'base_url': config_loader.get_config('LLM_BASE_URL') or config_loader.get_config('OPENAI_BASE_URL'),
         'model': model_str
     }
 
@@ -132,66 +143,29 @@ def get_llm_config():
     if not config['base_url']:
         logger.warning("LLM Config: Could not find base URL.")
     if config['api_key'] or config['base_url']:
-        logger.info("LLM Config: Using configuration from environment variables.")
+        logger.info("LLM Config: Using configuration from environment variables or config.json")
 
     return config
 
-# --- Cloud Foundry Diagnostics Function ---
-def diagnose_cf_environment():
-    """Print diagnostic information about CF environment and services"""
-    logger.info("--- CF Environment Diagnostics ---")
-    # Basic check using cfenv attributes
-    is_cf = hasattr(cf_env, 'app') and cf_env.app is not None
-    logger.info(f"Running in Cloud Foundry (detected by cfenv): {is_cf}")
+def get_llm_api_key():
+    """Get LLM API key"""
+    return LLM_CONFIG.get('api_key')
 
-    if is_cf:
-        try:
-            logger.info(f"App Name: {cf_env.name}, Instance Index: {cf_env.index}")
-            # Access space/org info if available (might require VCAP_APPLICATION)
-            vcap_app = cf_env.app if hasattr(cf_env, 'app') else {}
-            logger.info(f"Space: {vcap_app.get('space_name', 'N/A')}, Org: {vcap_app.get('organization_name', 'N/A')}")
+def get_llm_base_url():
+    """Get LLM base URL"""
+    return LLM_CONFIG.get('base_url')
 
-            all_services = cf_env.services
-            if all_services:
-                logger.info(f"Bound Services ({len(all_services)}):")
-                for service in all_services:
-                    # Use cfenv's service object attributes with safe access
-                    service_info = []
-                    if hasattr(service, 'name'):
-                        service_info.append(f"Name: {service.name}")
-                    if hasattr(service, 'label'):
-                        service_info.append(f"Label: {service.label}")
-                    elif hasattr(service, 'tags') and service.tags:
-                        service_info.append(f"Tags: {', '.join(service.tags)}")
-                    if hasattr(service, 'plan'):
-                        service_info.append(f"Plan: {service.plan}")
+def get_llm_model():
+    """Get LLM model"""
+    return LLM_CONFIG.get('model')
 
-                    logger.info(f"  - {', '.join(service_info)}")
-
-                    if hasattr(service, 'credentials') and service.credentials:
-                        if isinstance(service.credentials, dict):
-                            logger.info(f"    Credential Keys: {list(service.credentials.keys())}")
-                            if 'credhub-ref' in service.credentials:
-                                logger.info(f"    Contains credhub-ref: {service.credentials['credhub-ref']}")
-
-                            # Check for model_capabilities specifically
-                            if 'model_capabilities' in service.credentials:
-                                logger.info(f"    Model Capabilities: {service.credentials['model_capabilities']}")
-                        else:
-                            logger.info(f"    Credentials type: {type(service.credentials)}")
-                    else:
-                        logger.info("    Credentials not available or empty.")
-            else:
-                logger.info("No bound services found via cfenv.")
-        except Exception as e:
-            logger.error(f"Error during CF diagnostics: {e}", exc_info=True)
-    else:
-        logger.info("Not running in Cloud Foundry (or cfenv couldn't detect it).")
-    logger.info("--- End CF Environment Diagnostics ---")
+def get_llm_provider():
+    """Get LLM provider"""
+    return LLM_CONFIG.get('provider')
 
 # --- Assign LLM Configuration ---
 LLM_CONFIG = get_llm_config()
 
 # Run diagnostics
 if DEBUG:
-    diagnose_cf_environment()
+    cf_service_config.diagnose_cf_environment()

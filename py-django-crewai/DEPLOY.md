@@ -16,6 +16,7 @@ This document provides comprehensive deployment instructions for the Movie Chatb
 - [Scaling Considerations](#scaling-considerations)
 - [Common Issues & Troubleshooting](#common-issues--troubleshooting)
 - [Deployment Checklist](#deployment-checklist)
+- [Additional Documentation](#additional-documentation)
 
 ## Deployment Prerequisites
 
@@ -126,6 +127,7 @@ The application includes CI/CD configurations for multiple platforms to automate
 ### GitHub Actions
 
 The GitHub Actions workflow (`.github/workflows/py-django-crewai.yml`) automates:
+
 - Backend testing with Django test framework
 - Frontend building with Node.js and npm
 - Static file collection
@@ -139,6 +141,7 @@ For deployment via GitHub Actions, use the on-demand Cloud Foundry deployment wo
 ### GitLab CI
 
 The GitLab CI configuration (`ci/gitlab/.gitlab-ci.yml`) provides:
+
 - Backend testing
 - Frontend building
 - Static file collection
@@ -148,6 +151,7 @@ The GitLab CI configuration (`ci/gitlab/.gitlab-ci.yml`) provides:
 The pipeline is organized into stages: install, test, build, package, and deploy.
 
 To enable automatic deployment, set the following CI/CD variables in GitLab:
+
 - `CF_API`: Cloud Foundry API endpoint
 - `CF_USERNAME`: Cloud Foundry username
 - `CF_PASSWORD`: Cloud Foundry password
@@ -158,6 +162,7 @@ To enable automatic deployment, set the following CI/CD variables in GitLab:
 ### Jenkins
 
 The Jenkins pipeline (`ci/jenkins/Jenkinsfile`) includes:
+
 - Backend testing
 - Frontend building
 - Static file collection
@@ -167,6 +172,7 @@ The Jenkins pipeline (`ci/jenkins/Jenkinsfile`) includes:
 The pipeline uses Jenkins' built-in caching mechanisms to speed up builds.
 
 To enable automatic deployment, set the following environment variables in Jenkins:
+
 - `CF_API`: Cloud Foundry API endpoint (as a Jenkins credential)
 - `CF_USERNAME`: Cloud Foundry username (as a Jenkins credential)
 - `CF_PASSWORD`: Cloud Foundry password (as a Jenkins credential)
@@ -177,6 +183,7 @@ To enable automatic deployment, set the following environment variables in Jenki
 ### Bitbucket Pipelines
 
 The Bitbucket Pipelines configuration (`ci/bitbucket/bitbucket-pipelines.yml`) provides:
+
 - Backend testing
 - Frontend building
 - Static file collection
@@ -187,6 +194,7 @@ The Bitbucket Pipelines configuration (`ci/bitbucket/bitbucket-pipelines.yml`) p
 The pipeline uses parallel steps to speed up the build process.
 
 To enable deployment, set the following repository variables in Bitbucket:
+
 - `CF_API`: Cloud Foundry API endpoint
 - `CF_USERNAME`: Cloud Foundry username
 - `CF_PASSWORD`: Cloud Foundry password
@@ -578,6 +586,12 @@ Use this checklist before deployment to production:
 - [ ] Verify CSRF protection is enabled
 - [ ] Ensure sensitive environment variables are properly set
 - [ ] Check that database connections are secured (if applicable)
+
+## Additional Documentation
+
+For more detailed information about Cloud Foundry deployment scenarios, refer to:
+
+- [Cloud Foundry Deployment Guide](./docs/CLOUD_FOUNDRY.md) - Detailed guide for deploying with different configuration options
 
 ## Additional Resources
 
