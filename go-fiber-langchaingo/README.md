@@ -131,12 +131,27 @@ cf start congress-chatbot
 - **Congress.gov API**: External API for fetching legislative data
 - **GenAI LLM Service**: Large language model service provided by Tanzu Platform for Cloud Foundry
 
+## Documentation
+
+Detailed documentation is available in the `docs/` directory:
+
+- [Architecture](docs/ARCHITECTURE.md): System architecture, components, and data flow
+- [API](docs/API.md): API endpoints and usage
+- [Development](docs/DEVELOPMENT.md): Development setup and workflow
+- [Deployment](docs/DEPLOYMENT.md): Deployment instructions and environments
+- [Testing](docs/TESTING.md): Testing strategies and procedures
+- [Troubleshooting](docs/TROUBLESHOOTING.md): Common issues and solutions
+- [Features](docs/FEATURES.md): Detailed feature descriptions
+- [Implementation](docs/IMPLEMENTATION.md): Implementation details
+- [Logging](docs/LOGGING.md): Logging configuration and usage
+
 ## Project Structure
 
 ```bash
 ├── api/            # API clients (Congress.gov)
 ├── cmd/            # Application entry points
 ├── config/         # Configuration handling
+├── docs/           # Documentation
 ├── internal/       # Private application code
 ├── pkg/            # Public libraries
 ├── .env.example    # Example environment variables
