@@ -15,9 +15,40 @@ const path = require('path');
 const { ChatOpenAI } = require('@langchain/openai');
 const { HumanMessage, SystemMessage } = require('@langchain/core/messages');
 const axios = require('axios');
+const net = require('net');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const DEFAULT_PORT = process.env.PORT || 3001;
+
+// Function to check if a port is in use
+function isPortInUse(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer()
+      .once('error', () => {
+        // Port is in use
+        resolve(true);
+      })
+      .once('listening', () => {
+        // Port is free
+        server.close();
+        resolve(false);
+      })
+      .listen(port);
+  });
+}
+
+// Function to find an available port
+async function findAvailablePort(startPort) {
+  let port = startPort;
+  while (await isPortInUse(port)) {
+    port++;
+    if (port > startPort + 100) {
+      // Avoid infinite loop, limit to 100 ports
+      throw new Error('Could not find an available port');
+    }
+  }
+  return port;
+}
 
 // Middleware
 app.use(cors());
@@ -196,7 +227,32 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Start the server with port detection
+(async () => {
+  try {
+    // Check if default port is available
+    const port = await findAvailablePort(DEFAULT_PORT);
+
+    // If we're using a different port than the default, update the environment variable
+    if (port !== DEFAULT_PORT) {
+      console.log(`Port ${DEFAULT_PORT} is in use, using port ${port} instead`);
+      process.env.PORT = port;
+    }
+
+    app.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+      console.log(`API available at http://localhost:${port}/api/news`);
+
+      // If we're using a different port, provide instructions for the frontend
+      if (port !== DEFAULT_PORT) {
+        console.log('\nIMPORTANT: The server is running on a different port than expected.');
+        console.log('You may need to update your frontend configuration:');
+        console.log(`1. Set REACT_APP_API_BASE_URL=http://localhost:${port} in your .env file`);
+        console.log('2. Restart the React development server');
+      }
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+})();
