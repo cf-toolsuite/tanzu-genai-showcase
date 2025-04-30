@@ -279,7 +279,7 @@ class FindTheatersTool(BaseTool):
                 # Add a variable delay between requests to avoid rate limiting (except for first request)
                 if index > 0:
                     # Get configurable delay values from settings with defaults
-                    base_delay = getattr(settings, 'SERPAPI_REQUEST_BASE_DELAY', 10.0)
+                    base_delay = getattr(settings, 'SERPAPI_REQUEST_BASE_DELAY', 5.0)
                     per_movie_delay = getattr(settings, 'SERPAPI_PER_MOVIE_DELAY', 3.0)
 
                     # Increase delay for subsequent requests to prevent rate limiting

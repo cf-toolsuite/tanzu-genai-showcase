@@ -1,0 +1,30 @@
+{
+  "DJANGO_SECRET_KEY": "replace_me",
+  "DJANGO_DEBUG": "True",
+  "DJANGO_ALLOWED_HOSTS": "0.0.0.0",
+  "DATABASE_URL": "sqlite:///db.sqlite3",
+  "TMDB_API_KEY": "replace_me",
+  "SERPAPI_API_KEY": "replace_me",
+  "DJANGO_READ_DOT_ENV_FILE": "True",
+
+  "OPENAI_API_KEY": "replace_me",
+  "LLM_BASE_URL": "https://api.openai.com/v1",
+  "LLM_MODEL": "gpt-4o-mini",
+  "LLM_PROVIDER": "openai",
+
+  "MOVIE_RESULTS_LIMIT": "10",
+  "MAX_RECOMMENDATIONS": "5",
+  "MAX_SHOWTIMES_PER_THEATER": "10",
+  "THEATER_SEARCH_RADIUS_MILES": "15",
+  "DEFAULT_SEARCH_START_YEAR": "1900",
+
+  "API_REQUEST_TIMEOUT_SECONDS": "180",
+  "API_MAX_RETRIES": "10",
+  "API_RETRY_BACKOFF_FACTOR": "1.3",
+
+  "SERPAPI_REQUEST_BASE_DELAY": "5.0",
+  "SERPAPI_PER_MOVIE_DELAY": "2.0",
+  "SERPAPI_MAX_RETRIES": "2",
+  "SERPAPI_BASE_RETRY_DELAY": "3.0",
+  "SERPAPI_RETRY_MULTIPLIER": "1.5"
+}
