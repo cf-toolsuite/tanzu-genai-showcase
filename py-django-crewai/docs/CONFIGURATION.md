@@ -22,6 +22,26 @@ The following configuration values are required for the application to function 
 | `TMDB_API_KEY` | API key for The Movie Database | Yes | None |
 | `SERPAPI_API_KEY` | API key for SerpAPI (for theater data) | Recommended | None |
 
+## Application Server Configuration
+
+The application uses Gunicorn as the WSGI server. The following configuration options are available:
+
+| Name | Description | Required | Default |
+|------|-------------|----------|---------|
+| `--timeout` | Worker timeout in seconds | No | 30 |
+
+The worker timeout is set in the Procfile and manifest.yml:
+
+```bash
+# In Procfile
+web: gunicorn movie_chatbot.wsgi --log-file - --timeout 120
+
+# In manifest.yml
+command: python manage.py makemigrations chatbot && python manage.py migrate && gunicorn movie_chatbot.wsgi --log-file - --timeout 120
+```
+
+The default worker timeout is 30 seconds, but we've increased it to 120 seconds to accommodate longer LLM API calls. If you're experiencing worker timeout issues, you may need to increase this value further.
+
 ## Configuration Sources
 
 ### Service Bindings (Cloud Foundry)

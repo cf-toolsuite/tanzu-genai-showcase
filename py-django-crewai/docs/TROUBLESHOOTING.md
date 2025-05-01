@@ -1049,6 +1049,43 @@ This document provides guidance on troubleshooting common issues with the Movie 
    - Check for platform-specific dependencies
    - Use compatible package versions
 
+### Worker Timeout Issues
+
+**Symptoms**:
+
+- "WORKER TIMEOUT (pid:XXX)" errors in logs
+- Requests taking longer than 30 seconds fail
+- LLM API calls get interrupted
+- Error stack traces ending with SSL read operations
+
+**Solutions**:
+
+1. **Increase Gunicorn worker timeout**:
+
+   The default Gunicorn worker timeout is 30 seconds, which may not be enough for LLM API calls that can take longer to complete.
+
+   ```bash
+   # In Procfile
+   web: gunicorn movie_chatbot.wsgi --log-file - --timeout 120
+
+   # In manifest.yml
+   command: python manage.py makemigrations chatbot && python manage.py migrate && gunicorn movie_chatbot.wsgi --log-file - --timeout 120
+   ```
+
+   This increases the timeout from 30 seconds to 120 seconds, giving the LLM API more time to respond.
+
+2. **Optimize LLM API calls**:
+
+   - Use smaller models with faster response times
+   - Reduce the complexity of prompts
+   - Set explicit timeouts on API calls
+
+3. **Implement asynchronous processing**:
+
+   - Use Celery or Django Channels for background processing
+   - Implement a polling mechanism for long-running tasks
+   - Return immediate responses and update results asynchronously
+
 ### Service Binding Issues
 
 **Symptoms**:
