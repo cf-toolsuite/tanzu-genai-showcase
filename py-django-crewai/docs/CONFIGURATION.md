@@ -34,13 +34,13 @@ The worker timeout is set in the Procfile and manifest.yml:
 
 ```bash
 # In Procfile
-web: gunicorn movie_chatbot.wsgi --log-file - --timeout 120
+web: gunicorn movie_chatbot.wsgi --log-file - --timeout 600
 
 # In manifest.yml
-command: python manage.py makemigrations chatbot && python manage.py migrate && gunicorn movie_chatbot.wsgi --log-file - --timeout 120
+command: python manage.py makemigrations chatbot && python manage.py migrate && gunicorn movie_chatbot.wsgi --log-file - --timeout 600
 ```
 
-The default worker timeout is 30 seconds, but we've increased it to 120 seconds to accommodate longer LLM API calls. If you're experiencing worker timeout issues, you may need to increase this value further.
+The default worker timeout is 30 seconds, but we've increased it to 600 seconds to accommodate longer LLM API calls. If you're experiencing worker timeout issues, you may need to increase this value further.
 
 ## Configuration Sources
 

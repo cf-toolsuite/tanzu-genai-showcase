@@ -18,7 +18,7 @@ applications:
   instances: 1
   buildpacks:
     - python_buildpack
-  command: python manage.py makemigrations chatbot && python manage.py migrate && gunicorn movie_chatbot.wsgi --log-file - --timeout 120
+  command: python manage.py makemigrations chatbot && python manage.py migrate && gunicorn movie_chatbot.wsgi --log-file - --timeout 600
   path: .
   env:
     # Django Configuration
