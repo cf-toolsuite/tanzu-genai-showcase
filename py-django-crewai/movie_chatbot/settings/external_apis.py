@@ -1,11 +1,11 @@
 # movie_chatbot/settings/external_apis.py
 
-import os
+from . import config_loader
 
 # --- External API Keys ---
 
 # The Movie Database API Key (for movie data)
-TMDB_API_KEY = os.getenv('TMDB_API_KEY')
+TMDB_API_KEY = config_loader.get_required_config('TMDB_API_KEY')
 
 # SerpAPI Configuration for movie showtimes
-SERPAPI_API_KEY = os.getenv('SERPAPI_API_KEY')
+SERPAPI_API_KEY = config_loader.get_required_config('SERPAPI_API_KEY')

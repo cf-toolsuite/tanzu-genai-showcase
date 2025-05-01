@@ -41,16 +41,24 @@ try:
     from .database import * # noqa
     from .static import * # noqa
     from .logging_config import * # noqa
-    from .external_apis import * # noqa
-    from .cf_service_config import * # noqa Import Cloud Foundry service configuration
     from .config_loader import * # noqa Import configuration loader
+    from .cf_service_config import * # noqa Import Cloud Foundry service configuration
+    from .external_apis import * # noqa
     from .app_config import * # noqa
     from .llm import * # noqa
+    from .validation import validate_required_configuration  # Import validation function
 except ImportError as e:
     logger.error(f"Error importing settings module: {e}", exc_info=True)
     raise
 
 logger.info("All settings modules loaded successfully.")
+
+# Validate required configuration
+try:
+    validate_required_configuration()
+except Exception as e:
+    logger.error(f"Error validating configuration: {e}", exc_info=True)
+    logger.warning("Application may not function correctly due to configuration issues")
 
 # Optional: Environment-specific overrides
 # if os.getenv('DJANGO_ENV') == 'production':

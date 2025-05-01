@@ -181,6 +181,67 @@ This document provides guidance on troubleshooting common issues with the Movie 
        print(f"API key error: {str(e)}")
    ```
 
+### Configuration Loading Issues
+
+**Symptoms**:
+
+- "1 validation error for EnhanceMovieImagesTool" in logs
+- "tmdb_api_key: Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]" error
+- Movie image enhancement not working
+
+**Solutions**:
+
+1. **Check configuration loading**:
+
+   - Verify that API keys are loaded using the proper configuration loader functions
+   - Check that `external_apis.py` uses `config_loader.get_config()` or `config_loader.get_required_config()`
+
+   ```python
+   # Correct implementation in movie_chatbot/settings/external_apis.py
+   from . import config_loader
+
+   # The Movie Database API Key (for movie data)
+   TMDB_API_KEY = config_loader.get_required_config('TMDB_API_KEY')
+   ```
+
+2. **Verify configuration sources**:
+
+   - Check that the API key is present in one of the configuration sources:
+     1. Service bindings (highest priority)
+     2. Environment variables
+     3. config.json file
+
+   ```bash
+   # Check environment variable
+   echo $TMDB_API_KEY
+
+   # Check config.json
+   cat config.json | grep TMDB_API_KEY
+
+   # Check service bindings in Cloud Foundry
+   cf env movie-chatbot
+   ```
+
+3. **Run configuration validation**:
+
+   - The application includes a validation function that checks for required configuration values
+   - Check the logs for validation results
+
+   ```bash
+   # Enable debug logging to see validation results
+   LOG_LEVEL=DEBUG
+   python manage.py runserver
+   ```
+
+4. **Create a user-provided service with the API key**:
+
+   ```bash
+   # For Cloud Foundry deployments
+   cf create-user-provided-service movie-chatbot-config -p '{"TMDB_API_KEY":"your-tmdb-api-key"}'
+   cf bind-service movie-chatbot movie-chatbot-config
+   cf restage movie-chatbot
+   ```
+
 ### TMDb API Issues
 
 **Symptoms**:

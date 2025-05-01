@@ -62,9 +62,18 @@ class MovieCrewManager:
         self.timezone = timezone
         self.llm_provider = llm_provider
 
+        # Log initialization details for debugging
+        logger.info(f"Initializing MovieCrewManager with LLM model: {model}")
+        logger.info(f"TMDB API key: {'present' if tmdb_api_key else 'missing'}")
+        logger.info(f"User location: {user_location or 'not provided'}")
+        logger.info(f"User timezone: {timezone or 'not provided'}")
+
         # Configure TMDb API if key is provided
         if tmdb_api_key:
             tmdb.API_KEY = tmdb_api_key
+            logger.info("TMDb API configured successfully")
+        else:
+            logger.warning("TMDb API key is missing - movie image enhancement will be unavailable")
 
     @LoggingMiddleware.log_method_call
     def create_llm(self, temperature: float = 0.5) -> ChatOpenAI:
