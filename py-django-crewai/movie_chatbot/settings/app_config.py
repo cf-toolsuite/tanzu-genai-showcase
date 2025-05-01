@@ -21,7 +21,7 @@ DEFAULT_SEARCH_START_YEAR = config_loader.get_int_config('DEFAULT_SEARCH_START_Y
 # --- API Request Configuration ---
 
 # Maximum seconds to wait for API responses
-API_REQUEST_TIMEOUT = config_loader.get_int_config('API_REQUEST_TIMEOUT_SECONDS', 180)  # Increased from 120 to 180
+API_REQUEST_TIMEOUT = config_loader.get_int_config('API_REQUEST_TIMEOUT_SECONDS', 180)  # Increased from 600 to 180
 # Maximum number of retry attempts for failed API requests
 API_MAX_RETRIES = config_loader.get_int_config('API_MAX_RETRIES', 10)  # Reduced from 15 to 10
 # Exponential backoff factor between retries (in seconds)

@@ -1066,13 +1066,13 @@ This document provides guidance on troubleshooting common issues with the Movie 
 
    ```bash
    # In Procfile
-   web: gunicorn movie_chatbot.wsgi --log-file - --timeout 120
+   web: gunicorn movie_chatbot.wsgi --log-file - --timeout 600
 
    # In manifest.yml
-   command: python manage.py makemigrations chatbot && python manage.py migrate && gunicorn movie_chatbot.wsgi --log-file - --timeout 120
+   command: python manage.py makemigrations chatbot && python manage.py migrate && gunicorn movie_chatbot.wsgi --log-file - --timeout 600
    ```
 
-   This increases the timeout from 30 seconds to 120 seconds, giving the LLM API more time to respond.
+   This increases the timeout from 30 seconds to 600 seconds, giving the LLM API more time to respond.
 
 2. **Optimize LLM API calls**:
 
