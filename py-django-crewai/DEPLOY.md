@@ -91,7 +91,7 @@ Additional requirements:
 
 The vendor approach pre-packages the essential dependencies for deployment, which can be useful in environments with limited internet access during staging.
 
-1. Run the deployment script:
+1.a Run the deployment script:
 
    ```bash
    ./deploy-on-tp4cf.sh
@@ -102,19 +102,19 @@ The vendor approach pre-packages the essential dependencies for deployment, whic
    - Collect static files
    - Stage the app artifact on Cloud Foundry
 
-2. If you prefer to run the steps manually:
+1.b. If you prefer to run the steps manually:
 
    ```bash
    # Set up the vendor directory
    ./setup-vendor.sh
 
    # Deploy to Cloud Foundry
-   cf push
+   cf push --no-start
    ```
 
-3. Configure environment variables and services (see sections below)
+2. Configure environment variables and services (see sections below)
 
-4. Start the application:
+3. Start the application:
 
    ```bash
    cf start movie-chatbot
