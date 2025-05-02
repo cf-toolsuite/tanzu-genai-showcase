@@ -2,8 +2,9 @@
 Theater Finder Agent for the movie crew.
 """
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from crewai import Agent
+from crewai.tools import BaseTool
 from langchain_openai import ChatOpenAI
 
 # Get the logger
@@ -13,7 +14,7 @@ class TheaterFinderAgent:
     """Agent for finding theaters showing the recommended movies."""
 
     @staticmethod
-    def create(llm: ChatOpenAI) -> Agent:
+    def create(llm: ChatOpenAI, tools: Optional[List[BaseTool]] = None) -> Agent:
         """
         Create the Theater Finder agent.
 
@@ -38,5 +39,6 @@ class TheaterFinderAgent:
                       3. If all attempts fail, return an empty array rather than giving an error""",
             verbose=True,
             llm=llm,
+            tools=tools or [],
             max_iterations=2  # Limit retries to avoid infinite loops
         )

@@ -4,16 +4,33 @@ Tool for analyzing user preferences and recommending movies.
 import json
 import logging
 from datetime import datetime
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Union
 from crewai.tools import BaseTool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 # Get the logger
 logger = logging.getLogger('chatbot.movie_crew')
 
 class AnalyzePreferencesInput(BaseModel):
     """Input schema for AnalyzePreferencesTool."""
-    movies_json: str = Field(default="", description="JSON string containing movies to analyze")
+    movies_json: Union[str, List[Dict[str, Any]], Dict[str, Any]] = Field(default="", description="JSON string containing movies to analyze")
+
+    @field_validator('movies_json')
+    def validate_movies_json(cls, v):
+        """Convert dictionaries or lists to string if needed."""
+        if isinstance(v, dict):
+            # Check if this is a dictionary with a nested 'movies_json' key - common LLM pattern
+            if 'movies_json' in v and isinstance(v['movies_json'], (str, list, dict)):
+                return v['movies_json'] if isinstance(v['movies_json'], str) else json.dumps(v['movies_json'])
+            # Check for other common structures
+            if 'movies' in v and isinstance(v['movies'], (list, dict)):
+                return json.dumps(v['movies'])
+            # Default to JSON conversion of the entire dict
+            return json.dumps(v)
+        elif isinstance(v, list):
+            # Convert list directly to JSON string
+            return json.dumps(v)
+        return v
 
 class AnalyzePreferencesTool(BaseTool):
     """Tool for analyzing user preferences and recommending the best movies."""
@@ -22,7 +39,7 @@ class AnalyzePreferencesTool(BaseTool):
     description: str = "Analyze user preferences and recommend the best movies from the provided list."
     args_schema: type[AnalyzePreferencesInput] = AnalyzePreferencesInput
 
-    def _run(self, movies_json: str = "") -> str:
+    def _run(self, movies_json: Union[str, List[Dict[str, Any]], Dict[str, Any]] = "") -> str:
         """
         Analyze user preferences and recommend the best movies from the provided list.
 
@@ -33,6 +50,24 @@ class AnalyzePreferencesTool(BaseTool):
             JSON string containing recommended movies
         """
         try:
+            # Convert non-string inputs to JSON strings with more detailed handling
+            if isinstance(movies_json, dict):
+                # Check if this is a dictionary with a nested 'movies_json' key
+                if 'movies_json' in movies_json and isinstance(movies_json['movies_json'], (str, list, dict)):
+                    if isinstance(movies_json['movies_json'], str):
+                        movies_json = movies_json['movies_json']
+                    else:
+                        movies_json = json.dumps(movies_json['movies_json'])
+                # Check for other common structures
+                elif 'movies' in movies_json and isinstance(movies_json['movies'], (list, dict)):
+                    movies_json = json.dumps(movies_json['movies'])
+                else:
+                    # Default to JSON conversion of the entire dict
+                    movies_json = json.dumps(movies_json)
+            elif isinstance(movies_json, list):
+                # Convert list directly to JSON string
+                movies_json = json.dumps(movies_json)
+
             # Default to empty list if the input is empty
             if not movies_json:
                 movies_json = "[]"

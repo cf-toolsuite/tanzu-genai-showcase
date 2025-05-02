@@ -186,7 +186,6 @@ class SerpShowtimeService:
         Returns:
             List of theater dictionaries with formatted showtimes
         """
-
         # Log the top-level keys to understand the structure
         result_keys = list(results.keys()) if isinstance(results, dict) else []
         logger.info(f"SerpAPI result keys: {result_keys}")
@@ -218,11 +217,18 @@ class SerpShowtimeService:
 
             # Process each day in the showtimes data
             for day_data in results['showtimes']:
+                # Enhanced logging for day data
                 day_name = day_data.get('day', 'Today')
                 logger.info(f"Processing showtimes for day: {day_name}")
 
+                # Check if 'theaters' key exists for this day
+                if 'theaters' not in day_data:
+                    logger.warning(f"No 'theaters' key found for day {day_name}")
+                    continue
+
                 # Extract date information from day_name string
                 day_date = self._extract_date_from_day_string(day_name)
+                logger.info(f"Extracted date: {day_date} from day string: {day_name}")
 
                 # Process each theater for this day
                 for theater_data in day_data.get('theaters', []):
@@ -230,6 +236,9 @@ class SerpShowtimeService:
                     theater_address = theater_data.get('address', '')
                     theater_distance_str = theater_data.get('distance', '')
                     theater_link = theater_data.get('link', '')
+
+                    # Enhanced logging for theater data
+                    logger.debug(f"Processing theater: {theater_name}, Address: {theater_address}, Distance: {theater_distance_str}")
 
                     # Parse distance (e.g., "21.0 mi" -> 21.0)
                     distance_miles = self._parse_distance(theater_distance_str)
@@ -241,10 +250,15 @@ class SerpShowtimeService:
 
                     logger.info(f"Processing theater: {theater_name} (Distance: {distance_miles} miles)")
 
+                    # FIXED: Check if 'showing' exists in the theater data
+                    if 'showing' not in theater_data:
+                        logger.warning(f"Theater '{theater_name}' has no 'showing' key")
+                        continue
+
                     # Process showing array - this should be a list of showing objects
                     showing_array = theater_data.get('showing', [])
                     if not showing_array:
-                        logger.warning(f"Theater '{theater_name}' has no showing data")
+                        logger.warning(f"Theater '{theater_name}' has empty showing data")
                         continue
 
                     # Track showtimes for this theater on this day
@@ -253,10 +267,14 @@ class SerpShowtimeService:
                     # Process each showing entry in the array
                     for showing in showing_array:
                         # The 'time' field should be an array of time strings (e.g., ["1:30pm", "4:00pm"])
-                        time_array = showing.get('time', [])
+                        # FIXED: Better handling of missing 'time' key
+                        if 'time' not in showing:
+                            logger.warning(f"Showing for theater '{theater_name}' has no 'time' key")
+                            continue
 
+                        time_array = showing.get('time', [])
                         if not time_array:
-                            logger.warning(f"Showing for theater '{theater_name}' has no time data")
+                            logger.warning(f"Showing for theater '{theater_name}' has empty time array")
                             continue
 
                         logger.info(f"Processing {len(time_array)} showtimes for theater '{theater_name}'")
@@ -264,8 +282,28 @@ class SerpShowtimeService:
                         # Process each time string
                         for time_str in time_array:
                             try:
-                                # Parse time string (e.g., "5:00pm")
-                                time_obj = datetime.strptime(time_str, "%I:%M%p")
+                                # FIXED: Try multiple time formats
+                                time_obj = None
+
+                                # Try various time formats (12-hour clock with am/pm)
+                                time_formats = [
+                                    "%I:%M%p",    # 1:30pm
+                                    "%I:%M %p",   # 1:30 pm
+                                    "%I%p",       # 1pm
+                                    "%I %p"       # 1 pm
+                                ]
+
+                                for time_format in time_formats:
+                                    try:
+                                        # Convert to lowercase for consistent am/pm handling
+                                        time_str_lower = time_str.lower().strip()
+                                        time_obj = datetime.strptime(time_str_lower, time_format)
+                                        break
+                                    except ValueError:
+                                        continue
+
+                                if time_obj is None:
+                                    raise ValueError(f"Could not parse time string: {time_str}")
 
                                 # Combine the date with the time
                                 start_time = datetime.combine(day_date, time_obj.time())
@@ -276,7 +314,7 @@ class SerpShowtimeService:
                                     try:
                                         tz = zoneinfo.ZoneInfo(timezone_info)
                                         start_time = start_time.replace(tzinfo=tz)
-                                        logger.info("Applied a timezone to the showtime")
+                                        logger.debug("Applied a timezone to the showtime")
                                     except Exception as tz_error:
                                         logger.warning(f"Could not apply timezone: {str(tz_error)}")
 
@@ -286,6 +324,17 @@ class SerpShowtimeService:
                                     "timezone": timezone_info,  # Store timezone string for reference
                                     "format": "Standard"  # Default format since API doesn't provide format info
                                 }
+
+                                # Check for special formats in showing info
+                                format_type = showing.get('type', '').strip()
+                                if format_type:
+                                    # FIXED: Better format detection
+                                    format_type = format_type.upper()
+                                    if 'IMAX' in format_type:
+                                        showtime_info["format"] = "IMAX"
+                                    elif '3D' in format_type:
+                                        showtime_info["format"] = "3D"
+
                                 theater_showtimes.append(showtime_info)
                                 logger.debug(f"Added showtime: {start_time.isoformat()} for '{theater_name}'")
                             except (ValueError, TypeError) as e:

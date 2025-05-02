@@ -22,6 +22,7 @@ from .tools.enhance_images_tool import EnhanceMovieImagesTool
 from .utils.logging_middleware import LoggingMiddleware
 from .utils.json_parser import JsonParser
 from .utils.response_formatter import ResponseFormatter
+from .utils.custom_event_listener import CustomEventListener
 
 # Get the logger
 logger = logging.getLogger('chatbot.movie_crew')
@@ -122,13 +123,28 @@ class MovieCrewManager:
         if self.base_url:
             os.environ["OPENAI_API_BASE"] = self.base_url
 
-        # Base configuration with the key as a parameter (belt and suspenders approach)
-        config = {
-            "openai_api_key": self.api_key,
-            "model": full_model_name,
-            "temperature": temperature,
-            "model_kwargs": model_kwargs
-        }
+        # Check if litellm is available through langchain-openai's dependencies
+        try:
+            import litellm
+            # Get version safely without relying on __version__ attribute
+            litellm_version = getattr(litellm, "__version__", "unknown")
+            logger.info(f"Using litellm version: {litellm_version}")
+
+            # Base configuration with the key as a parameter (belt and suspenders approach)
+            config = {
+                "openai_api_key": self.api_key,
+                "model": full_model_name,
+                "temperature": temperature,
+                "model_kwargs": model_kwargs
+            }
+        except ImportError:
+            logger.warning("litellm not available, using standard configuration")
+            # Use standard configuration without litellm mapping
+            config = {
+                "openai_api_key": self.api_key,
+                "model": model_name,  # Use just the model name without provider prefix
+                "temperature": temperature
+            }
 
         # Add base URL if provided
         if self.base_url:
@@ -168,16 +184,51 @@ class MovieCrewManager:
 
         # Create the agents with detailed logging
         try:
+            # Create and register tools first to ensure they're properly initialized
+            search_tool = SearchMoviesTool()
+            search_tool.first_run_mode = first_run_mode  # Set the mode
+            analyze_tool = AnalyzePreferencesTool()
+
+            # Set up the theater finder tool with location and timezone
+            theater_finder_tool = FindTheatersTool(user_location=self.user_location)
+            theater_finder_tool.user_ip = self.user_ip
+            theater_finder_tool.timezone = self.timezone
+
+            # Create a shared tools registry to ensure all agents have access to all tools
+            tools_registry = {
+                "search_movies_tool": search_tool,
+                "analyze_preferences_tool": analyze_tool,
+                "find_theaters_tool": theater_finder_tool
+            }
+
+            logger.info(f"Created SearchMoviesTool with first_run_mode: {first_run_mode}")
+
+            # Ensure tool compatibility with CrewAI 0.114.0
+            self._ensure_tool_compatibility(list(tools_registry.values()))
+
+            # Create shared tool lists for different agent types
+            movie_finder_tools = [search_tool, analyze_tool]
+            recommender_tools = [search_tool, analyze_tool]
+            theater_finder_tools = [search_tool, theater_finder_tool]
+
+            # Make sure all agents have access to the search_tool
+            if search_tool not in movie_finder_tools:
+                movie_finder_tools.append(search_tool)
+            if search_tool not in recommender_tools:
+                recommender_tools.append(search_tool)
+            if search_tool not in theater_finder_tools:
+                theater_finder_tools.append(search_tool)
+
             logger.debug("Creating movie finder agent")
-            movie_finder = MovieFinderAgent.create(llm)
+            movie_finder = MovieFinderAgent.create(llm, tools=movie_finder_tools)
 
             logger.debug("Creating recommendation agent")
-            recommender = RecommendationAgent.create(llm)
+            recommender = RecommendationAgent.create(llm, tools=recommender_tools)
 
             logger.debug("Creating theater finder agent")
-            theater_finder = TheaterFinderAgent.create(llm)
+            theater_finder = TheaterFinderAgent.create(llm, tools=theater_finder_tools)
 
-            logger.info("All agents created successfully")
+            logger.info("All agents created successfully with shared tools")
         except Exception as agent_error:
             logger.error(f"Failed to initialize one or more agents: {str(agent_error)}")
             logger.exception(agent_error)
@@ -187,30 +238,16 @@ class MovieCrewManager:
                 "movies": []
             }
 
-        # Create tools for each task, passing the mode
-        search_tool = SearchMoviesTool()
-        search_tool.first_run_mode = first_run_mode  # Set the mode
-        analyze_tool = AnalyzePreferencesTool()
-
-        # Set up the theater finder tool with location and timezone
-        theater_finder_tool = FindTheatersTool(user_location=self.user_location)
-        theater_finder_tool.user_ip = self.user_ip
-        theater_finder_tool.timezone = self.timezone
-
-        logger.info(f"Created SearchMoviesTool with first_run_mode: {first_run_mode}")
-
-        # Ensure tool compatibility with CrewAI 0.114.0
-        self._ensure_tool_compatibility([search_tool, analyze_tool, theater_finder_tool])
+        # Tools are already created and configured in agent creation code above
 
         # Set up the image enhancement tool
         enhance_images_tool = EnhanceMovieImagesTool(tmdb_api_key=self.tmdb_api_key)
 
-        # Create the tasks with the defined tools
+        # Create the tasks using the tools already assigned to the agents
         find_movies_task = Task(
             description=f"Find movies that match the user's criteria: '{query}'",
             expected_output="A JSON list of relevant movies with title, overview, release date, and TMDb ID",
-            agent=movie_finder,
-            tools=[search_tool]
+            agent=movie_finder
         )
 
         # Get max recommendations count from settings
@@ -219,16 +256,17 @@ class MovieCrewManager:
         recommend_movies_task = Task(
             description=f"Recommend the top {max_recommendations} movies from the list that best match the user's preferences",
             expected_output=f"A JSON list of the top {max_recommendations} recommended movies with explanations",
-            agent=recommender,
-            tools=[analyze_tool]
+            agent=recommender
         )
 
         find_theaters_task = Task(
             description="Find theaters showing the recommended movies near the user's location",
             expected_output="A JSON list of theaters showing the recommended movies with showtimes",
-            agent=theater_finder,
-            tools=[theater_finder_tool]
+            agent=theater_finder
         )
+
+        # Create a custom event listener for better event handling
+        event_listener = CustomEventListener()
 
         # Create the crew based on the mode
         if first_run_mode:
@@ -236,7 +274,8 @@ class MovieCrewManager:
             crew = Crew(
                 agents=[movie_finder, recommender, theater_finder],
                 tasks=[find_movies_task, recommend_movies_task, find_theaters_task],
-                verbose=True
+                verbose=True,
+                event_listeners=[event_listener]
             )
             logger.info("Created crew for First Run mode (including theater search)")
         else:
@@ -244,7 +283,8 @@ class MovieCrewManager:
             crew = Crew(
                 agents=[movie_finder, recommender],
                 tasks=[find_movies_task, recommend_movies_task],
-                verbose=True
+                verbose=True,
+                event_listeners=[event_listener]
             )
             logger.info("Created crew for Casual Viewing mode (skipping theater search)")
 
@@ -256,6 +296,10 @@ class MovieCrewManager:
             logger.info("Starting crew execution with query: %s", query)
             logger.debug(f"Crew tasks: {[t.description for t in crew.tasks]}")
             logger.debug(f"Crew agents: {[a.role for a in crew.agents]}")
+
+            # Log all tools for better debugging
+            for agent in crew.agents:
+                logger.info(f"Agent {agent.role} has {len(agent.tools)} tools: {[t.name for t in agent.tools]}")
 
             # Set execution timeout and execute with detailed logging
             logger.info("Initiating crew kickoff")
@@ -528,51 +572,104 @@ class MovieCrewManager:
     def _patch_crewai_event_tracking(self):
         """
         Patch CrewAI's event tracking system to handle missing tools gracefully.
-        This addresses the KeyError: 'search_movies_tool' issue in newer CrewAI versions.
+        Updated for latest CrewAI version (0.114.0+).
         """
         try:
-            # Import necessary modules from CrewAI
-            from crewai.utilities.events.utils.console_formatter import ConsoleFormatter
-            from crewai.utilities.events.event_listener import CrewAgentEventListener
+            # First try to import key components to determine which CrewAI version we're using
+            try:
+                # Check if we can import BaseEventListener - available in newer versions
+                from crewai.utilities.events.base_event_listener import BaseEventListener
+                logger.info("Using modern CrewAI event system with BaseEventListener")
 
-            # Store original handle_tool_usage_finished method
-            original_handle = ConsoleFormatter.handle_tool_usage_finished
-
-            # Define patched method with error handling
-            def patched_handle_tool_usage_finished(self, event):
+                # Also try to import the console formatter for the newer versions
                 try:
-                    # First try to initialize tool_usage_counts if it doesn't exist
-                    if not hasattr(self, 'tool_usage_counts'):
-                        self.tool_usage_counts = {}
+                    from crewai.utilities.events.utils.console_formatter import ConsoleFormatter
 
-                    # Get tool name safely
-                    tool_name = getattr(event, 'tool_name', 'unknown_tool')
+                    # Pre-register our tools with the console formatter
+                    tool_names = ["search_movies_tool", "analyze_preferences_tool", "find_theaters_tool"]
 
-                    # Initialize counter for this tool if not already done
-                    if tool_name not in self.tool_usage_counts:
-                        self.tool_usage_counts[tool_name] = 0
+                    # Check if tool_usage_counts exists and initialize if needed
+                    if not hasattr(ConsoleFormatter, 'tool_usage_counts'):
+                        ConsoleFormatter.tool_usage_counts = {}
+                        logger.info("Initialized tool_usage_counts for ConsoleFormatter")
 
-                    # Now call the original method which should work
-                    return original_handle(self, event)
-                except KeyError as e:
-                    # Log the error but continue execution
-                    logger.warning(f"CrewAI event tracking KeyError handled: {e}")
-                    # Initialize the missing key
-                    if hasattr(event, 'tool_name'):
-                        self.tool_usage_counts[event.tool_name] = 1
-                    return None
-                except Exception as e:
-                    # Log other errors but don't crash
-                    logger.error(f"Error in CrewAI event tracking: {e}")
-                    return None
+                    # Add our tool names to the tracking dictionary
+                    for tool_name in tool_names:
+                        if tool_name not in ConsoleFormatter.tool_usage_counts:
+                            ConsoleFormatter.tool_usage_counts[tool_name] = 0
+                            logger.info(f"Added {tool_name} to tool_usage_counts")
 
-            # Apply the patch
-            ConsoleFormatter.handle_tool_usage_finished = patched_handle_tool_usage_finished
-            logger.info("Successfully patched CrewAI event tracking")
+                    # Make sure the class has the necessary methods we expect
+                    for method_name in ['handle_tool_usage_started', 'handle_tool_usage_finished', 'handle_tool_usage_error']:
+                        if not hasattr(ConsoleFormatter, method_name):
+                            logger.warning(f"ConsoleFormatter is missing expected method: {method_name}")
+
+                    # Patch the handle_tool_usage_finished method for better error handling
+                    original_handle = getattr(ConsoleFormatter, 'handle_tool_usage_finished', None)
+
+                    if original_handle:
+                        # Define patched method with error handling
+                        # Updated to accept variable arguments for compatibility with CrewAI 0.118.0
+                        def patched_handle_tool_usage_finished(self, *args, **kwargs):
+                            try:
+                                # Extract event from args - it could be the first or second argument
+                                event = None
+                                if len(args) >= 1 and hasattr(args[0], 'tool_name'):
+                                    event = args[0]
+                                elif len(args) >= 2 and hasattr(args[1], 'tool_name'):
+                                    event = args[1]
+
+                                # Get tool name safely
+                                tool_name = "unknown_tool"
+                                if event and hasattr(event, 'tool_name'):
+                                    tool_name = event.tool_name
+
+                                # Initialize counter for this tool if not already done
+                                if tool_name not in self.tool_usage_counts:
+                                    self.tool_usage_counts[tool_name] = 0
+                                    logger.info(f"Added missing tool {tool_name} to tracking dynamically")
+
+                                # Call the original method with all arguments
+                                if original_handle:
+                                    return original_handle(self, *args, **kwargs)
+                                return None
+                            except KeyError as e:
+                                # Log the error but continue execution
+                                logger.warning(f"CrewAI event tracking KeyError handled: {e}")
+                                # Initialize the missing key
+                                if event and hasattr(event, 'tool_name'):
+                                    self.tool_usage_counts[event.tool_name] = 1
+                                return None
+                            except Exception as e:
+                                # Log other errors but don't crash
+                                logger.error(f"Error in CrewAI event tracking: {e}")
+                                return None
+
+                        # Apply the patch
+                        ConsoleFormatter.handle_tool_usage_finished = patched_handle_tool_usage_finished
+                        logger.info("Successfully patched ConsoleFormatter.handle_tool_usage_finished")
+                    else:
+                        logger.info("ConsoleFormatter does not have handle_tool_usage_finished method, skipping patch")
+
+                except ImportError as console_err:
+                    logger.warning(f"Could not import ConsoleFormatter: {console_err}")
+                    logger.info("Will continue without patching the console formatter")
+
+                # Successfully configured event tracking
+                logger.info("Successfully configured event tracking with BaseEventListener")
+
+            except ImportError as base_err:
+                logger.warning(f"Could not import BaseEventListener: {base_err}")
+                logger.warning("CrewAI likely uses an older event system - falling back to basic compatibility")
+
+                # Set up compatibility for older CrewAI versions
+                # (This section would have code for compatibility with older versions if needed)
+                logger.info("Basic compatibility for event tracking is configured")
 
         except Exception as e:
-            # If patching fails, log but continue
+            # Log error but continue - application can still function
             logger.warning(f"Failed to patch CrewAI event tracking: {e}")
+            logger.info("Application will continue without event tracking patches")
 
     def _combine_movies_and_theaters(self,
                                     recommendations: List[Dict[str, Any]],

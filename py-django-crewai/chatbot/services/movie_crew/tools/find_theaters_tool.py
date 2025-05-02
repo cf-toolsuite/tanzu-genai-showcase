@@ -5,9 +5,9 @@ import json
 import logging
 import time
 from datetime import datetime
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Union
 from crewai.tools import BaseTool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from django.conf import settings
 
 from ...location_service import LocationService
@@ -19,7 +19,14 @@ logger = logging.getLogger('chatbot.movie_crew')
 
 class FindTheatersInput(BaseModel):
     """Input schema for FindTheatersTool."""
-    movie_recommendations_json: str = Field(default="", description="JSON string containing movie recommendations")
+    movie_recommendations_json: Union[str, List[Dict[str, Any]], Dict[str, Any]] = Field(default="", description="JSON string containing movie recommendations")
+
+    @field_validator('movie_recommendations_json')
+    def validate_movie_recommendations_json(cls, v):
+        """Convert dictionaries or lists to string if needed."""
+        if isinstance(v, (list, dict)):
+            return json.dumps(v)
+        return v
 
 class FindTheatersConfig(BaseModel):
     """Configuration for FindTheatersTool."""
@@ -193,7 +200,7 @@ class FindTheatersTool(BaseTool):
             logger.exception(e)  # Log the full exception traceback
             return []
 
-    def _run(self, movie_recommendations_json: str = "") -> str:
+    def _run(self, movie_recommendations_json: Union[str, List[Dict[str, Any]], Dict[str, Any]] = "") -> str:
         """
         Find theaters showing the recommended movies near the user's location.
 
@@ -212,6 +219,10 @@ class FindTheatersTool(BaseTool):
         MAX_MOVIES_TO_PROCESS = getattr(settings, 'MAX_RECOMMENDATIONS', 5)
         logger.info(f"Maximum movies to process for theaters: {MAX_MOVIES_TO_PROCESS}")
         try:
+            # Convert non-string inputs to JSON strings
+            if isinstance(movie_recommendations_json, (list, dict)):
+                movie_recommendations_json = json.dumps(movie_recommendations_json)
+
             # Default to empty list if the input is empty
             if not movie_recommendations_json:
                 movie_recommendations_json = "[]"

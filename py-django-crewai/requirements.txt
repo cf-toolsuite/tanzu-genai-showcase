@@ -8,10 +8,10 @@ gunicorn==23.0.0
 pytz==2025.2  # Timezone support
 
 # CrewAI and dependencies
-crewai==0.114.0
+crewai==0.118.0  # Latest stable version with improved event system
 langchain==0.3.24
-langchain-openai==0.3.14
-pydantic==2.11.3
+langchain-openai==0.3.15
+pydantic==2.11.4  # Maintain compatibility with CrewAI's Pydantic v2 usage
 google-search-results==2.4.2  # SerpAPI client
 
 # Movie database API

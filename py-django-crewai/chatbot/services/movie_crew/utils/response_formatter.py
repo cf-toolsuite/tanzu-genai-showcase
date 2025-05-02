@@ -4,7 +4,6 @@ Response formatter for the movie crew.
 import logging
 from datetime import datetime
 from typing import List, Dict, Any
-from django.conf import settings
 
 # Get the logger
 logger = logging.getLogger('chatbot.movie_crew')

@@ -4,10 +4,10 @@ Tool for searching movies based on user criteria.
 import json
 import logging
 from datetime import datetime
-from typing import Dict, Any
+from typing import Dict, Any, Union
 import tmdbsimple as tmdb
 from crewai.tools import BaseTool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 from django.conf import settings
 
 # Get the logger
@@ -15,7 +15,26 @@ logger = logging.getLogger('chatbot.movie_crew')
 
 class SearchMoviesInput(BaseModel):
     """Input schema for SearchMoviesTool."""
-    query: str = Field(default="", description="The search query for movies")
+    query: Union[str, Dict[str, Any]] = Field(default="", description="The search query for movies")
+
+    @field_validator('query')
+    def validate_query(cls, v):
+        """Convert dictionary to string if needed."""
+        if isinstance(v, dict):
+            # Check if this is a dictionary with a nested 'query' key - common LLM pattern
+            if 'query' in v and isinstance(v['query'], str):
+                return v['query']
+            # Check if this has genre and release_date keys - another common pattern
+            if 'genre' in v or 'release_date.gte' in v:
+                query_parts = []
+                if 'genre' in v:
+                    query_parts.append(f"genre={v['genre']}")
+                if 'release_date.gte' in v:
+                    query_parts.append(f"release_date.gte={v['release_date.gte']}")
+                return " AND ".join(query_parts)
+            # Default to JSON conversion
+            return json.dumps(v)
+        return v
 
 class SearchMoviesTool(BaseTool):
     """Tool for searching movies based on user criteria."""
@@ -25,7 +44,7 @@ class SearchMoviesTool(BaseTool):
     args_schema: type[SearchMoviesInput] = SearchMoviesInput
     first_run_mode: bool = True  # Default to First Run mode (theater search)
 
-    def _run(self, query: str = "") -> str:
+    def _run(self, query: Union[str, Dict[str, Any]] = "") -> str:
         """
         Search for movies based on user criteria.
 
@@ -36,6 +55,23 @@ class SearchMoviesTool(BaseTool):
             JSON string containing movie results
         """
         try:
+            # Handle dictionary input if passed directly
+            if isinstance(query, dict):
+                # Check if this is a dictionary with a nested 'query' key
+                if 'query' in query and isinstance(query['query'], str):
+                    query = query['query']
+                # Check if this has genre and release_date keys
+                elif 'genre' in query or 'release_date.gte' in query:
+                    query_parts = []
+                    if 'genre' in query:
+                        query_parts.append(f"genre={query['genre']}")
+                    if 'release_date.gte' in query:
+                        query_parts.append(f"release_date.gte={query['release_date.gte']}")
+                    query = " AND ".join(query_parts)
+                # Default to JSON conversion
+                else:
+                    query = json.dumps(query)
+
             # Use the query parameter if provided
             search_query = query if query else ""
 
