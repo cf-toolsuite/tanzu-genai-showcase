@@ -104,6 +104,25 @@ graph TD
         TheaterTool --> SerpAPI[SerpAPI Showtimes]
     end
 
+    subgraph "Implementation Features"
+        ModularManager --- ManagerFeatures[Manager Features]
+        ManagerFeatures --> Caching[TTL Caching]
+        ManagerFeatures --> CircuitBreaker[Circuit Breaker]
+        ManagerFeatures --> AsyncProcessing[Async Processing]
+        ManagerFeatures --> ThreadPool[Thread Pool Executor]
+        ManagerFeatures --> JsonRepair[JSON Repair Utility]
+
+        Caching --> LlmCache[LLM Cache]
+        Caching --> ResultCache[Result Cache]
+
+        CircuitBreaker --> TheaterCircuit[Theater Circuit]
+        CircuitBreaker --> LlmCircuit[LLM Circuit]
+        CircuitBreaker --> TmdbCircuit[TMDB Circuit]
+
+        AsyncProcessing --> Asyncio[Asyncio]
+        AsyncProcessing --> ConcurrentTasks[Concurrent Tasks]
+    end
+
     DjangoAPI --> DatabaseLayer[Database Layer]
     DatabaseLayer --> Models[Data Models]
 
@@ -132,6 +151,7 @@ graph TD
    - AJAX for asynchronous communication with backend
    - Progressive loading feedback with state tracking
    - Responsive design with Bootstrap
+   - Polling pattern for long-running operations
 
 2. **Django Backend Layer**
    - RESTful API endpoints for chat interactions
@@ -140,6 +160,7 @@ graph TD
    - JSON response handling
    - Error handling and logging
    - Environment detection (Cloud Foundry vs. local)
+   - Status tracking for long-running operations
 
 3. **Chatbot Controller**
    - API endpoints for processing chat messages
@@ -147,15 +168,21 @@ graph TD
    - User session management
    - Conversation history tracking
    - CrewAI integration and orchestration
+   - Polling endpoints for long-running operations
+   - Status tracking for multi-phase operations
 
 4. **Movie Crew Manager**
-   - Implements a wrapper around modular components
+   - **Optimized Enhanced Implementation**: High-performance version with caching and parallel processing
    - Coordinates AI agents via CrewAI
    - Processes query results with error recovery
    - Handles agent communication failures
    - Formats structured data
    - Classifies movies as current releases or older movies
    - Manages mode-specific behavior (First Run vs. Casual Viewing)
+   - Implements circuit breaker pattern for external APIs
+   - Uses TTL caching for LLM instances and results
+   - Processes theater data in parallel with thread pools
+   - Implements advanced JSON repair strategies
 
 5. **CrewAI Agents**
    - **Movie Finder Agent**: Searches for movies based on user preferences
@@ -170,6 +197,27 @@ graph TD
      - Integrates geolocation data
      - Searches for real theaters near the user
      - Retrieves and formats showtime information
+     - Uses optimized implementation for parallel processing
+
+6. **Optimization Components**:
+   - **TTL Cache System**: Time-based caching with automatic expiration
+     - LLM instance caching to avoid recreation
+     - Result caching for theaters and recommendations
+     - Automatic cleanup of expired cache entries
+   - **Circuit Breaker Pattern**: Prevents cascading failures from external API issues
+     - Separate circuit breakers for theater, LLM, and TMDb services
+     - Failure threshold configuration
+     - Self-healing with recovery timeout
+     - Half-open state for gradual recovery
+   - **Asynchronous Processing**: Parallel execution of tasks
+     - ThreadPoolExecutor for CPU-bound operations
+     - Asyncio for I/O-bound operations
+     - Task coordination with Future objects
+     - Timeout handling for long-running operations
+   - **JSON Repair Utilities**: Robust parsing of potentially malformed JSON
+     - Multiple repair strategies (regex-based fixes, structure analysis)
+     - Fallback mechanisms for invalid JSON
+     - Auto-correction of common JSON syntax issues
 
 6. **CrewAI Tools**
    - **SearchMoviesTool**: Pydantic-based tool for searching TMDb movies
