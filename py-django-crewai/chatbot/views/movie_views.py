@@ -257,7 +257,7 @@ def poll_first_run_recommendations(request):
         }, status=405)
 
     try:
-        start_time = time.time()
+        processing_start_time = time.time()
 
         # Get the conversation
         conversation = _get_or_create_conversation(request, 'first_run')
@@ -299,44 +299,44 @@ def poll_first_run_recommendations(request):
                     query_dt = timezone.make_aware(query_dt)
 
                 for movie in existing_recommendations.filter(created_at__gt=query_dt):
-                    # Get theaters for this movie
-                    theaters_data = []
-                    for showtime in movie.showtimes.all():
-                        theater = showtime.theater
+                                # Get theaters for this movie
+                                theaters_data = []
+                                for showtime in movie.showtimes.all():
+                                    theater = showtime.theater
 
-                        # Check if this theater is already in the list
-                        theater_exists = False
-                        for t in theaters_data:
-                            if t['name'] == theater.name:
-                                theater_exists = True
-                                # Add showtime to existing theater
-                                t['showtimes'].append({
-                                    'start_time': showtime.start_time.isoformat(),
-                                    'format': showtime.format
+                                    # Check if this theater is already in the list
+                                    theater_exists = False
+                                    for t in theaters_data:
+                                        if t['name'] == theater.name:
+                                            theater_exists = True
+                                            # Add showtime to existing theater
+                                            t['showtimes'].append({
+                                                'start_time': showtime.start_time.isoformat() if hasattr(showtime.start_time, 'isoformat') else showtime.start_time,
+                                                'format': showtime.format
+                                            })
+                                            break
+
+                                    # If theater not in list, add it
+                                    if not theater_exists:
+                                        theaters_data.append({
+                                            'name': theater.name,
+                                            'address': theater.address,
+                                            'distance_miles': float(theater.distance_miles) if theater.distance_miles else None,
+                                            'showtimes': [{
+                                                'start_time': showtime.start_time.isoformat() if hasattr(showtime.start_time, 'isoformat') else showtime.start_time,
+                                                'format': showtime.format
+                                            }]
+                                        })
+
+                                recommendations_data.append({
+                                    'id': movie.id,
+                                    'title': movie.title,
+                                    'overview': movie.overview,
+                                    'poster_url': movie.poster_url,
+                                    'release_date': movie.release_date.isoformat() if movie.release_date and hasattr(movie.release_date, 'isoformat') else movie.release_date,
+                                    'rating': float(movie.rating) if movie.rating else None,
+                                    'theaters': theaters_data
                                 })
-                                break
-
-                        # If theater not in list, add it
-                        if not theater_exists:
-                            theaters_data.append({
-                                'name': theater.name,
-                                'address': theater.address,
-                                'distance_miles': float(theater.distance_miles) if theater.distance_miles else None,
-                                'showtimes': [{
-                                    'start_time': showtime.start_time.isoformat(),
-                                    'format': showtime.format
-                                }]
-                            })
-
-                    recommendations_data.append({
-                        'id': movie.id,
-                        'title': movie.title,
-                        'overview': movie.overview,
-                        'poster_url': movie.poster_url,
-                        'release_date': movie.release_date.isoformat() if movie.release_date and hasattr(movie.release_date, 'isoformat') else movie.release_date,
-                        'rating': float(movie.rating) if movie.rating else None,
-                        'theaters': theaters_data
-                    })
 
                 if recommendations_data:
                     # Clear the query from the session
@@ -346,7 +346,7 @@ def poll_first_run_recommendations(request):
                         del request.session['first_run_query_timestamp']
 
                     # Log processing time
-                    processing_time = time.time() - start_time
+                    processing_time = time.time() - processing_start_time
                     logger.info(f"Recommendation processing completed in {processing_time:.2f}s")
 
                     return JsonResponse({
@@ -437,25 +437,53 @@ def poll_first_run_recommendations(request):
                         # Save showtimes
                         showtimes_data = []
                         for showtime_data in theater_data.get('showtimes', []):
-                            # Check if the datetime is already timezone-aware
-                            dt_obj = datetime.fromisoformat(showtime_data['start_time'])
-                            if dt_obj.tzinfo is not None:
-                                # Already timezone-aware, use as is
-                                start_time = dt_obj
-                            else:
-                                # Naive datetime, make it timezone-aware
-                                start_time = timezone.make_aware(dt_obj)
+                            # Process the showtime data
+                            try:
+                                # Check for non-ISO format times (e.g., "8:00 PM")
+                                time_str = showtime_data['start_time']
 
-                            showtime = Showtime.objects.create(
-                                movie=movie,
-                                theater=theater,
-                                start_time=start_time,
-                                format=showtime_data.get('format', 'Standard')
-                            )
-                            showtimes_data.append({
-                                'start_time': showtime.start_time.isoformat(),
-                                'format': showtime.format
-                            })
+                                if ":" in time_str and ("AM" in time_str.upper() or "PM" in time_str.upper()):
+                                    # Parse time like "8:00 PM"
+                                    import pytz
+
+                                    # Get the base date (today)
+                                    today = datetime.now().date()
+
+                                    # Parse the time
+                                    time_format = "%I:%M %p"  # Format for "8:00 PM"
+                                    time_obj = datetime.strptime(time_str, time_format).time()
+
+                                    # Combine date and time
+                                    start_time = datetime.combine(today, time_obj)
+
+                                    # Make it timezone aware
+                                    tz = pytz.timezone(user_timezone)
+                                    start_time = tz.localize(start_time)
+                                else:
+                                    # Standard ISO format parsing
+                                    start_time = datetime.fromisoformat(time_str)
+                                    if start_time.tzinfo is None:
+                                        # Make timezone-aware if needed
+                                        start_time = timezone.make_aware(start_time)
+
+                                # Create the showtime
+                                showtime = Showtime.objects.create(
+                                    movie=movie,
+                                    theater=theater,
+                                    start_time=start_time,
+                                    format=showtime_data.get('format', 'Standard')
+                                )
+
+                                # Add formatted showtime to the response
+                                showtimes_data.append({
+                                    'start_time': showtime.start_time.isoformat(),
+                                    'format': showtime.format
+                                })
+                            except (ValueError, TypeError) as e:
+                                # Log the error but continue processing other showtimes
+                                logger.warning(f"Invalid datetime format in showtime: {showtime_data['start_time']} - {str(e)}")
+                                # Skip this showtime
+                                continue
 
                         theaters_data.append({
                             'name': theater.name,
@@ -481,7 +509,7 @@ def poll_first_run_recommendations(request):
                 del request.session['first_run_query_timestamp']
 
             # Log processing time
-            processing_time = time.time() - start_time
+            processing_time = time.time() - processing_start_time
             logger.info(f"First run recommendations processed in {processing_time:.2f}s")
 
             return JsonResponse({

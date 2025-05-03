@@ -113,10 +113,14 @@ class FindTheatersToolOptimized(BaseTool):
             except TimeoutError:
                 logger.warning(f"Global timeout reached after {global_timeout}s, returning partial results")
 
-            # If no theaters found, generate fallback data
+            # If no theaters found, generate fallback data in First Run mode
             if not theater_results:
-                theater_results = self._generate_fallback_theater_data(movies_to_process)
-                logger.info("Using fallback theater data since no real theaters were found")
+                logger.warning("No theaters found for any of the recommended movies")
+                # Check if we're in first run mode
+                use_fallback = getattr(settings, 'USE_FALLBACK_THEATERS', True)
+                if use_fallback:
+                    logger.info("Generating fallback theater data for First Run mode")
+                    theater_results = self._generate_fallback_theater_data(movies_to_process)
 
             # Format results
             logger.info(f"Found {len(theater_results)} theaters across all movies")
@@ -163,9 +167,12 @@ class FindTheatersToolOptimized(BaseTool):
 
         return current_releases
 
-    def _process_theaters_parallel(self, movies: List[Dict[str, Any]], user_coords: Dict[str, Any], 
+    def _process_theaters_parallel(self, movies: List[Dict[str, Any]], user_coords: Dict[str, Any],
                                    global_timeout: int = 30) -> List[Dict[str, Any]]:
         """Process theaters for all movies in parallel with caching and timeout"""
+        # Import settings from django.conf for use in this method
+        from django.conf import settings
+
         if not movies:
             return []
 
@@ -203,6 +210,7 @@ class FindTheatersToolOptimized(BaseTool):
             # Adjust parameters based on position (process first movie more thoroughly)
             retry_count = 2 if i == 0 else 1  # Only retry for the first movie
 
+            # Pass settings as an argument to avoid thread issues
             # Submit task to thread pool with remaining time as timeout
             future = self._thread_pool.submit(
                 self._get_movie_showtimes_with_retries,
@@ -211,7 +219,8 @@ class FindTheatersToolOptimized(BaseTool):
                 location,
                 user_coords,
                 retry_count,
-                remaining_time
+                remaining_time,
+                settings
             )
             futures.append((future, movie_id, movie_title))
 
@@ -260,12 +269,18 @@ class FindTheatersToolOptimized(BaseTool):
 
     def _get_movie_showtimes_with_retries(self, movie_title: str, movie_id: Any, location: str,
                                         user_coords: Dict[str, Any], max_retries: int = 1,
-                                        timeout: int = 30) -> List[Dict[str, Any]]:
+                                        timeout: int = 30, settings_obj = None) -> List[Dict[str, Any]]:
         """Get showtimes for a movie with automatic retries and timeout"""
         # Start timer for timeout
         start_time = time.time()
-        retry_delay = getattr(settings, 'SERPAPI_BASE_RETRY_DELAY', 3.0)
-        retry_multiplier = getattr(settings, 'SERPAPI_RETRY_MULTIPLIER', 1.5)
+        # Use passed settings if available, otherwise try to import
+        if settings_obj:
+            settings_to_use = settings_obj
+        else:
+            from django.conf import settings as settings_to_use
+
+        retry_delay = getattr(settings_to_use, 'SERPAPI_BASE_RETRY_DELAY', 3.0)
+        retry_multiplier = getattr(settings_to_use, 'SERPAPI_RETRY_MULTIPLIER', 1.5)
 
         # Initialize SerpAPI service
         try:
