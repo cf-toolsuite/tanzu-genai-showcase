@@ -91,8 +91,8 @@ class FindTheatersToolOptimized(BaseTool):
             # Get user coordinates efficiently
             user_coords = self._get_user_coordinates(location_service)
 
-            # Get the max movies to process from settings
-            max_movies = min(getattr(settings, 'MAX_RECOMMENDATIONS', 3), 2)  # Limit to 2 for better performance
+            # Get the max movies to process from settings - use configured value without hardcoded limit
+            max_movies = getattr(settings, 'MAX_RECOMMENDATIONS', 3)  # Use the configured value without restriction
 
             # Filter for current releases only
             current_movies = self._filter_current_releases(movie_recommendations)
@@ -113,12 +113,12 @@ class FindTheatersToolOptimized(BaseTool):
             except TimeoutError:
                 logger.warning(f"Global timeout reached after {global_timeout}s, returning partial results")
 
-            # If no theaters found, log a warning and use fallback data
+            # If no theaters found, log a warning but DO NOT use fallback data
             if not theater_results:
                 logger.warning("No theaters found for any of the recommended movies")
-                # Enable fallback data to ensure we have showtimes in First Run mode
-                logger.info("Using fallback theater data in First Run mode")
-                theater_results = self._generate_fallback_theater_data(movies_to_process)
+                # Disable fallback data - never use fake data
+                logger.info("No fallback theater data will be used - returning empty results")
+                # DO NOT call _generate_fallback_theater_data
 
             # Format results
             logger.info(f"Found {len(theater_results)} theaters across all movies")
@@ -169,7 +169,18 @@ class FindTheatersToolOptimized(BaseTool):
                                    global_timeout: int = 30) -> List[Dict[str, Any]]:
         """Process theaters for all movies in parallel with caching and timeout"""
         # Import settings from django.conf for use in this method
-        from django.conf import settings
+        try:
+            from django.conf import settings as settings_instance
+        except ImportError:
+            # Fallback to default settings
+            class DefaultSettings:
+                MAX_THEATERS = 10
+                THEATER_SEARCH_TIMEOUT = 30
+                SERPAPI_BASE_RETRY_DELAY = 3.0
+                SERPAPI_RETRY_MULTIPLIER = 1.5
+                THEATER_SEARCH_RADIUS_MILES = 25
+
+            settings_instance = DefaultSettings()
 
         if not movies:
             return []
@@ -218,7 +229,7 @@ class FindTheatersToolOptimized(BaseTool):
                 user_coords,
                 retry_count,
                 remaining_time,
-                settings
+                settings_instance
             )
             futures.append((future, movie_id, movie_title))
 
@@ -304,7 +315,7 @@ class FindTheatersToolOptimized(BaseTool):
                     break
 
                 # Use a larger search radius to find more theaters
-                radius_miles = getattr(settings, 'THEATER_SEARCH_RADIUS_MILES', 25)  # Increased from 15 to 25
+                radius_miles = getattr(settings_to_use, 'THEATER_SEARCH_RADIUS_MILES', 25)  # Increased from 15 to 25
 
                 real_theaters_with_showtimes = APIRequestHandler.make_request(
                     lambda: showtime_service.search_showtimes(
@@ -396,10 +407,22 @@ class FindTheatersToolOptimized(BaseTool):
         formatted_theaters = []
 
         try:
+            # Get settings safely
+            try:
+                from django.conf import settings as settings_instance
+            except ImportError:
+                # Fallback to default settings
+                class DefaultSettings:
+                    THEATER_SEARCH_RADIUS_MILES = 25
+                    MAX_SHOWTIMES_PER_THEATER = 20
+                    MAX_THEATERS = 10
+
+                settings_instance = DefaultSettings()
+
             # Get configuration - allow theaters that are slightly beyond the search radius
-            max_radius_miles = getattr(settings, 'THEATER_SEARCH_RADIUS_MILES', 25) * 1.5  # 50% buffer
-            max_showtimes_per_theater = getattr(settings, 'MAX_SHOWTIMES_PER_THEATER', 20)
-            max_theaters = getattr(settings, 'MAX_THEATERS', 10)
+            max_radius_miles = getattr(settings_instance, 'THEATER_SEARCH_RADIUS_MILES', 25) * 1.5  # 50% buffer
+            max_showtimes_per_theater = getattr(settings_instance, 'MAX_SHOWTIMES_PER_THEATER', 20)
+            max_theaters = getattr(settings_instance, 'MAX_THEATERS', 10)
 
             # Process theaters
             for theater in serp_theaters:
@@ -536,9 +559,13 @@ class FindTheatersToolOptimized(BaseTool):
                         microsecond=0
                     ) + timedelta(days=day)
 
-                    # Add to showtimes with proper ISO format
+                    # Format time as "8:00 PM" since that's what the frontend expects based on real data
+                    hour_display = hour
+                    minute_display = "00" if hour_offset % 2 == 0 else "30"
+                    start_time = f"{hour_display}:{minute_display} {am_pm}"
+
                     theater_entry["showtimes"].append({
-                        "start_time": showtime_dt.isoformat(),
+                        "start_time": start_time,
                         "format": "Standard" if hour_offset < 3 else "IMAX"
                     })
 

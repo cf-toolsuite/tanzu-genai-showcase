@@ -482,10 +482,10 @@ class MovieCrewManagerOptimized:
                             RESULT_CACHE['theaters'][movie_id] = []
                         RESULT_CACHE['theaters'][movie_id].append(theater)
 
-            # Generate fallback theaters if enabled and no real theaters found
-            if not theaters_data and self.fallback_enabled:
-                logger.info("No theaters found, generating fallback theater data")
-                theaters_data = self._generate_fallback_theaters(recommendations)
+            # Never use fallback theaters - even if no theaters found
+            if not theaters_data:
+                logger.info("No theaters found, but fallback theater data generation is disabled")
+                # Do not generate fallback theaters, return empty list
 
             return theaters_data if theaters_data else []
         except Exception as e:

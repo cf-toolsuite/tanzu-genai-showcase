@@ -447,13 +447,17 @@ def poll_first_run_recommendations(request):
                         # Save showtimes
                         showtimes_data = []
                         for showtime_data in theater_data.get('showtimes', []):
-                            # Process the showtime data
                             try:
+                                # Process the showtime data
                                 try:
-                                    # Check for non-ISO format times (e.g., "8:00 PM")
-                                    time_str = showtime_data['start_time']
+                                    # Save the original time string format for response
+                                    original_time_str = showtime_data['start_time']
 
-                                    if ":" in time_str and ("AM" in time_str.upper() or "PM" in time_str.upper()):
+                                    # Check for non-ISO format times (e.g., "8:00 PM")
+                                    time_str = original_time_str
+
+                                    # First check if it's a time like "8:00 PM" or other non-ISO format
+                                    if isinstance(time_str, str) and (":" in time_str and ("AM" in time_str.upper() or "PM" in time_str.upper())):
                                         # Parse time like "8:00 PM"
                                         import pytz
 
@@ -470,12 +474,42 @@ def poll_first_run_recommendations(request):
                                         # Make it timezone aware
                                         tz = pytz.timezone(user_timezone)
                                         start_time = tz.localize(start_time)
+
+                                        # Log successful conversion
+                                        logger.info(f"Converted time format '{original_time_str}' to ISO format")
                                     else:
-                                        # Standard ISO format parsing
-                                        start_time = datetime.fromisoformat(time_str)
-                                        if start_time.tzinfo is None:
-                                            # Make timezone-aware if needed
-                                            start_time = timezone.make_aware(start_time)
+                                        try:
+                                            # Standard ISO format parsing
+                                            start_time = datetime.fromisoformat(time_str)
+                                            if start_time.tzinfo is None:
+                                                # Make timezone-aware if needed
+                                                start_time = timezone.make_aware(start_time)
+                                        except ValueError:
+                                            # If ISO parsing fails, try one more time with AM/PM format
+                                            # This catches cases where the format detection might have failed
+                                            logger.warning(f"Trying alternative parsing for: {time_str}")
+                                            import pytz
+                                            today = datetime.now().date()
+
+                                            # Try multiple time formats
+                                            formats_to_try = ["%I:%M %p", "%I:%M%p", "%H:%M"]
+                                            parsed = False
+
+                                            for fmt in formats_to_try:
+                                                try:
+                                                    time_obj = datetime.strptime(time_str, fmt).time()
+                                                    start_time = datetime.combine(today, time_obj)
+                                                    tz = pytz.timezone(user_timezone)
+                                                    start_time = tz.localize(start_time)
+                                                    parsed = True
+                                                    logger.info(f"Parsed time with format {fmt}: {time_str}")
+                                                    break
+                                                except ValueError:
+                                                    continue
+
+                                            if not parsed:
+                                                # If all parsing attempts fail, raise an error
+                                                raise ValueError(f"Could not parse time: {time_str}")
                                 except ValueError as e:
                                     # Handle invalid datetime format by skipping this showtime
                                     logger.warning(f"Invalid datetime format in showtime: {time_str} - {str(e)}")
