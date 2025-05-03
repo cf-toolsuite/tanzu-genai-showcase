@@ -15,9 +15,40 @@ const path = require('path');
 const { ChatOpenAI } = require('@langchain/openai');
 const { HumanMessage, SystemMessage } = require('@langchain/core/messages');
 const axios = require('axios');
+const net = require('net');
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const DEFAULT_PORT = process.env.PORT || 3001;
+
+// Function to check if a port is in use
+function isPortInUse(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer()
+      .once('error', () => {
+        // Port is in use
+        resolve(true);
+      })
+      .once('listening', () => {
+        // Port is free
+        server.close();
+        resolve(false);
+      })
+      .listen(port);
+  });
+}
+
+// Function to find an available port
+async function findAvailablePort(startPort) {
+  let port = startPort;
+  while (await isPortInUse(port)) {
+    port++;
+    if (port > startPort + 100) {
+      // Avoid infinite loop, limit to 100 ports
+      throw new Error('Could not find an available port');
+    }
+  }
+  return port;
+}
 
 // Middleware
 app.use(cors());
@@ -25,33 +56,79 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'build')));
 
 
-// Get LLM credentials from Cloud Foundry VCAP_SERVICES or environment variables
+/**
+ * Get LLM credentials from Cloud Foundry VCAP_SERVICES or environment variables
+ *
+ * Environment Variable Fallbacks:
+ * The service will check for credentials in this order:
+ * 1. Cloud Foundry VCAP_SERVICES (GenAI service binding)
+ * 2. Environment variables (multiple options for compatibility):
+ *    - API Key: API_KEY, LLM_API_KEY, GENAI_API_KEY
+ *    - API Base URL: API_BASE_URL, LLM_API_BASE, GENAI_API_BASE_URL
+ *    - Model: MODEL_NAME, LLM_MODEL, GENAI_MODEL
+ * 3. Default values where appropriate
+ */
 function getLLMConfig() {
   // Check if running in Cloud Foundry with bound services
   if (process.env.VCAP_SERVICES) {
-    const vcapServices = JSON.parse(process.env.VCAP_SERVICES);
+    try {
+      const vcapServices = JSON.parse(process.env.VCAP_SERVICES);
 
-    // Look for GenAI service instance
-    const genaiServices = Object.keys(vcapServices).find(
-      (service) => service.includes('genai') || service.includes('llm')
-    );
+      // Iterate through all services to find GenAI services
+      for (const [serviceName, instances] of Object.entries(vcapServices)) {
+        for (const instance of instances) {
+          // Check for genai tag
+          const hasGenAITag = instance.tags &&
+            instance.tags.some(tag => tag.toLowerCase().includes('genai'));
 
-    if (genaiServices && vcapServices[genaiServices] && vcapServices[genaiServices][0]) {
-      const credentials = vcapServices[genaiServices][0].credentials;
+          // Check for genai label
+          const hasGenAILabel = instance.label &&
+            instance.label.toLowerCase().includes('genai');
 
-      return {
-        apiKey: credentials.api_key || credentials.apiKey,
-        baseUrl: credentials.url || credentials.baseUrl,
-        modelName: credentials.model || 'gpt-4o-mini' // default fallback
-      };
+          // Check service name
+          const hasGenAIName = serviceName.toLowerCase().includes('genai') ||
+            serviceName.toLowerCase().includes('llm');
+
+          if (hasGenAITag || hasGenAILabel || hasGenAIName) {
+            // Found a potential GenAI service, check for chat capability
+            const credentials = instance.credentials;
+
+            if (!credentials) continue;
+
+            // Check for model_capabilities
+            const hasChatCapability = credentials.model_capabilities &&
+              credentials.model_capabilities.some(cap => cap.toLowerCase() === 'chat');
+
+            // If no capabilities specified or has chat capability
+            if (!credentials.model_capabilities || hasChatCapability) {
+              // Extract credentials with proper field mapping
+              const config = {
+                apiKey: credentials.api_key || credentials.apiKey,
+                baseUrl: credentials.api_base || credentials.url || credentials.baseUrl || credentials.base_url,
+                modelName: credentials.model_name || credentials.model || 'gpt-4o-mini'
+              };
+
+              // If model_provider is available, prefix the model name
+              if (credentials.model_provider && config.modelName) {
+                config.modelName = `${credentials.model_provider}/${config.modelName}`;
+              }
+
+              console.log('Using LLM configuration from VCAP_SERVICES');
+              return config;
+            }
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error parsing VCAP_SERVICES:', error);
     }
   }
 
   // Fallback to environment variables for local development
   return {
-    apiKey: process.env.API_KEY,
-    baseUrl: process.env.API_BASE_URL,
-    modelName: process.env.MODEL_NAME || 'gpt-4o-mini'
+    apiKey: process.env.API_KEY || process.env.LLM_API_KEY || process.env.GENAI_API_KEY,
+    baseUrl: process.env.API_BASE_URL || process.env.LLM_API_BASE || process.env.GENAI_API_BASE_URL,
+    modelName: process.env.MODEL_NAME || process.env.LLM_MODEL || process.env.GENAI_MODEL || 'gpt-4o-mini'
   };
 }
 
@@ -150,7 +227,32 @@ app.get('*', (req, res) => {
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-});
+// Start the server with port detection
+(async () => {
+  try {
+    // Check if default port is available
+    const port = await findAvailablePort(DEFAULT_PORT);
+
+    // If we're using a different port than the default, update the environment variable
+    if (port !== DEFAULT_PORT) {
+      console.log(`Port ${DEFAULT_PORT} is in use, using port ${port} instead`);
+      process.env.PORT = port;
+    }
+
+    app.listen(port, () => {
+      console.log(`Server running on port ${port}`);
+      console.log(`API available at http://localhost:${port}/api/news`);
+
+      // If we're using a different port, provide instructions for the frontend
+      if (port !== DEFAULT_PORT) {
+        console.log('\nIMPORTANT: The server is running on a different port than expected.');
+        console.log('You may need to update your frontend configuration:');
+        console.log(`1. Set REACT_APP_API_BASE_URL=http://localhost:${port} in your .env file`);
+        console.log('2. Restart the React development server');
+      }
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+})();

@@ -1,0 +1,186 @@
+# GitLab CI/CD for java-spring-ai-mcp
+# Equivalent to GitHub Actions workflow: java-spring-ai-mcp.yml
+
+image: bellsoft/liberica-openjdk-debian:21
+
+variables:
+  MAVEN_OPTS: "-Dmaven.repo.local=.m2/repository"
+
+# Cache Maven dependencies between pipeline jobs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .m2/repository/
+
+# Defines stages in the pipeline
+stages:
+  - build
+  - upload
+  - deploy-client
+  - deploy-server
+
+# Run CI only when changes in the project files or CI configuration
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      changes:
+        - java-spring-ai-mcp/**/*
+        - java-spring-ai-mcp/ci/gitlab/.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - java-spring-ai-mcp/**/*
+        - java-spring-ai-mcp/ci/gitlab/.gitlab-ci.yml
+
+# Build job
+build:
+  stage: build
+  script:
+    - cd java-spring-ai-mcp
+    - mvn -B package --file pom.xml
+  artifacts:
+    paths:
+      - java-spring-ai-mcp/client/target/*.jar
+      - java-spring-ai-mcp/server/target/*.jar
+      - java-spring-ai-mcp/api/target/*.jar
+    expire_in: 1 week
+
+# Upload artifacts job - only on main branch
+upload:
+  stage: upload
+  script:
+    - echo "Uploading artifacts to GitLab package registry"
+    - cd java-spring-ai-mcp
+    - |
+      for module in client server api; do
+        mvn deploy:deploy-file \
+          -DgroupId=com.example \
+          -DartifactId=java-spring-ai-mcp-${module} \
+          -Dversion=${CI_COMMIT_TAG:-0.0.1-SNAPSHOT} \
+          -DgeneratePom=true \
+          -Dpackaging=jar \
+          -DrepositoryId=gitlab-maven \
+          -Durl=${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/maven \
+          -Dfile=${module}/target/java-spring-ai-mcp-${module}-*.jar
+      done
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  dependencies:
+    - build
+
+# Deploy client to Cloud Foundry - manual trigger with parameters
+deploy-client:
+  stage: deploy-client
+  image: governmentpaas/cf-cli:latest
+  variables:
+    CF_API: ""
+    CF_USERNAME: ""
+    CF_PASSWORD: ""
+    CF_ORG: ""
+    CF_SPACE: ""
+    RANDOM_ROUTE: "false"
+    OPENAI_API_KEY: ""
+  script:
+    - cd java-spring-ai-mcp/client
+    - echo "Deploying client to Cloud Foundry..."
+    - cf api "$CF_API"
+    - cf auth "$CF_USERNAME" "$CF_PASSWORD"
+    - cf target -o "$CF_ORG" -s "$CF_SPACE"
+
+    # Create GenAI service if it doesn't exist
+    - |
+      if ! cf service tracker-llm-service > /dev/null 2>&1; then
+        echo "Creating GenAI service..."
+        cf create-service genai standard tracker-llm-service || echo "Service creation failed, it might already exist or plan is not available"
+      else
+        echo "GenAI service already exists"
+      fi
+
+    # Set environment variables
+    - |
+      APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+      if [ -z "$APP_NAME" ]; then
+        APP_NAME=$(basename $(pwd)) # Fallback to directory name
+      fi
+
+      # Push the application without starting it
+      if [ "$RANDOM_ROUTE" = "true" ]; then
+        echo "Pushing with random route..."
+        cf push "$APP_NAME" -f manifest.yml --no-start --random-route
+      else
+        echo "Pushing with route from manifest..."
+        cf push "$APP_NAME" -f manifest.yml --no-start
+      fi
+
+      # Set environment variables
+      if [ -n "$OPENAI_API_KEY" ]; then
+        cf set-env "$APP_NAME" "SPRING_AI_OPENAI_API_KEY" "$OPENAI_API_KEY"
+      fi
+
+      # Start the application
+      cf start "$APP_NAME"
+  environment:
+    name: client-production
+  when: manual
+  needs:
+    - build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# Deploy server to Cloud Foundry - manual trigger with parameters
+deploy-server:
+  stage: deploy-server
+  image: governmentpaas/cf-cli:latest
+  variables:
+    CF_API: ""
+    CF_USERNAME: ""
+    CF_PASSWORD: ""
+    CF_ORG: ""
+    CF_SPACE: ""
+    RANDOM_ROUTE: "false"
+    AVIATION_STACK_ACCESS_KEY: ""
+  script:
+    - cd java-spring-ai-mcp/server
+    - echo "Deploying server to Cloud Foundry..."
+    - cf api "$CF_API"
+    - cf auth "$CF_USERNAME" "$CF_PASSWORD"
+    - cf target -o "$CF_ORG" -s "$CF_SPACE"
+
+    # Create UPS if it doesn't exist
+    - |
+      if ! cf service aviation-stack-service-credentials > /dev/null 2>&1; then
+        echo "Creating user-provided service: aviation-stack-service-credentials"
+        cf create-user-provided-service aviation-stack-service-credentials -p '{"access_key":"'"$AVIATION_STACK_ACCESS_KEY"'"}' || echo "UPS creation might have failed or already exists"
+      else
+        echo "UPS aviation-stack-service-credentials already exists."
+      fi
+
+    # Set environment variables
+    - |
+      APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+      if [ -z "$APP_NAME" ]; then
+        APP_NAME=$(basename $(pwd)) # Fallback to directory name
+      fi
+
+      # Push the application without starting it
+      if [ "$RANDOM_ROUTE" = "true" ]; then
+        echo "Pushing with random route..."
+        cf push "$APP_NAME" -f manifest.yml --no-start --random-route
+      else
+        echo "Pushing with route from manifest..."
+        cf push "$APP_NAME" -f manifest.yml --no-start
+      fi
+
+      # Set environment variables
+      if [ -n "$AVIATION_STACK_ACCESS_KEY" ]; then
+        cf set-env "$APP_NAME" "AVIATION_STACK_ACCESS_KEY" "$AVIATION_STACK_ACCESS_KEY"
+      fi
+
+      # Start the application
+      cf start "$APP_NAME"
+  environment:
+    name: server-production
+  when: manual
+  needs:
+    - build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

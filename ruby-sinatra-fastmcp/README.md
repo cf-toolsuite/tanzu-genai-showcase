@@ -4,7 +4,7 @@
 
 This project demonstrates a flight tracking chatbot built with Ruby, Sinatra, and FastMCP. The chatbot integrates with the AviationStack API to provide real-time flight information and status updates through Model Context Protocol (MCP) for AI-powered interactions.
 
-**New to MCP?** Check out our [Frequently Asked Questions](docs/FAQ.md) to learn more about MCP servers, clients, and how they work together.
+**New to MCP?** Check out our [FAQ.md](docs/FAQ.md) to learn more about MCP servers, clients, and how they work together.
 
 ## Features
 
@@ -18,49 +18,38 @@ This project demonstrates a flight tracking chatbot built with Ruby, Sinatra, an
 - MCP integration for AI-powered interactions
 - Ready to deploy to Tanzu Platform for Cloud Foundry
 
-## Architecture
+## Architecture Overview
 
-This application uses the following technologies:
+This application uses a modular architecture that combines a web application with an MCP server:
 
-- **Ruby**: Core programming language
-- **Sinatra**: Lightweight web framework
-- **FastMCP**: Ruby implementation of the Model Context Protocol (MCP)
-- **AviationStack API**: Source for flight data
-- **Rack/Puma**: Application server
+```mermaid
+graph TD
+    A[User] -->|Interacts with| B[Web UI]
+    A -->|Asks questions to| C[Claude Desktop]
+    B -->|API Requests| D[Sinatra Web App]
+    C -->|MCP Requests| E[MCP Server]
+    D -->|Uses| F[AviationStackClient]
+    E -->|Uses| F
+    F -->|API Calls| G[AviationStack API]
 
-The application exposes MCP tools that can be called by AI models like Claude to provide flight information to users. These tools interface with the AviationStack API to fetch real-time flight data.
+    subgraph "Ruby Sinatra Application"
+    D
+    E
+    F
+    end
+```
+
+For a detailed architecture description, see [ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Prerequisites
 
-- Ruby 3.0+
+- Ruby 3.3+
 - Bundler
 - AviationStack API Key (Get one at [AviationStack](https://aviationstack.com/signup/free))
 - For Claude Desktop integration: Claude Desktop app
 - For Cloud Foundry deployment: CF CLI and access to a Tanzu Platform for Cloud Foundry environment
 
-## Project Structure
-
-```
-.
-├── app/                  # Application code
-│   ├── tools/            # MCP tools
-│   ├── resources/        # MCP resources
-│   └── aviation_stack_client.rb  # API client
-├── config/               # Configuration files
-├── public/               # Static assets
-│   └── css/              # CSS files
-├── scripts/              # Utility scripts
-├── test/                 # Test files
-├── views/                # ERB templates
-├── .env.example          # Example environment variables
-├── app.rb                # Main application entry point
-├── config.ru             # Rack configuration
-├── mcp_server.rb         # Standalone MCP server
-├── Gemfile               # Ruby dependencies
-└── manifest.yml          # Cloud Foundry deployment configuration
-```
-
-## Installation
+## Quick Start
 
 1. Clone the repository:
 
@@ -82,23 +71,33 @@ The application exposes MCP tools that can be called by AI models like Claude to
    cp .env.example .env
    ```
 
-4. Edit the `.env` file and add your AviationStack API key
+4. Edit the `.env` file and add your AviationStack API key:
 
-## Running Locally
+   ```
+   AVIATIONSTACK_API_KEY=your_api_key_here
+   ```
 
-Start the server with our development script:
+5. Start the server:
 
-```bash
-./scripts/start-dev.sh
-```
+   ```bash
+   ./scripts/start-dev.sh
+   ```
 
-Or manually with:
+6. Visit `http://localhost:4567` to access the web UI
 
-```bash
-bundle exec rackup -p 4567
-```
+For detailed installation and setup instructions, see [DEVELOPMENT.md](docs/DEVELOPMENT.md).
 
-Visit `http://localhost:4567` to access the web UI or `http://localhost:4567/api` to access the API endpoints.
+## Documentation
+
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture, components, data flow
+- [API.md](docs/API.md) - API documentation, endpoints, request/response formats
+- [DEVELOPMENT.md](docs/DEVELOPMENT.md) - Development setup, workflow, best practices
+- [DEPLOYMENT.md](docs/DEPLOYMENT.md) - Deployment instructions and environments
+- [TESTING.md](docs/TESTING.md) - Testing strategies and procedures
+- [TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) - Common issues and solutions
+- [CLAUDE.md](docs/CLAUDE.md) - Claude Desktop integration details
+- [FAQ.md](docs/FAQ.md) - Frequently asked questions
+- [CONTRIBUTING.md](docs/CONTRIBUTING.md) - Contribution guidelines
 
 ## Web UI Features
 
@@ -111,7 +110,7 @@ The web UI provides a user-friendly interface to interact with flight data:
 
 ## API Endpoints
 
-The following API endpoints are available:
+The application exposes several RESTful API endpoints:
 
 - `GET /api`: API information
 - `GET /api/search`: Search for flights
@@ -119,40 +118,26 @@ The following API endpoints are available:
 - `GET /api/schedules`: Get current flight schedules
 - `GET /api/future-schedules`: Get future flight schedules
 
-## Using with Claude Desktop
+For detailed API documentation, see [API.md](docs/API.md).
 
-To use this MCP server with [Claude Desktop](https://claude.ai/download), you can run our setup script which will configure Claude Desktop to recognize the MCP server:
+## MCP Integration
 
-```bash
-./scripts/setup-claude-desktop.sh
-```
+The application implements the Model Context Protocol (MCP) to enable AI assistants like Claude to interact with it. The following MCP tools are available:
 
-Alternatively, you can manually add the server configuration to Claude Desktop's config file:
+- `FlightSearchTool`: Search for flights based on various criteria
+- `FlightStatusTool`: Get detailed status information for specific flights
+- `AirportInfoTool`: Get information about airports worldwide
+- `AirlineInfoTool`: Get information about airlines
+- `FlightSchedulesTool`: Get current flight schedules
+- `FutureFlightSchedulesTool`: Get future flight schedules for specific dates
 
-**macOS**: `~/Library/Application Support/Claude/claude_desktop_config.json`
-**Windows**: `%APPDATA%\Claude\claude_desktop_config.json`
-**Linux**: `~/.config/Claude/claude_desktop_config.json`
+The MCP server supports two transport methods:
+- **STDIO Transport**: Used by Claude Desktop for local development (default)
+- **HTTP/SSE Transport**: Used for Cloud Foundry deployments to enable remote access via HTTP
 
-```json
-{
-  "mcpServers": {
-    "flight-tracking-bot": {
-      "command": "ruby",
-      "args": [
-        "/full/path/to/scripts/mcp_server_wrapper.rb"
-      ]
-    }
-  }
-}
-```
+For Claude Desktop integration instructions, see [CLAUDE.md](docs/CLAUDE.md).
 
-> [!IMPORTANT]
-> Make sure to use the full path to the `mcp_server_wrapper.rb` script, not the `mcp_server.rb` file. The wrapper script ensures that all dependencies are properly loaded.
-
-Restart Claude Desktop to apply the changes.
-
-> [!NOTE]
-> For more details on the wrapper script, troubleshooting, design, and function of the MCP server, consult [this guide](docs/CLAUDE.md).
+For HTTP/SSE transport configuration, see [MCP_SSE.md](docs/MCP_SSE.md).
 
 ## Example Chat Interactions
 
@@ -165,7 +150,7 @@ Once the MCP server is connected to Claude, you can ask questions like:
 - "Show me flight schedules for next week"
 - "What are the future flight schedules for JFK on April 10th?"
 
-## Running Tests
+## Testing
 
 Run the test suite with:
 
@@ -173,65 +158,27 @@ Run the test suite with:
 bundle exec rake test
 ```
 
-## Deploying to Tanzu Platform for Cloud Foundry
+For detailed testing information, see [TESTING.md](docs/TESTING.md).
 
-### Requirements
+## Deployment
 
-- Cloud Foundry CLI
-- Access to a Tanzu Platform for Cloud Foundry environment
+For detailed deployment instructions, see [DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
-### Deployment Steps
+## Contributing
 
-You can use our deployment script to automate the process:
+We welcome contributions to this project! Please see [CONTRIBUTING.md](docs/CONTRIBUTING.md) for guidelines.
 
-```bash
-set -a; source .env; set +a
-envsubst '${APP_NAME} ${AVIATIONSTACK_API_KEY} ${GENAI_SERVICE_TYPE} ${GENAI_SERVICE_PLAN} ${GENAI_SERVICE_NAME}' < scripts/deploy-to-tanzu.sh > scripts/deploy.sh
-chmod +x deploy.sh
-./scripts/deploy.sh
-```
+## License
 
-### Important Note About Cloud Foundry Deployment
-
-When deployed to Cloud Foundry, this application functions as an MCP server only. Users will need an MCP client to interact with it conversationally. See the [FAQ](docs/FAQ.md) for more information about MCP servers and clients.
+This project is licensed under the MIT License - see the LICENSE file for details.
 
 ## Resources
 
 ### Core Technologies
 
-- [Ruby](https://www.ruby-lang.org/en/) - Dynamic, open source programming language with a focus on simplicity and productivity
-- [Sinatra](https://sinatrarb.com/) - DSL for quickly creating web applications in Ruby with minimal effort
+- [Ruby](https://www.ruby-lang.org/en/) - Dynamic, open source programming language
+- [Sinatra](https://sinatrarb.com/) - Lightweight web framework for Ruby
 - [Fast-MCP](https://github.com/yjacquin/fast-mcp) - Ruby implementation of the Model Context Protocol
-- [Puma](https://puma.io/) - A Ruby/Rack web server built for parallelism
-- [Rack](https://github.com/rack/rack) - A modular Ruby webserver interface
-
-### Dependencies
-
-- [Bundler](https://bundler.io/) - Dependency management for Ruby applications
-- [Faraday](https://lostisland.github.io/faraday/) - HTTP client library for making external API requests
-- [JSON](https://rubygems.org/gems/json) - JSON implementation for Ruby
-- [Dotenv](https://github.com/bkeepers/dotenv) - Loads environment variables from .env files
-- [Dry-Schema](https://dry-rb.org/gems/dry-schema/) - Schema validation library
-
-### Development Dependencies
-
-- [Rackup](https://github.com/rack/rackup) - Command-line tool for running Rack applications
-- [Rerun](https://github.com/alexch/rerun) - Tool for restarting applications when files change
-
-### Testing Dependencies
-
-- [Minitest](https://github.com/minitest/minitest) - Complete suite of testing facilities
-- [Rack-Test](https://github.com/rack/rack-test) - Testing API for Rack applications
-- [WebMock](https://github.com/bblimke/webmock) - Library for stubbing HTTP requests
-- [Mocha](https://github.com/freerange/mocha) - Mocking and stubbing library
-
-### APIs & External Services
-
 - [AviationStack API](https://aviationstack.com/) - Real-time flight information provider
 - [Claude AI](https://claude.ai/) - AI assistant with MCP client capabilities
 - [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) - Protocol specification for AI model interactions
-
-### Deployment Platforms
-
-- [Cloud Foundry](https://www.cloudfoundry.org/) - Open-source cloud application platform
-- [Tanzu Platform](https://www.vmware.com/products/app-platform/tanzu) - VMware's enterprise PaaS built on Cloud Foundry

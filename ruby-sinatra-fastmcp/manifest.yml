@@ -9,6 +9,7 @@ applications:
   command: bundle exec rackup -p $PORT -o 0.0.0.0
   env:
     RACK_ENV: production
+    ENABLE_MCP_SSE: true
   health-check-type: http
   health-check-http-endpoint: /
   timeout: 60

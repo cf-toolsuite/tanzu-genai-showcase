@@ -1,0 +1,142 @@
+# GitLab CI/CD for dotnet-extensions-ai
+# Equivalent to GitHub Actions workflow: dotnet-extensions-ai.yml
+
+image: mcr.microsoft.com/dotnet/sdk:latest
+
+# Cache NuGet packages between pipeline jobs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .nuget/
+
+# Define stages in the pipeline
+stages:
+  - build
+  - test
+  - publish
+  - upload
+  - deploy
+
+# Run CI only when changes in the project files or CI configuration
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      changes:
+        - dotnet-extensions-ai/**/*
+        - dotnet-extensions-ai/ci/gitlab/.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - dotnet-extensions-ai/**/*
+        - dotnet-extensions-ai/ci/gitlab/.gitlab-ci.yml
+
+# Set environment variables for the pipeline
+variables:
+  NUGET_PACKAGES: .nuget
+
+# Build the application
+build:
+  stage: build
+  script:
+    - cd dotnet-extensions-ai
+    - dotnet restore
+    - dotnet build --no-restore
+
+# Run tests
+test:
+  stage: test
+  script:
+    - cd dotnet-extensions-ai
+    - dotnet test --no-build --verbosity normal
+  needs:
+    - build
+
+# Publish the application
+publish:
+  stage: publish
+  script:
+    - cd dotnet-extensions-ai
+    - dotnet publish -c Release -o ./publish
+  artifacts:
+    paths:
+      - dotnet-extensions-ai/publish/
+    expire_in: 1 week
+  needs:
+    - test
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# Upload artifacts - only on main branch
+upload:
+  stage: upload
+  script:
+    - echo "Uploading build artifacts to GitLab Package Registry"
+    - |
+      cd dotnet-extensions-ai
+      # Create archive of the publish directory
+      tar -czf publish.tar.gz publish/
+
+      # Upload the archive to GitLab Package Registry using the API
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           --upload-file publish.tar.gz \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/dotnet-extensions-ai/${CI_COMMIT_TAG:-latest}/publish.tar.gz"
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - publish
+
+# Deploy to Cloud Foundry - manual trigger with parameters
+deploy:
+  stage: deploy
+  image: governmentpaas/cf-cli:latest
+  variables:
+    CF_API: ""
+    CF_USERNAME: ""
+    CF_PASSWORD: ""
+    CF_ORG: ""
+    CF_SPACE: ""
+    RANDOM_ROUTE: "false"
+    GOOGLEMAPS_API_KEY: ""
+  script:
+    - cd dotnet-extensions-ai
+    - echo "Deploying to Cloud Foundry..."
+    - cf api "$CF_API"
+    - cf auth "$CF_USERNAME" "$CF_PASSWORD"
+    - cf target -o "$CF_ORG" -s "$CF_SPACE"
+
+    # Create GenAI service if it doesn't exist
+    - |
+      if ! cf service travel-advisor-llm > /dev/null 2>&1; then
+        echo "Creating GenAI service..."
+        cf create-service genai standard travel-advisor-llm || echo "Service creation failed, it might already exist or plan is not available"
+      else
+        echo "GenAI service already exists"
+      fi
+
+    # Set environment variables
+    - |
+      APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+      if [ -z "$APP_NAME" ]; then
+        APP_NAME=$(basename $(pwd)) # Fallback to directory name
+      fi
+
+      # Push the application without starting it
+      if [ "$RANDOM_ROUTE" = "true" ]; then
+        echo "Pushing with random route..."
+        cf push "$APP_NAME" -f manifest.yml --no-start --random-route
+      else
+        echo "Pushing with route from manifest..."
+        cf push "$APP_NAME" -f manifest.yml --no-start
+      fi
+
+      # Set environment variables
+      if [ -n "$GOOGLEMAPS_API_KEY" ]; then
+        cf set-env "$APP_NAME" "GOOGLEMAPS__APIKEY" "$GOOGLEMAPS_API_KEY"
+      fi
+
+      # Start the application
+      cf start "$APP_NAME"
+  environment:
+    name: production
+  when: manual
+  needs:
+    - publish

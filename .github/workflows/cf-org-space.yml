@@ -1,0 +1,39 @@
+name: Cloud Foundry Org and Space Setup
+
+on:
+  workflow_call:
+    inputs:
+      cf_org:
+        required: true
+        type: string
+        description: 'Cloud Foundry Target Organization'
+      cf_space:
+        required: true
+        type: string
+        description: 'Cloud Foundry Target Space'
+
+jobs:
+  setup_org_space:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check/Create Organization
+        run: |
+          if ! cf org --guid "${{ inputs.cf_org }}"; then
+            echo "Organization '${{ inputs.cf_org }}' not found. Creating..."
+            cf create-org "${{ inputs.cf_org }}"
+          else
+            echo "Organization '${{ inputs.cf_org }}' found."
+          fi
+
+      - name: Check/Create Space
+        run: |
+          if ! cf space --guid "${{ inputs.cf_space }}" -o "${{ inputs.cf_org }}"; then
+            echo "Space '${{ inputs.cf_space }}' not found in org '${{ inputs.cf_org }}'. Creating..."
+            cf create-space "${{ inputs.cf_space }}" -o "${{ inputs.cf_org }}"
+          else
+            echo "Space '${{ inputs.cf_space }}' found."
+          fi
+
+      - name: Target Org and Space
+        run: |
+          cf target -o "${{ inputs.cf_org }}" -s "${{ inputs.cf_space }}"

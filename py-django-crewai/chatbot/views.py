@@ -5,9 +5,13 @@ from django.conf import settings
 from django.utils import timezone
 from .models import Conversation, Message, MovieRecommendation, Theater, Showtime
 from .services.movie_crew import MovieCrewManager
+from .services.movie_crew_optimized import MovieCrewManagerOptimized
+from django.conf import settings
+from .performance_settings import THEATER_SEARCH_TIMEOUT, THEATER_FALLBACK_ENABLED
 import json
 import logging
 import traceback
+import time
 from datetime import datetime as dt
 from datetime import datetime
 
@@ -92,545 +96,402 @@ def index(request):
         'casual_recommendations': casual_recommendations,
     })
 
-@csrf_exempt
-def send_message(request):
-    """Process a message sent by the user and return the chatbot's response with complete movie and theater data."""
-    if request.method == 'POST':
+def _parse_request_data(request):
+    """Helper function to parse request data."""
+    try:
+        raw_body = request.body.decode('utf-8')
         try:
-            logger.info("=== Processing new chat message ===")
-
-            # Parse request data first to determine the mode
+            data = json.loads(raw_body)
+        except json.JSONDecodeError:
             try:
-                raw_body = request.body.decode('utf-8')
-                try:
-                    data = json.loads(raw_body)
-                except json.JSONDecodeError:
-                    try:
-                        data = json.loads(raw_body.replace("'", '"'))
-                    except Exception:
-                        if raw_body.startswith('"') and raw_body.endswith('"'):
-                            data = {"message": raw_body.strip('"')}
-                        else:
-                            return JsonResponse({
-                                'status': 'error',
-                                'message': 'Invalid request format. Could not parse message.'
-                            }, status=400)
-
-                # Extract first run filter preference to determine which conversation to use
-                first_run_filter = data.get('first_run_filter', True)
-                if isinstance(first_run_filter, str):
-                    first_run_filter = first_run_filter.lower() == 'true'
-
-                logger.info(f"Message mode: {'First Run' if first_run_filter else 'Casual Viewing'}")
-            except Exception as parsing_error:
-                logger.error(f"Error parsing request: {str(parsing_error)}")
-                # Default to First Run mode if we can't determine from the request
-                first_run_filter = True
-                logger.info("Defaulting to First Run mode due to parsing error")
-
-            # Get the appropriate conversation based on the mode
-            if first_run_filter:
-                conversation_id = request.session.get('first_run_conversation_id')
-                if not conversation_id:
-                    logger.info("Creating new First Run conversation")
-                    conversation = Conversation.objects.create(mode='first_run')
-                    request.session['first_run_conversation_id'] = conversation.id
-                    logger.info(f"New First Run conversation created with ID: {conversation.id}")
+                data = json.loads(raw_body.replace("'", '"'))
+            except Exception:
+                if raw_body.startswith('"') and raw_body.endswith('"'):
+                    data = {"message": raw_body.strip('"')}
                 else:
-                    logger.info(f"Using existing First Run conversation with ID: {conversation_id}")
-                    try:
-                        conversation = Conversation.objects.get(id=conversation_id)
-                        # Set mode if it's not already set (for backwards compatibility)
-                        if conversation.mode != 'first_run':
-                            conversation.mode = 'first_run'
-                            conversation.save()
-                    except Conversation.DoesNotExist:
-                        # Create a new one if the stored ID doesn't exist
-                        conversation = Conversation.objects.create(mode='first_run')
-                        request.session['first_run_conversation_id'] = conversation.id
-            else:
-                conversation_id = request.session.get('casual_conversation_id')
-                if not conversation_id:
-                    logger.info("Creating new Casual Viewing conversation")
-                    conversation = Conversation.objects.create(mode='casual')
-                    request.session['casual_conversation_id'] = conversation.id
-                    logger.info(f"New Casual Viewing conversation created with ID: {conversation.id}")
-                else:
-                    logger.info(f"Using existing Casual Viewing conversation with ID: {conversation_id}")
-                    try:
-                        conversation = Conversation.objects.get(id=conversation_id)
-                        # Set mode if it's not already set (for backwards compatibility)
-                        if conversation.mode != 'casual':
-                            conversation.mode = 'casual'
-                            conversation.save()
-                    except Conversation.DoesNotExist:
-                        # Create a new one if the stored ID doesn't exist
-                        conversation = Conversation.objects.create(mode='casual')
-                        request.session['casual_conversation_id'] = conversation.id
-
-            # Robust JSON parsing with comprehensive logging
-            try:
-                # First, log the raw request body
-                raw_body = request.body.decode('utf-8')
-                logger.debug(f"Raw request body: {raw_body}")
-                logger.debug(f"Request method: {request.method}")
-                logger.debug(f"Request content type: {request.content_type}")
-                logger.debug(f"Request headers: {dict(request.headers)}")
-
-                # Try parsing with multiple strategies
-                try:
-                    # First, standard json.loads
-                    data = json.loads(raw_body)
-                except json.JSONDecodeError:
-                    # Handle common JSON parsing issues
-                    try:
-                        # Try parsing with single quotes or other variations
-                        data = json.loads(raw_body.replace("'", '"'))
-                    except Exception as parse_error:
-                        # If all parsing fails, try extracting message by simple string operations
-                        if raw_body.startswith('"') and raw_body.endswith('"'):
-                            data = {"message": raw_body.strip('"')}
-                            logger.warning("Received message as a raw string, converted to dictionary")
-                        else:
-                            logger.error(f"Failed to parse request body: {parse_error}")
-                            return JsonResponse({
-                                'status': 'error',
-                                'message': 'Invalid request format. Could not parse message.'
-                            }, status=400)
-
-                # Ensure data is a dictionary
-                if not isinstance(data, dict):
-                    logger.error(f"Request data is not a dictionary after parsing: {data}")
-                    return JsonResponse({
-                        'status': 'error',
-                        'message': 'Invalid request format'
-                    }, status=400)
-
-                # Extract user message with multiple fallback strategies
-                user_message_text = (
-                    data.get('message') or
-                    data.get('text') or
-                    data.get('query') or
-                    ''
-                )
-
-                # Additional safety check to ensure it's a string
-                if not isinstance(user_message_text, str):
-                    logger.error(f"User message is not a string: {user_message_text}")
-                    user_message_text = str(user_message_text)
-
-                # Trim message to reasonable length
-                user_message_text = user_message_text[:500]  # Limit to 500 characters
-
-                logger.info(f"Processed user message: {user_message_text}")
-
-                # Extract location with multiple keys and improved handling
-                location = (
-                    data.get('location') or
-                    data.get('city') or
-                    data.get('loc') or
-                    request.session.get('user_location') or
-                    'Unknown'
-                )
-                # Store location in session for future use
-                request.session['user_location'] = location
-
-                # Extract timezone information (passed from frontend)
-                timezone_str = (
-                    data.get('timezone') or
-                    request.session.get('user_timezone') or
-                    'America/Los_Angeles'  # Default if not provided
-                )
-                # Store timezone in session for future use
-                request.session['user_timezone'] = timezone_str
-                logger.info(f"Using timezone: {timezone_str}")
-
-                # Extract first run filter preference (default to True for first run movie mode)
-                first_run_filter = data.get('first_run_filter', True)
-                # Convert string representation to boolean if needed
-                if isinstance(first_run_filter, str):
-                    first_run_filter = first_run_filter.lower() == 'true'
-                logger.info(f"First run filter: {first_run_filter}")
-
-                # Log location details
-                if location and location.lower() != 'unknown':
-                    logger.info(f"User provided location: {location}")
-                else:
-                    logger.info("No user location provided, using default")
-
-            except Exception as parsing_error:
-                logger.error(f"Comprehensive parsing error: {str(parsing_error)}")
-                logger.error(traceback.format_exc())
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Failed to process your request. Please try again.'
-                }, status=400)
-
-            # Save user message with additional logging
-            try:
-                user_message = Message.objects.create(
-                    conversation=conversation,
-                    sender='user',
-                    content=user_message_text
-                )
-                logger.info(f"Saved user message: {user_message.id}")
-            except Exception as save_error:
-                logger.error(f"Error saving user message: {str(save_error)}")
-                logger.error(traceback.format_exc())
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Could not save your message. Please try again.'
-                }, status=500)
-
-            # Initialize the movie crew with robust configuration
-            try:
-                # Validate configuration before initialization
-                if not settings.LLM_CONFIG.get('api_key'):
-                    logger.error("Missing API key in LLM_CONFIG")
-                    return JsonResponse({
-                        'status': 'error',
-                        'message': 'LLM API key is not configured. Please check your environment variables.'
-                    }, status=500)
-
-                logger.info(f"Initializing MovieCrewManager with model: {settings.LLM_CONFIG.get('model', 'gpt-4o-mini')}")
-                logger.info(f"Base URL configured: {'Yes' if settings.LLM_CONFIG.get('base_url') else 'No'}")
-                logger.info(f"TMDb API key configured: {'Yes' if settings.TMDB_API_KEY else 'No'}")
-                logger.info(f"User location: {location}")
-
-                # Get client IP address for geolocation
-                client_ip = get_client_ip(request)
-                logger.info(f"Client IP: {client_ip}")
-
-                movie_crew_manager = MovieCrewManager(
-                    api_key=settings.LLM_CONFIG['api_key'],
-                    base_url=settings.LLM_CONFIG.get('base_url'),
-                    model=settings.LLM_CONFIG.get('model', 'gpt-4o-mini'),
-                    tmdb_api_key=settings.TMDB_API_KEY,
-                    user_location=location,
-                    user_ip=client_ip,  # Pass the IP directly in constructor
-                    timezone=timezone_str  # Pass the timezone string for showtime conversions
-                )
-                logger.info("Movie crew manager initialized successfully")
-            except Exception as init_error:
-                logger.error(f"Error initializing movie crew manager: {str(init_error)}")
-                logger.error(traceback.format_exc())
-                return JsonResponse({
-                    'status': 'error',
-                    'message': 'Could not initialize movie assistant. Please try again.'
-                }, status=500)
-
-            # Process the message with extensive error handling
-            try:
-                # Prepare conversation history with clear logging
-                conversation_messages = conversation.messages.all()
-                logger.info(f"Found {conversation_messages.count()} messages in conversation history")
-
-                conversation_history = [{
-                    'sender': msg.sender,
-                    'content': msg.content
-                } for msg in conversation_messages]
-
-                logger.debug(f"Conversation history preview: {conversation_history[-3:] if len(conversation_history) > 3 else conversation_history}")
-
-                # Use the same query for both modes, but pass the mode flag to process_query
-                query_to_use = user_message_text
-                logger.info(f"Using query: '{query_to_use[:50]}{'...' if len(query_to_use) > 50 else ''}' in {'casual' if not first_run_filter else 'first run'} mode")
-
-                # Track processing time
-                import time
-                start_time = time.time()
-
-                response_data = movie_crew_manager.process_query(
-                    query=query_to_use,
-                    conversation_history=conversation_history,
-                    first_run_mode=first_run_filter
-                )
-
-                processing_time = time.time() - start_time
-                logger.info(f"Query processing completed in {processing_time:.2f} seconds")
-
-                logger.info(f"Response data type: {type(response_data)}")
-                logger.info(f"Response data keys: {response_data.keys() if isinstance(response_data, dict) else 'Not a dictionary'}")
-
-                if isinstance(response_data, dict) and 'movies' in response_data:
-                    logger.info(f"Received {len(response_data.get('movies', []))} movie recommendations")
-            except Exception as process_error:
-                logger.error(f"Error processing query: {str(process_error)}")
-                logger.error(traceback.format_exc())
-                # Instead of returning an error, we'll set response_data to a default value and continue
-                response_data = {
-                    'response': 'I encountered an issue while processing your request about movies. Please try asking in a different way or check back later.',
-                    'movies': []
-                }
-                logger.info("Set default response_data after catching process_query exception")
-
-            # Handle the case when response_data is None
-            if response_data is None:
-                logger.warning("response_data is None from movie_crew_manager.process_query")
-                response_data = {
-                    'response': 'I encountered an issue while searching for movies. Please try again or be more specific.',
-                    'movies': []
-                }
-
-            # Save chatbot response
-            try:
-                # Safely extract response content
-                bot_response = response_data.get('response', 'Sorry, I could not generate a response.')
-
-                bot_message = Message.objects.create(
-                    conversation=conversation,
-                    sender='bot',
-                    content=bot_response
-                )
-                logger.info(f"Saved bot message: {bot_message.id}")
-            except Exception as save_error:
-                logger.error(f"Error saving bot message: {str(save_error)}")
-                logger.error(traceback.format_exc())
-                bot_response = 'Sorry, I could not generate a response.'
-
-            # Save movie recommendations with error handling
-            try:
-                # Safely extract movies, default to empty list
-                movies = response_data.get('movies', [])
-                if not isinstance(movies, list):
-                    logger.warning(f"Movies data is not a list, type: {type(movies)}")
-                    movies = []
-
-                saved_movies = []
-                for movie_index, movie_data in enumerate(movies):
-                    logger.debug(f"Processing movie {movie_index+1}/{len(movies)}: {movie_data.get('title', 'Unknown')}")
-
-                    # Validate required fields
-                    if not movie_data.get('title'):
-                        logger.warning(f"Movie {movie_index+1} missing title, using default")
-
-                    # Robust data extraction with defaults
-                    movie = MovieRecommendation.objects.create(
-                        conversation=conversation,
-                        title=movie_data.get('title', 'Unknown Movie'),
-                        overview=movie_data.get('overview', ''),
-                        poster_url=movie_data.get('poster_url', ''),
-                        release_date=movie_data.get('release_date'),
-                        tmdb_id=movie_data.get('tmdb_id'),
-                        rating=movie_data.get('rating')
-                    )
-                    saved_movies.append(movie)
-
-                    # Track theaters data
-                    theaters_count = 0
-                    showtimes_count = 0
-
-                    # Check if this is a current release movie before processing theaters
-                    is_current_release = movie_data.get('is_current_release', False)
-
-                    # Save associated theaters and showtimes - only for current releases and in first run mode
-                    if first_run_filter and is_current_release and 'theaters' in movie_data and movie_data['theaters']:
-                        theaters_data = movie_data['theaters']
-                        logger.debug(f"Found {len(theaters_data)} theaters for current movie: {movie.title}")
-
-                        for theater_index, theater_data in enumerate(theaters_data):
-                            logger.debug(f"Processing theater {theater_index+1}/{len(theaters_data)}: {theater_data.get('name', 'Unknown')}")
-
-                            # Get distance from theater data if available
-                            distance_miles = theater_data.get('distance_miles')
-
-                            theater, created = Theater.objects.get_or_create(
-                                name=theater_data.get('name', 'Unknown Theater'),
-                                defaults={
-                                    'address': theater_data.get('address', ''),
-                                    'latitude': theater_data.get('latitude'),
-                                    'longitude': theater_data.get('longitude'),
-                                    'distance_miles': distance_miles
-                                }
-                            )
-
-                            # Update distance even for existing theaters (may change based on user location)
-                            if not created and distance_miles is not None:
-                                theater.distance_miles = distance_miles
-                                theater.save(update_fields=['distance_miles'])
-                            theaters_count += 1
-
-                            # Log whether we created a new theater or found existing
-                            if created:
-                                logger.debug(f"Created new theater: {theater.name}")
-                            else:
-                                logger.debug(f"Using existing theater: {theater.name}")
-
-                            # Save showtimes
-                            if 'showtimes' in theater_data:
-                                showtime_data_list = theater_data['showtimes']
-                                logger.debug(f"Found {len(showtime_data_list)} showtimes for theater: {theater.name}")
-
-                                for showtime_data in showtime_data_list:
-                                    # Try to parse the start time and add timezone info
-                                    try:
-                                        start_time_str = showtime_data.get('start_time', '')
-                                        if not start_time_str:
-                                            continue
-
-                                        # If the time is in HH:mm AM/PM format from SerpAPI
-                                        if ':' in start_time_str and ('AM' in start_time_str or 'PM' in start_time_str):
-                                            # Convert to a datetime object with date from the selected day
-
-                                            # Get the date part from the string if available
-                                            if 'T' in start_time_str:
-                                                # Already has date information
-                                                start_time = dt.fromisoformat(start_time_str.replace(' ', 'T'))
-                                            else:
-                                                # Extract time
-                                                time_format = '%I:%M %p' if ' ' in start_time_str else '%H:%M'
-                                                time_only = datetime.strptime(start_time_str, time_format).time()
-
-                                                # Combine with today's date
-                                                start_time = datetime.combine(datetime.today().date(), time_only)
-
-                                            # Add timezone info - use Django's timezone utilities
-                                            start_time = timezone.make_aware(start_time)
-                                        else:
-                                            # Standard ISO format processing
-                                            start_time = dt.fromisoformat(start_time_str.replace(' ', 'T'))
-
-                                            # Ensure timezone is set
-                                            from django.utils import timezone as django_timezone
-                                            if django_timezone.is_naive(start_time):
-                                                start_time = django_timezone.make_aware(start_time)
-                                    except (ValueError, TypeError) as e:
-                                        logger.warning(f"Failed to parse showtime: {start_time_str} - {e}")
-                                        continue
-
-                                    # Create or update showtime with timezone-aware datetime
-                                    try:
-                                        Showtime.objects.create(
-                                            movie=movie,
-                                            theater=theater,
-                                            start_time=start_time,
-                                            format=showtime_data.get('format', 'Standard')
-                                        )
-                                        logger.debug(f"Created showtime: {start_time} for '{movie.title}' at {theater.name}")
-                                    except Exception as showtime_error:
-                                        logger.error(f"Error creating showtime: {str(showtime_error)}")
-                                    showtimes_count += 1
-                    else:
-                        if not first_run_filter:
-                            logger.info(f"Movie '{movie.title}' processed in casual viewing mode, skipping theaters and showtimes")
-                        elif not is_current_release:
-                            logger.info(f"Movie '{movie.title}' is not a current release, skipping theaters and showtimes")
-                        else:
-                            logger.debug(f"No theaters found for movie: {movie.title}")
-
-                    logger.info(f"Movie '{movie.title}' saved with {theaters_count} theaters and {showtimes_count} showtimes")
-
-                logger.info(f"Saved {len(saved_movies)} movie recommendations out of {len(movies)} received")
-            except Exception as rec_error:
-                logger.error(f"Error saving movie recommendations: {str(rec_error)}")
-                logger.error(traceback.format_exc())
-
-            # Return response with comprehensive error handling
-            try:
-                # Fetch recent recommendations
-                recent_recs = conversation.recommendations.order_by('-created_at')[:5]
-
-                # Debug logging of theaters/showtimes
-                for rec in recent_recs:
-                    showtime_count = rec.showtimes.count()
-                    if showtime_count > 0:
-                        logger.info(f"Movie {rec.title} has {showtime_count} showtimes in database")
-                    else:
-                        logger.warning(f"Movie {rec.title} has NO showtimes in database")
-
-                # Check if this is a current year movie
-                current_year = dt.now().year
-
-                # Prepare recommendations data
-                recommendations_data = []
-
-                for rec in recent_recs:
-                    # Create base recommendation data
-                    movie_data = {
-                        'id': rec.id,
-                        'title': rec.title,
-                        'overview': rec.overview,
-                        'poster_url': rec.poster_url,
-                        'release_date': rec.release_date.isoformat() if rec.release_date else None,
-                        'rating': float(rec.rating) if rec.rating else None,
-                        # Mark as current release if it's from current year or if it has showtimes
-                        'is_current_release': (rec.release_date and rec.release_date.year >= current_year - 1) or rec.showtimes.exists(),
-                        # Properly format theater data with all required fields
-                        'theaters': []
-                    }
-
-                    # Add to recommendations data
-                    recommendations_data.append(movie_data)
-
-                    # Group showtimes by theater to build the correct structure
-                    theater_map = {}
-                    for showtime in rec.showtimes.all():
-                        theater_name = showtime.theater.name
-
-                        # Create theater entry if not exists
-                        if theater_name not in theater_map:
-                            # Find matching theater in the retrieved movie data
-                            matching_theater = next((theater for movie in movies if movie.get('title') == rec.title
-                                                  for theater in movie.get('theaters', [])
-                                                  if theater.get('name') == theater_name), None)
-
-                            # Get distance from the matched theater from API response
-                            distance_miles = None
-                            if matching_theater and matching_theater.get('distance_miles') is not None:
-                                distance_miles = matching_theater.get('distance_miles')
-                                logger.info(f"Found actual distance for theater {theater_name}: {distance_miles} miles")
-                            else:
-                                # Use default distance if not available
-                                distance_miles = showtime.theater.distance_miles if hasattr(showtime.theater, 'distance_miles') else None
-
-                                # If still no distance, use a single default value
-                                if distance_miles is None:
-                                    distance_miles = 10.0  # Default distance
-                                    logger.info(f"Using default distance for theater {theater_name}")
-
-                            theater_map[theater_name] = {
-                                'name': theater_name,
-                                'address': showtime.theater.address,
-                                'distance_miles': distance_miles,
-                                'showtimes': []
-                            }
-
-                        # Add showtimes to the theater
-                        theater_map[theater_name]['showtimes'].append({
-                            'start_time': showtime.start_time.isoformat(),
-                            'format': showtime.format
-                        })
-
-                    # Add theaters to movie sorted by distance
-                    for _, theater in sorted(theater_map.items(), key=lambda x: x[1].get('distance_miles', float('inf'))):
-                        movie_data['theaters'].append(theater)
-
-                return JsonResponse({
-                    'status': 'success',
-                    'message': bot_response,
-                    'recommendations': recommendations_data
-                })
-            except Exception as final_error:
-                logger.error(f"Final response generation error: {str(final_error)}")
-                logger.error(traceback.format_exc())
-                return JsonResponse({
-                    'status': 'success',
-                    'message': bot_response,
-                    'recommendations': []
-                })
-
-        except Exception as global_error:
-            logger.error(f"Global error in send_message: {str(global_error)}")
-            logger.error(traceback.format_exc())
+                    raise ValueError('Invalid request format. Could not parse message.')
+        return data
+    except Exception as parsing_error:
+        logger.error(f"Error parsing request: {str(parsing_error)}")
+        raise
+
+def _get_or_create_conversation(request, mode):
+    """Helper function to get or create a conversation."""
+    session_key = f"{mode}_conversation_id"
+    conversation_id = request.session.get(session_key)
+
+    if not conversation_id:
+        logger.info(f"Creating new {mode} conversation")
+        conversation = Conversation.objects.create(mode=mode)
+        request.session[session_key] = conversation.id
+        logger.info(f"New {mode} conversation created with ID: {conversation.id}")
+    else:
+        logger.info(f"Using existing {mode} conversation with ID: {conversation_id}")
+        try:
+            conversation = Conversation.objects.get(id=conversation_id)
+            if conversation.mode != mode:
+                conversation.mode = mode
+                conversation.save()
+        except Conversation.DoesNotExist:
+            conversation = Conversation.objects.create(mode=mode)
+            request.session[session_key] = conversation.id
+
+    return conversation
+
+@csrf_exempt
+def get_movies_theaters_and_showtimes(request):
+    """Process a message in First Run mode to get movies, theaters, and showtimes."""
+    if request.method != 'POST':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'This endpoint only accepts POST requests'
+        }, status=405)
+
+    # Check if First Run mode is enabled
+    if not settings.FEATURES.get('ENABLE_FIRST_RUN_MODE', True):
+        logger.warning("First Run mode is disabled but endpoint was accessed")
+        return JsonResponse({
+            'status': 'error',
+            'message': 'First Run mode is currently disabled. Please use Casual Viewing mode instead.'
+        }, status=403)
+
+    try:
+        logger.info("=== Processing First Run mode request for movies, theaters, and showtimes ===")
+        data = _parse_request_data(request)
+        conversation = _get_or_create_conversation(request, 'first_run')
+
+        # Extract message and location from request data
+        user_message_text = (
+            data.get('message') or
+            data.get('text') or
+            data.get('query') or
+            ''
+        )
+        location = (
+            data.get('location') or
+            data.get('city') or
+            data.get('loc') or
+            request.session.get('user_location') or
+            'Unknown'
+        )
+        timezone_str = (
+            data.get('timezone') or
+            request.session.get('user_timezone') or
+            'America/Los_Angeles'
+        )
+
+        # Save user message
+        user_message = Message.objects.create(
+            conversation=conversation,
+            sender='user',
+            content=user_message_text
+        )
+
+        # Store the query in the session for polling
+        request.session['first_run_query'] = user_message_text
+        request.session['user_location'] = location
+        request.session['user_timezone'] = timezone_str
+        request.session['first_run_query_timestamp'] = timezone.now().isoformat()
+
+        # Return a processing status to enable polling
+        return JsonResponse({
+            'status': 'processing',
+            'message': 'Your movie recommendations are being processed. Please wait a moment.',
+            'conversation_id': conversation.id
+        })
+
+    except Exception as e:
+        logger.error(f"Error initiating first run movie recommendation request: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({
+            'status': 'error',
+            'message': 'An error occurred while processing your request.'
+        }, status=500)
+
+@csrf_exempt
+def get_movie_recommendations(request):
+    """Process a message in Casual Viewing mode to get movie recommendations."""
+    if request.method != 'POST':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'This endpoint only accepts POST requests'
+        }, status=405)
+
+    try:
+        logger.info("=== Processing Casual Viewing mode request for movie recommendations ===")
+        data = _parse_request_data(request)
+        conversation = _get_or_create_conversation(request, 'casual')
+
+        # Extract message from request data
+        user_message_text = (
+            data.get('message') or
+            data.get('text') or
+            data.get('query') or
+            ''
+        )
+
+        # Save user message
+        user_message = Message.objects.create(
+            conversation=conversation,
+            sender='user',
+            content=user_message_text
+        )
+
+        # Store the query in the session for polling
+        request.session['casual_query'] = user_message_text
+        request.session['casual_query_timestamp'] = timezone.now().isoformat()
+
+        # Check if we should process immediately or return a processing status
+        # For simplicity, we'll always return processing status to enable polling
+        return JsonResponse({
+            'status': 'processing',
+            'message': 'Your movie recommendations are being processed. Please wait a moment.',
+            'conversation_id': conversation.id
+        })
+
+    except Exception as e:
+        logger.error(f"Error initiating movie recommendation request: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({
+            'status': 'error',
+            'message': 'An error occurred while processing your request.'
+        }, status=500)
+
+
+@csrf_exempt
+def poll_movie_recommendations(request):
+    """Poll for movie recommendations that are being processed."""
+    if request.method != 'GET':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'This endpoint only accepts GET requests'
+        }, status=405)
+
+    timeout_seconds = getattr(settings, "THEATER_SEARCH_TIMEOUT", 60)
+    start_time = time.time()
+
+    try:
+        # Get the conversation
+        conversation = _get_or_create_conversation(request, 'casual')
+
+        # Check if we have a query to process
+        user_message_text = request.session.get('casual_query')
+        if not user_message_text:
             return JsonResponse({
                 'status': 'error',
-                'message': 'An unexpected error occurred. Please try again.'
-            }, status=500)
+                'message': 'No pending movie recommendation request found.'
+            }, status=404)
 
-    return JsonResponse({
-        'status': 'error',
-        'message': 'Invalid request method'
-    }, status=400)
+        # Check if we already have recommendations for this conversation
+        existing_recommendations = conversation.recommendations.all()
+
+        # If we have recommendations and they were created after the query timestamp,
+        # return them as the result
+        query_timestamp = request.session.get('casual_query_timestamp')
+        if query_timestamp and existing_recommendations.exists():
+            # Get the latest recommendation timestamp
+            latest_recommendation = existing_recommendations.order_by('-created_at').first()
+            if latest_recommendation and latest_recommendation.created_at.isoformat() > query_timestamp:
+                # We have fresh recommendations, return them
+                logger.info(f"Found existing recommendations for conversation {conversation.id}")
+
+                # Get the bot message
+                bot_message = conversation.messages.filter(sender='bot').order_by('-created_at').first()
+                bot_response = bot_message.content if bot_message else "Here are your movie recommendations."
+
+                # Format recommendations
+                recommendations_data = []
+                # Convert ISO format string to datetime object
+                from datetime import datetime
+                query_dt = datetime.fromisoformat(query_timestamp)
+
+                # If the query_dt is naive (no timezone), make it timezone-aware
+                if query_dt.tzinfo is None:
+                    query_dt = timezone.make_aware(query_dt)
+
+                for movie in existing_recommendations.filter(created_at__gt=query_dt):
+                    recommendations_data.append({
+                        'id': movie.id,
+                        'title': movie.title,
+                        'overview': movie.overview,
+                        'poster_url': movie.poster_url,
+                        'release_date': movie.release_date.isoformat() if movie.release_date and hasattr(movie.release_date, 'isoformat') else movie.release_date,
+                        'rating': float(movie.rating) if movie.rating else None,
+                        'theaters': []  # No theaters for casual mode
+                    })
+
+                if recommendations_data:
+                    # Clear the query from the session
+                    if 'casual_query' in request.session:
+                        del request.session['casual_query']
+                    if 'casual_query_timestamp' in request.session:
+                        del request.session['casual_query_timestamp']
+
+                    return JsonResponse({
+                        'status': 'success',
+                        'message': bot_response,
+                        'recommendations': recommendations_data
+                    })
+
+        # If we don't have recommendations yet, process the query
+        # Initialize movie crew manager
+        # Use optimized manager if optimization is enabled in settings
+        use_optimized = getattr(settings, "USE_OPTIMIZED_COMPONENTS", True)
+
+        if use_optimized:
+            # Note: The optimized manager doesn't support timeout and fallback parameters yet
+            movie_crew_manager = MovieCrewManagerOptimized(
+                api_key=settings.LLM_CONFIG['api_key'],
+                base_url=settings.LLM_CONFIG.get('base_url'),
+                model=settings.LLM_CONFIG.get('model', 'gpt-4o-mini'),
+                tmdb_api_key=settings.TMDB_API_KEY,
+                user_location='',  # No location needed for casual mode
+                user_ip=get_client_ip(request),
+                timezone='UTC'  # Default timezone for casual mode
+                # timeout and fallback parameters removed as they're not supported
+            )
+        else:
+            movie_crew_manager = MovieCrewManager(
+                api_key=settings.LLM_CONFIG['api_key'],
+                base_url=settings.LLM_CONFIG.get('base_url'),
+                model=settings.LLM_CONFIG.get('model', 'gpt-4o-mini'),
+                tmdb_api_key=settings.TMDB_API_KEY,
+                user_location='',  # No location needed for casual mode
+                user_ip=get_client_ip(request),
+                timezone='UTC'  # Default timezone for casual mode
+            )
+
+        # Process query with casual mode
+        conversation_history = [{
+            'sender': msg.sender,
+            'content': msg.content
+        } for msg in conversation.messages.all()]
+
+        # Check if we're already processing this query
+        if getattr(request, '_processing_casual_query', False):
+            return JsonResponse({
+                'status': 'processing',
+                'message': 'Your movie recommendations are still being processed. Please wait a moment.',
+                'conversation_id': conversation.id
+            })
+
+        # Set a flag to prevent concurrent processing
+        setattr(request, '_processing_casual_query', True)
+
+        # Log the conversation mode to help with debugging
+        logger.info(f"Processing query in poll_movie_recommendations with conversation mode: {conversation.mode}")
+
+        # Ensure we're explicitly setting first_run_mode to False for casual mode
+        first_run_mode = False
+        if conversation.mode != 'casual':
+            logger.warning(f"Unexpected conversation mode in casual polling: {conversation.mode}. Forcing casual mode.")
+            # Update the conversation mode if it's not set correctly
+            conversation.mode = 'casual'
+            conversation.save()
+
+        try:
+            # Add timeout handling for the process_query call
+            # Use the timeout parameter if the manager supports it
+            response_data = movie_crew_manager.process_query(
+                query=user_message_text,
+                conversation_history=conversation_history,
+                first_run_mode=False  # Explicitly set to False for casual mode
+            )
+
+            # Save bot response
+            bot_response = response_data.get('response', 'Sorry, I could not generate a response.')
+            bot_message = Message.objects.create(
+                conversation=conversation,
+                sender='bot',
+                content=bot_response
+            )
+
+            # Process and save movie recommendations
+            recommendations_data = []
+            for movie_data in response_data.get('movies', []):
+                # Convert release_date string to a proper date object
+                release_date_str = movie_data.get('release_date')
+                release_date = None
+                if release_date_str:
+                    try:
+                        from datetime import datetime
+                        release_date = datetime.strptime(release_date_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        # Handle invalid date format
+                        logger.warning(f"Invalid release date format: {release_date_str}")
+                        pass
+
+                movie = MovieRecommendation.objects.create(
+                    conversation=conversation,
+                    title=movie_data.get('title', 'Unknown Movie'),
+                    overview=movie_data.get('overview', ''),
+                    poster_url=movie_data.get('poster_url', ''),
+                    release_date=release_date,  # Now a proper date object
+                    tmdb_id=movie_data.get('tmdb_id'),
+                    rating=movie_data.get('rating')
+                )
+
+                recommendations_data.append({
+                    'id': movie.id,
+                    'title': movie.title,
+                    'overview': movie.overview,
+                    'poster_url': movie.poster_url,
+                    'release_date': movie.release_date.isoformat() if movie.release_date and hasattr(movie.release_date, 'isoformat') else movie.release_date,
+                    'rating': float(movie.rating) if movie.rating else None,
+                    'theaters': []  # No theaters for casual mode
+                })
+
+            # Clear the query from the session
+            if 'casual_query' in request.session:
+                del request.session['casual_query']
+            if 'casual_query_timestamp' in request.session:
+                del request.session['casual_query_timestamp']
+
+            return JsonResponse({
+                'status': 'success',
+                'message': bot_response,
+                'recommendations': recommendations_data
+            })
+        finally:
+            # Clear the processing flag
+            setattr(request, '_processing_casual_query', False)
+
+        # If we get here, we're still processing
+        return JsonResponse({
+            'status': 'processing',
+            'message': 'Your movie recommendations are still being processed. Please wait a moment.',
+            'conversation_id': conversation.id
+        })
+
+    except Exception as e:
+        # Check if it's a timeout issue
+        elapsed = time.time() - start_time if 'start_time' in locals() else float('inf')
+        if elapsed >= timeout_seconds:
+            logger.warning(f"Timeout occurred while processing theater data after {elapsed:.1f} seconds")
+            # Return partial results with empty theaters on timeout
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Your movie recommendations are ready, but we couldn\'t find theater information within the time limit.',
+                'recommendations': [
+                    {
+                        'id': movie.id,
+                        'title': movie.title,
+                        'overview': movie.overview,
+                        'poster_url': movie.poster_url,
+                        'release_date': movie.release_date.isoformat() if movie.release_date and hasattr(movie.release_date, 'isoformat') else None,
+                        'rating': float(movie.rating) if movie.rating else None,
+                        'theaters': []
+                    } for movie in conversation.recommendations.all().order_by('-created_at')[:5]
+                ]
+            })
+
+        logger.error(f"Error processing movie recommendation poll: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({
+            'status': 'error',
+            'message': 'An error occurred while processing your request.'
+        }, status=500)
+
 
 @csrf_exempt
 def get_theaters(request, movie_id):
@@ -664,8 +525,7 @@ def get_theaters(request, movie_id):
         existing_showtimes = movie.showtimes.count()
         logger.info(f"Movie has {existing_showtimes} existing showtimes in database")
 
-        theater_data = []
-
+        # If we have showtimes already, return them
         if existing_showtimes > 0:
             # If we already have showtimes, use them
             logger.info(f"Using existing theater data for {movie.title}")
@@ -693,22 +553,25 @@ def get_theaters(request, movie_id):
                 })
 
             # Convert theater map to list sorted by distance
+            theater_data = []
             for _, theater in sorted(theater_map.items(), key=lambda x: x[1].get('distance_miles', float('inf'))):
                 theater_data.append(theater)
 
             logger.info(f"Returning {len(theater_data)} theaters with existing showtimes")
-        else:
-            # No existing showtimes, we might want to fetch them from SerpAPI
-            # This would be a more complex implementation requiring access to the MovieCrewManager
-            # For now, we'll return an empty list
-            logger.warning(f"No existing showtimes for movie {movie.title}, returning empty theater list")
 
-        return JsonResponse({
-            'status': 'success',
-            'movie_id': movie_id,
-            'movie_title': movie.title,
-            'theaters': theater_data
-        })
+            return JsonResponse({
+                'status': 'success',
+                'movie_id': movie_id,
+                'movie_title': movie.title,
+                'theaters': theater_data
+            })
+        else:
+            # Return processing status to trigger polling
+            logger.info(f"No showtimes found for {movie.title}, returning processing status")
+            return JsonResponse({
+                'status': 'processing',
+                'message': f'Processing theater data for {movie.title}. Please check back in a moment.'
+            })
 
     except Exception as e:
         logger.error(f"Error fetching theaters: {str(e)}")
@@ -732,3 +595,418 @@ def reset_conversation(request):
         del request.session['conversation_id']
 
     return redirect('index')
+
+
+@csrf_exempt
+def theater_status(request, movie_id):
+    """Check the status of theater fetching for a specific movie - used for polling."""
+    if request.method != 'GET':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'This endpoint only accepts GET requests'
+        }, status=405)
+
+    try:
+        logger.info(f"=== Checking theater status for movie ID: {movie_id} ===")
+
+        # Get the movie from the database
+        try:
+            movie = MovieRecommendation.objects.get(id=movie_id)
+            logger.info(f"Found movie: {movie.title} (ID: {movie_id})")
+        except MovieRecommendation.DoesNotExist:
+            logger.error(f"Movie with ID {movie_id} not found")
+            return JsonResponse({
+                'status': 'error',
+                'message': f'Movie with ID {movie_id} not found'
+            }, status=404)
+
+        # Check if we have theaters and showtimes for this movie
+        existing_showtimes = movie.showtimes.count()
+        logger.info(f"Movie has {existing_showtimes} existing showtimes in database")
+
+        # If we have showtimes already, return them
+        if existing_showtimes > 0:
+            logger.info(f"Theaters are ready for {movie.title}, returning data")
+
+            # Group showtimes by theater
+            theater_map = {}
+            for showtime in movie.showtimes.all():
+                theater_name = showtime.theater.name
+
+                # Create theater entry if not exists
+                if theater_name not in theater_map:
+                    distance_miles = showtime.theater.distance_miles if hasattr(showtime.theater, 'distance_miles') else 10.0
+
+                    theater_map[theater_name] = {
+                        'name': theater_name,
+                        'address': showtime.theater.address,
+                        'distance_miles': distance_miles,
+                        'showtimes': []
+                    }
+
+                # Add showtimes to the theater
+                theater_map[theater_name]['showtimes'].append({
+                    'start_time': showtime.start_time.isoformat(),
+                    'format': showtime.format
+                })
+
+            # Convert theater map to list sorted by distance
+            theater_data = []
+            for _, theater in sorted(theater_map.items(), key=lambda x: x[1].get('distance_miles', float('inf'))):
+                theater_data.append(theater)
+
+            return JsonResponse({
+                'status': 'success',
+                'movie_id': movie_id,
+                'movie_title': movie.title,
+                'theaters': theater_data
+            })
+        else:
+            # If no showtimes yet, return processing status
+            return JsonResponse({
+                'status': 'processing',
+                'message': f'Still searching for theaters for {movie.title}...'
+            })
+
+    except Exception as e:
+        logger.error(f"Error checking theater status: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({
+            'status': 'error',
+            'message': 'An error occurred while checking theater status'
+        }, status=500)
+
+
+@csrf_exempt
+def poll_first_run_recommendations(request):
+    """Poll for first run movie recommendations, theaters, and showtimes that are being processed."""
+    if request.method != 'GET':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'This endpoint only accepts GET requests'
+        }, status=405)
+
+    # Check if First Run mode is enabled
+    if not settings.FEATURES.get('ENABLE_FIRST_RUN_MODE', True):
+        logger.warning("First Run mode is disabled but poll endpoint was accessed")
+        return JsonResponse({
+            'status': 'error',
+            'message': 'First Run mode is currently disabled. Please use Casual Viewing mode instead.'
+        }, status=403)
+
+    timeout_seconds = getattr(settings, "THEATER_SEARCH_TIMEOUT", 60)
+    start_time = time.time()
+
+    try:
+        # Get the conversation
+        conversation = _get_or_create_conversation(request, 'first_run')
+
+        # Check if we have a query to process
+        user_message_text = request.session.get('first_run_query')
+        user_location = request.session.get('user_location', '')
+
+        if not user_message_text:
+            return JsonResponse({
+                'status': 'error',
+                'message': 'No pending first run movie request found.'
+            }, status=404)
+
+        # Check if we already have recommendations for this conversation
+        existing_recommendations = conversation.recommendations.all()
+
+        # If we have recommendations and they were created after the query timestamp,
+        # return them as the result
+        query_timestamp = request.session.get('first_run_query_timestamp')
+        if query_timestamp and existing_recommendations.exists():
+            # Get the latest recommendation timestamp
+            latest_recommendation = existing_recommendations.order_by('-created_at').first()
+            if latest_recommendation and latest_recommendation.created_at.isoformat() > query_timestamp:
+                # We have fresh recommendations, return them
+                logger.info(f"Found existing recommendations for conversation {conversation.id}")
+
+                # Get the bot message
+                bot_message = conversation.messages.filter(sender='bot').order_by('-created_at').first()
+                bot_response = bot_message.content if bot_message else "Here are your movie recommendations."
+
+                # Format recommendations
+                recommendations_data = []
+                # Convert ISO format string to datetime object
+                from datetime import datetime
+                query_dt = datetime.fromisoformat(query_timestamp)
+
+                # If the query_dt is naive (no timezone), make it timezone-aware
+                if query_dt.tzinfo is None:
+                    query_dt = timezone.make_aware(query_dt)
+
+                for movie in existing_recommendations.filter(created_at__gt=query_dt):
+                    # Get theaters for this movie
+                    theaters_data = []
+                    for showtime in movie.showtimes.all():
+                        theater = showtime.theater
+
+                        # Check if this theater is already in the list
+                        theater_exists = False
+                        for t in theaters_data:
+                            if t['name'] == theater.name:
+                                theater_exists = True
+                                # Add showtime to existing theater
+                                t['showtimes'].append({
+                                    'start_time': showtime.start_time.isoformat(),
+                                    'format': showtime.format
+                                })
+                                break
+
+                        # If theater not in list, add it
+                        if not theater_exists:
+                            theaters_data.append({
+                                'name': theater.name,
+                                'address': theater.address,
+                                'distance_miles': float(theater.distance_miles) if theater.distance_miles else None,
+                                'showtimes': [{
+                                    'start_time': showtime.start_time.isoformat(),
+                                    'format': showtime.format
+                                }]
+                            })
+
+                    recommendations_data.append({
+                        'id': movie.id,
+                        'title': movie.title,
+                        'overview': movie.overview,
+                        'poster_url': movie.poster_url,
+                        'release_date': movie.release_date.isoformat() if movie.release_date and hasattr(movie.release_date, 'isoformat') else movie.release_date,
+                        'rating': float(movie.rating) if movie.rating else None,
+                        'theaters': theaters_data
+                    })
+
+                if recommendations_data:
+                    # Clear the query from the session
+                    if 'first_run_query' in request.session:
+                        del request.session['first_run_query']
+                    if 'first_run_query_timestamp' in request.session:
+                        del request.session['first_run_query_timestamp']
+
+                    return JsonResponse({
+                        'status': 'success',
+                        'message': bot_response,
+                        'recommendations': recommendations_data
+                    })
+
+        # If we don't have recommendations yet, process the query
+        # Initialize movie crew manager
+        # Use optimized manager if optimization is enabled in settings
+        use_optimized = getattr(settings, "USE_OPTIMIZED_COMPONENTS", True)
+
+        if use_optimized:
+            # Note: The optimized manager doesn't support timeout and fallback parameters yet
+            movie_crew_manager = MovieCrewManagerOptimized(
+                api_key=settings.LLM_CONFIG['api_key'],
+                base_url=settings.LLM_CONFIG.get('base_url'),
+                model=settings.LLM_CONFIG.get('model', 'gpt-4o-mini'),
+                tmdb_api_key=settings.TMDB_API_KEY,
+                user_location=user_location,
+                user_ip=get_client_ip(request),
+                timezone=request.session.get('user_timezone', 'America/Los_Angeles')
+                # timeout and fallback parameters removed as they're not supported
+            )
+        else:
+            movie_crew_manager = MovieCrewManager(
+                api_key=settings.LLM_CONFIG['api_key'],
+                base_url=settings.LLM_CONFIG.get('base_url'),
+                model=settings.LLM_CONFIG.get('model', 'gpt-4o-mini'),
+                tmdb_api_key=settings.TMDB_API_KEY,
+                user_location=user_location,
+                user_ip=get_client_ip(request),
+                timezone=request.session.get('user_timezone', 'America/Los_Angeles')
+            )
+
+        # Process query with first run mode
+        conversation_history = [{
+            'sender': msg.sender,
+            'content': msg.content
+        } for msg in conversation.messages.all()]
+
+        # Check if we're already processing this query
+        if getattr(request, '_processing_first_run_query', False):
+            return JsonResponse({
+                'status': 'processing',
+                'message': 'Your movie recommendations are still being processed. Please wait a moment.',
+                'conversation_id': conversation.id
+            })
+
+        # Set a flag to prevent concurrent processing
+        setattr(request, '_processing_first_run_query', True)
+
+        try:
+            # Add timeout handling for the process_query call
+            # Use the timeout parameter if the manager supports it
+            response_data = movie_crew_manager.process_query(
+                query=user_message_text,
+                conversation_history=conversation_history,
+                first_run_mode=True  # Explicitly set to True for first run mode
+            )
+
+            # Save bot response
+            bot_response = response_data.get('response', 'Sorry, I could not generate a response.')
+            bot_message = Message.objects.create(
+                conversation=conversation,
+                sender='bot',
+                content=bot_response
+            )
+
+            # Process and save movie recommendations
+            recommendations_data = []
+            for movie_data in response_data.get('movies', []):
+                # Convert release_date string to a proper date object
+                release_date_str = movie_data.get('release_date')
+                release_date = None
+                if release_date_str:
+                    try:
+                        from datetime import datetime
+                        release_date = datetime.strptime(release_date_str, '%Y-%m-%d').date()
+                    except ValueError:
+                        # Handle invalid date format
+                        logger.warning(f"Invalid release date format: {release_date_str}")
+                        pass
+
+                movie = MovieRecommendation.objects.create(
+                    conversation=conversation,
+                    title=movie_data.get('title', 'Unknown Movie'),
+                    overview=movie_data.get('overview', ''),
+                    poster_url=movie_data.get('poster_url', ''),
+                    release_date=release_date,
+                    tmdb_id=movie_data.get('tmdb_id'),
+                    rating=movie_data.get('rating')
+                )
+
+                # Process theaters and showtimes
+                theaters_data = []
+                if movie_data.get('theaters'):
+                    for theater_data in movie_data['theaters']:
+                        theater, _ = Theater.objects.get_or_create(
+                            name=theater_data.get('name', 'Unknown Theater'),
+                            defaults={
+                                'address': theater_data.get('address', ''),
+                                'latitude': theater_data.get('latitude'),
+                                'longitude': theater_data.get('longitude'),
+                                'distance_miles': theater_data.get('distance_miles')
+                            }
+                        )
+
+                        # Save showtimes
+                        showtimes_data = []
+                        for showtime_data in theater_data.get('showtimes', []):
+                            # Check if the datetime is already timezone-aware
+                            dt_obj = dt.fromisoformat(showtime_data['start_time'])
+                            if dt_obj.tzinfo is not None:
+                                # Already timezone-aware, use as is
+                                start_time = dt_obj
+                            else:
+                                # Naive datetime, make it timezone-aware
+                                start_time = timezone.make_aware(dt_obj)
+
+                            showtime = Showtime.objects.create(
+                                movie=movie,
+                                theater=theater,
+                                start_time=start_time,
+                                format=showtime_data.get('format', 'Standard')
+                            )
+                            showtimes_data.append({
+                                'start_time': showtime.start_time.isoformat(),
+                                'format': showtime.format
+                            })
+
+                        theaters_data.append({
+                            'name': theater.name,
+                            'address': theater.address,
+                            'distance_miles': float(theater.distance_miles) if theater.distance_miles else None,
+                            'showtimes': showtimes_data
+                        })
+
+                recommendations_data.append({
+                    'id': movie.id,
+                    'title': movie.title,
+                    'overview': movie.overview,
+                    'poster_url': movie.poster_url,
+                    'release_date': movie.release_date.isoformat() if movie.release_date and hasattr(movie.release_date, 'isoformat') else movie.release_date,
+                    'rating': float(movie.rating) if movie.rating else None,
+                    'theaters': theaters_data
+                })
+
+            # Clear the query from the session
+            if 'first_run_query' in request.session:
+                del request.session['first_run_query']
+            if 'first_run_query_timestamp' in request.session:
+                del request.session['first_run_query_timestamp']
+
+            return JsonResponse({
+                'status': 'success',
+                'message': bot_response,
+                'recommendations': recommendations_data
+            })
+        finally:
+            # Clear the processing flag
+            setattr(request, '_processing_first_run_query', False)
+
+        # If we get here, we're still processing
+        return JsonResponse({
+            'status': 'processing',
+            'message': 'Your movie recommendations are still being processed. Please wait a moment.',
+            'conversation_id': conversation.id
+        })
+
+    except Exception as e:
+        # Check if it's a timeout issue
+        elapsed = time.time() - start_time if 'start_time' in locals() else float('inf')
+        if elapsed >= timeout_seconds:
+            logger.warning(f"Timeout occurred while processing theater data after {elapsed:.1f} seconds")
+            # Return partial results with empty theaters on timeout
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Your movie recommendations are ready, but we couldn\'t find theater information within the time limit.',
+                'recommendations': [
+                    {
+                        'id': movie.id,
+                        'title': movie.title,
+                        'overview': movie.overview,
+                        'poster_url': movie.poster_url,
+                        'release_date': movie.release_date.isoformat() if movie.release_date and hasattr(movie.release_date, 'isoformat') else None,
+                        'rating': float(movie.rating) if movie.rating else None,
+                        'theaters': []
+                    } for movie in conversation.recommendations.all().order_by('-created_at')[:5]
+                ]
+            })
+
+        logger.error(f"Error processing first run movie recommendation poll: {str(e)}")
+        logger.error(traceback.format_exc())
+        return JsonResponse({
+            'status': 'error',
+            'message': 'An error occurred while processing your request.'
+        }, status=500)
+
+@csrf_exempt
+def get_api_config(request):
+    """Return API configuration settings for the frontend."""
+    if request.method != 'GET':
+        return JsonResponse({
+            'status': 'error',
+            'message': 'This endpoint only accepts GET requests'
+        }, status=405)
+
+    try:
+        from movie_chatbot.settings import app_config
+
+        # Return non-sensitive configuration settings including feature flags
+        return JsonResponse({
+            'api_timeout_seconds': app_config.API_REQUEST_TIMEOUT,
+            'api_max_retries': app_config.API_MAX_RETRIES,
+            'api_retry_backoff_factor': app_config.API_RETRY_BACKOFF_FACTOR,
+            'features': {
+                'enable_first_run_mode': settings.FEATURES.get('ENABLE_FIRST_RUN_MODE', True)
+            }
+        })
+    except Exception as e:
+        logger.error(f"Error getting API configuration: {str(e)}")
+        return JsonResponse({
+            'status': 'error',
+            'message': 'An error occurred while getting API configuration'
+        }, status=500)

@@ -3,6 +3,12 @@
 import os
 import sys
 
+# Add vendor directory to Python path if it exists
+try:
+    import vendor_path  # This will add the vendor directory to sys.path
+except ImportError:
+    pass  # Continue without vendor path in development
+
 
 def main():
     """Run administrative tasks."""

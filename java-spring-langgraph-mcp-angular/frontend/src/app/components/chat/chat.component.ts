@@ -18,7 +18,7 @@ import { CityInfo } from '../../models/city-info.model';
 })
 export class ChatComponent implements OnInit, AfterViewChecked {
   @ViewChild('messagesContainer') private messagesContainer!: ElementRef;
-  
+
   session: ChatSession | null = null;
   currentMessage = '';
   loading = false;
@@ -26,7 +26,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
 
   // Make enum available in template
   MessageType = MessageType;
-  
+
   // Store temporary local data until backend response
   displayedEvents: EventInfo[] = [];
   displayedCity: CityInfo | null = null;
@@ -44,7 +44,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
   createNewSession(): void {
     this.loading = true;
     this.error = '';
-    
+
     this.chatService.createSession().subscribe({
       next: (session) => {
         this.session = session;
@@ -71,31 +71,31 @@ export class ChatComponent implements OnInit, AfterViewChecked {
       timestamp: new Date().toISOString(),
       type: MessageType.TEXT
     };
-    
+
     this.session.messages.push(userMessage);
-    
+
     const request = {
       sessionId: this.session.id,
       message: this.currentMessage
     };
-    
+
     this.currentMessage = '';
     this.loading = true;
-    
+
     this.chatService.sendMessage(request).subscribe({
       next: (response) => {
         this.loading = false;
-        
+
         // Check if we need to update the events display
         if (response.recommendedEvents && response.recommendedEvents.length > 0) {
           this.displayedEvents = response.recommendedEvents;
         }
-        
+
         // Check if we need to update the city info display
         if (response.cityInfo) {
           this.displayedCity = response.cityInfo;
         }
-        
+
         // Add assistant response to the UI
         this.session?.messages.push(response.message);
       },
@@ -103,7 +103,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
         console.error('Error sending message:', err);
         this.error = 'Failed to send message. Please try again.';
         this.loading = false;
-        
+
         // Add error message to chat
         if (this.session) {
           this.session.messages.push({
@@ -117,7 +117,7 @@ export class ChatComponent implements OnInit, AfterViewChecked {
       }
     });
   }
-  
+
   clearChat(): void {
     this.createNewSession();
     this.displayedEvents = [];

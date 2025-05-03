@@ -7,7 +7,7 @@
   display: flex;
   flex-direction: column;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
-  
+
   &:hover {
     transform: translateY(-4px);
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
@@ -18,7 +18,7 @@
   display: flex;
   justify-content: space-between;
   margin-bottom: 8px;
-  
+
   .event-type {
     font-size: 13px;
     background-color: #e9ecef;
@@ -26,7 +26,7 @@
     border-radius: 12px;
     color: #495057;
   }
-  
+
   .event-price {
     font-size: 13px;
     color: #28a745;
@@ -47,13 +47,13 @@
   gap: 8px;
   margin-bottom: 16px;
   flex-grow: 1;
-  
+
   .detail {
     display: flex;
     font-size: 14px;
     color: #6c757d;
     align-items: flex-start;
-    
+
     .icon {
       margin-right: 8px;
     }
@@ -62,7 +62,7 @@
 
 .event-action {
   margin-top: auto;
-  
+
   .event-link {
     display: inline-block;
     background-color: #2c7be5;
@@ -74,7 +74,7 @@
     font-weight: 500;
     text-align: center;
     transition: background-color 0.2s ease;
-    
+
     &:hover {
       background-color: #1a68d1;
     }

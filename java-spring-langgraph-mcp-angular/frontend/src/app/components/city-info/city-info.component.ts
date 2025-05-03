@@ -11,7 +11,7 @@ import { CityInfo } from '../../models/city-info.model';
 })
 export class CityInfoComponent {
   @Input() cityInfo!: CityInfo;
-  
+
   formatPopulation(population: number): string {
     if (population >= 1000000) {
       return (population / 1000000).toFixed(1) + ' million';

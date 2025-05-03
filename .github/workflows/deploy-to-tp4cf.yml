@@ -1,0 +1,224 @@
+name: On-Demand CF Deploy
+
+# Note on secrets: GitHub Actions secrets are defined at the repository or environment level,
+# not in the workflow file itself. The following secrets are used by this workflow:
+# - CF_PASSWORD: Cloud Foundry password (used when not using SSO)
+# - CF_SSO_REFRESH_TOKEN: Cloud Foundry SSO refresh token (used when using SSO)
+# - Project-specific API keys and secrets (e.g., GOOGLEMAPS_API_KEY, OPENAI_API_KEY, etc.)
+# These secrets should be configured in the repository settings or environment.
+
+on:
+  workflow_dispatch:
+    inputs:
+      project:
+        description: 'Application to deploy'
+        required: true
+        type: choice
+        options:
+          - dotnet-extensions-ai
+          - go-fiber-langchaingo
+          - java-spring-ai-mcp/client
+          - java-spring-ai-mcp/server
+          - java-spring-langgraph-mcp-angular
+          - js-langchain-react
+          - php-symfony-neuron
+          - py-django-crewai
+          - ruby-sinatra-fastmcp
+      cf_api:
+        description: 'Cloud Foundry API Endpoint'
+        required: true
+        type: string
+      cf_username:
+        description: 'Cloud Foundry Username (not required if using SSO)'
+        required: false
+        type: string
+      use_sso:
+        description: 'Use SSO authentication instead of username/password'
+        required: false
+        type: boolean
+        default: false
+      cf_org:
+        description: 'Cloud Foundry Target Organization'
+        required: true
+        type: string
+      cf_space:
+        description: 'Cloud Foundry Target Space'
+        required: true
+        type: string
+      genai_plan:
+        description: 'GenAI Service Plan Name (if needed by app)'
+        required: false
+        type: string
+      db_service_type:
+        description: 'Database Service Type (e.g., postgresql, mysql, if needed)'
+        required: false
+        type: string
+      db_plan:
+        description: 'Database Service Plan Name (if needed by app)'
+        required: false
+        type: string
+      random_route:
+        description: 'Use random route for the application'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  # Delegate to the appropriate project-specific CD job
+  deploy-dotnet-extensions-ai:
+    if: inputs.project == 'dotnet-extensions-ai'
+    uses: ./.github/workflows/deploy-dotnet-extensions-ai-to-tp4cf.yml
+    with:
+      cf_api: ${{ inputs.cf_api }}
+      cf_username: ${{ inputs.cf_username }}
+      use_sso: ${{ inputs.use_sso }}
+      cf_org: ${{ inputs.cf_org }}
+      cf_space: ${{ inputs.cf_space }}
+      genai_plan: ${{ inputs.genai_plan }}
+      random_route: ${{ inputs.random_route }}
+    secrets:
+      CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+      CF_SSO_REFRESH_TOKEN: ${{ secrets.CF_SSO_REFRESH_TOKEN }}
+      GOOGLEMAPS_API_KEY: ${{ secrets.GOOGLEMAPS_API_KEY }}
+
+  deploy-go-fiber-langchaingo:
+    if: inputs.project == 'go-fiber-langchaingo'
+    uses: ./.github/workflows/deploy-go-fiber-langchaingo-to-tp4cf.yml
+    with:
+      cf_api: ${{ inputs.cf_api }}
+      cf_username: ${{ inputs.cf_username }}
+      use_sso: ${{ inputs.use_sso }}
+      cf_org: ${{ inputs.cf_org }}
+      cf_space: ${{ inputs.cf_space }}
+      genai_plan: ${{ inputs.genai_plan }}
+      random_route: ${{ inputs.random_route }}
+    secrets:
+      CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+      CF_SSO_REFRESH_TOKEN: ${{ secrets.CF_SSO_REFRESH_TOKEN }}
+      CONGRESS_API_KEY: ${{ secrets.CONGRESS_API_KEY }}
+
+  deploy-java-spring-ai-mcp-client:
+    if: inputs.project == 'java-spring-ai-mcp/client'
+    uses: ./.github/workflows/deploy-java-spring-ai-mcp-client-to-tp4cf.yml
+    with:
+      cf_api: ${{ inputs.cf_api }}
+      cf_username: ${{ inputs.cf_username }}
+      use_sso: ${{ inputs.use_sso }}
+      cf_org: ${{ inputs.cf_org }}
+      cf_space: ${{ inputs.cf_space }}
+      genai_plan: ${{ inputs.genai_plan }}
+      random_route: ${{ inputs.random_route }}
+    secrets:
+      CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+      CF_SSO_REFRESH_TOKEN: ${{ secrets.CF_SSO_REFRESH_TOKEN }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+  deploy-java-spring-ai-mcp-server:
+    if: inputs.project == 'java-spring-ai-mcp/server'
+    uses: ./.github/workflows/deploy-java-spring-ai-mcp-server-to-tp4cf.yml
+    with:
+      cf_api: ${{ inputs.cf_api }}
+      cf_username: ${{ inputs.cf_username }}
+      use_sso: ${{ inputs.use_sso }}
+      cf_org: ${{ inputs.cf_org }}
+      cf_space: ${{ inputs.cf_space }}
+      random_route: ${{ inputs.random_route }}
+    secrets:
+      CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+      CF_SSO_REFRESH_TOKEN: ${{ secrets.CF_SSO_REFRESH_TOKEN }}
+      AVIATION_STACK_ACCESS_KEY: ${{ secrets.AVIATION_STACK_ACCESS_KEY }}
+
+  deploy-java-spring-langgraph-mcp-angular:
+    if: inputs.project == 'java-spring-langgraph-mcp-angular'
+    uses: ./.github/workflows/deploy-java-spring-langgraph-mcp-angular-to-tp4cf.yml
+    with:
+      cf_api: ${{ inputs.cf_api }}
+      cf_username: ${{ inputs.cf_username }}
+      use_sso: ${{ inputs.use_sso }}
+      cf_org: ${{ inputs.cf_org }}
+      cf_space: ${{ inputs.cf_space }}
+      genai_plan: ${{ inputs.genai_plan }}
+      random_route: ${{ inputs.random_route }}
+    secrets:
+      CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+      CF_SSO_REFRESH_TOKEN: ${{ secrets.CF_SSO_REFRESH_TOKEN }}
+      TICKETMASTER_API_KEY: ${{ secrets.TICKETMASTER_API_KEY }}
+      CITIES_API_KEY: ${{ secrets.CITIES_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+
+  deploy-js-langchain-react:
+    if: inputs.project == 'js-langchain-react'
+    uses: ./.github/workflows/deploy-js-langchain-react-to-tp4cf.yml
+    with:
+      cf_api: ${{ inputs.cf_api }}
+      cf_username: ${{ inputs.cf_username }}
+      use_sso: ${{ inputs.use_sso }}
+      cf_org: ${{ inputs.cf_org }}
+      cf_space: ${{ inputs.cf_space }}
+      genai_plan: ${{ inputs.genai_plan }}
+      random_route: ${{ inputs.random_route }}
+    secrets:
+      CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+      CF_SSO_REFRESH_TOKEN: ${{ secrets.CF_SSO_REFRESH_TOKEN }}
+      NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+      LLM_API_KEY: ${{ secrets.LLM_API_KEY }}
+
+  deploy-php-symfony-neuron:
+    if: inputs.project == 'php-symfony-neuron'
+    uses: ./.github/workflows/deploy-php-symfony-neuron-to-tp4cf.yml
+    with:
+      cf_api: ${{ inputs.cf_api }}
+      cf_username: ${{ inputs.cf_username }}
+      use_sso: ${{ inputs.use_sso }}
+      cf_org: ${{ inputs.cf_org }}
+      cf_space: ${{ inputs.cf_space }}
+      genai_plan: ${{ inputs.genai_plan }}
+      db_service_type: ${{ inputs.db_service_type }}
+      db_plan: ${{ inputs.db_plan }}
+      random_route: ${{ inputs.random_route }}
+    secrets:
+      CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+      CF_SSO_REFRESH_TOKEN: ${{ secrets.CF_SSO_REFRESH_TOKEN }}
+      STOCK_API_KEY: ${{ secrets.STOCK_API_KEY }}
+      NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
+      EDGAR_API_KEY: ${{ secrets.EDGAR_API_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      LINKEDIN_CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
+      LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}
+
+  deploy-py-django-crewai:
+    if: inputs.project == 'py-django-crewai'
+    uses: ./.github/workflows/deploy-py-django-crewai-to-tp4cf.yml
+    with:
+      cf_api: ${{ inputs.cf_api }}
+      cf_username: ${{ inputs.cf_username }}
+      use_sso: ${{ inputs.use_sso }}
+      cf_org: ${{ inputs.cf_org }}
+      cf_space: ${{ inputs.cf_space }}
+      genai_plan: ${{ inputs.genai_plan }}
+      db_service_type: ${{ inputs.db_service_type }}
+      db_plan: ${{ inputs.db_plan }}
+      random_route: ${{ inputs.random_route }}
+    secrets:
+      CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+      CF_SSO_REFRESH_TOKEN: ${{ secrets.CF_SSO_REFRESH_TOKEN }}
+      DJANGO_SECRET_KEY: ${{ secrets.DJANGO_SECRET_KEY }}
+      OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+      TMDB_API_KEY: ${{ secrets.TMDB_API_KEY }}
+      SERPAPI_API_KEY: ${{ secrets.SERPAPI_API_KEY }}
+
+  deploy-ruby-sinatra-fastmcp:
+    if: inputs.project == 'ruby-sinatra-fastmcp'
+    uses: ./.github/workflows/deploy-ruby-sinatra-fastmcp-to-tp4cf.yml
+    with:
+      cf_api: ${{ inputs.cf_api }}
+      cf_username: ${{ inputs.cf_username }}
+      use_sso: ${{ inputs.use_sso }}
+      cf_org: ${{ inputs.cf_org }}
+      cf_space: ${{ inputs.cf_space }}
+      genai_plan: ${{ inputs.genai_plan }}
+      random_route: ${{ inputs.random_route }}
+    secrets:
+      CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+      CF_SSO_REFRESH_TOKEN: ${{ secrets.CF_SSO_REFRESH_TOKEN }}
+      AVIATIONSTACK_API_KEY: ${{ secrets.AVIATIONSTACK_API_KEY }}

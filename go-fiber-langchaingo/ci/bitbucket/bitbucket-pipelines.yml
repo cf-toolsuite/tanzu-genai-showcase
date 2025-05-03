@@ -1,0 +1,121 @@
+# BitBucket Pipelines for go-fiber-langchaingo
+# Equivalent to GitHub Actions workflow: go-fiber-langchaingo.yml
+
+image: golang:latest
+
+definitions:
+  caches:
+    go-mod: ~/.cache/go-build
+
+pipelines:
+  default:
+    - step:
+        name: Test
+        caches:
+          - go-mod
+        script:
+          - cd go-fiber-langchaingo
+          - go test ./... -v
+    - step:
+        name: Build
+        caches:
+          - go-mod
+        script:
+          - cd go-fiber-langchaingo
+          - mkdir -p bin
+          - make build || go build -o ./bin/app ./cmd/server
+        artifacts:
+          - go-fiber-langchaingo/bin/**
+
+  branches:
+    main:
+      - step:
+          name: Test
+          caches:
+            - go-mod
+          script:
+            - cd go-fiber-langchaingo
+            - go test ./... -v
+      - step:
+          name: Build
+          caches:
+            - go-mod
+          script:
+            - cd go-fiber-langchaingo
+            - mkdir -p bin
+            - make build || go build -o ./bin/app ./cmd/server
+          artifacts:
+            - go-fiber-langchaingo/bin/**
+      - step:
+          name: Upload Artifacts
+          script:
+            - cd go-fiber-langchaingo
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'bin/app'
+                TARGET: 'artifacts/go-fiber-langchaingo-${BITBUCKET_BUILD_NUMBER}'
+      - step:
+          name: Deploy to Cloud Foundry
+          deployment: production
+          trigger: manual
+          script:
+            - apt-get update && apt-get install -y wget gnupg2 apt-transport-https
+            - wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | apt-key add -
+            - echo "deb https://packages.cloudfoundry.org/debian stable main" | tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+            - apt-get update && apt-get install -y cf8-cli jq
+            - cd go-fiber-langchaingo
+            - echo "Deploying to Cloud Foundry..."
+            - cf api $CF_API
+            - cf auth $CF_USERNAME $CF_PASSWORD
+            - cf target -o $CF_ORG -s $CF_SPACE
+
+            # Create GenAI service if it doesn't exist
+            - |
+              if ! cf service congress-llm > /dev/null 2>&1; then
+                echo "Creating GenAI service..."
+                cf create-service genai standard congress-llm || echo "Service creation failed, it might already exist or plan is not available"
+              else
+                echo "GenAI service already exists"
+              fi
+
+            # Set environment variables
+            - |
+              APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+              if [ -z "$APP_NAME" ]; then
+                APP_NAME=$(basename $(pwd)) # Fallback to directory name
+              fi
+
+              # Push the application without starting it
+              if [ "$RANDOM_ROUTE" = "true" ]; then
+                echo "Pushing with random route..."
+                cf push "$APP_NAME" -f manifest.yml --no-start --random-route
+              else
+                echo "Pushing with route from manifest..."
+                cf push "$APP_NAME" -f manifest.yml --no-start
+              fi
+
+              # Set environment variables
+              if [ -n "$CONGRESS_API_KEY" ]; then
+                cf set-env "$APP_NAME" "CONGRESS_API_KEY" "$CONGRESS_API_KEY"
+              fi
+
+              # Start the application
+              cf start "$APP_NAME"
+
+clone:
+  depth: full
+
+options:
+  max-time: 20
+
+# Custom deployment variables
+# These can be set in the Bitbucket repository settings
+# CF_API: Cloud Foundry API endpoint
+# CF_USERNAME: Cloud Foundry username
+# CF_PASSWORD: Cloud Foundry password
+# CF_ORG: Cloud Foundry organization
+# CF_SPACE: Cloud Foundry space
+# RANDOM_ROUTE: Whether to use a random route (true/false)
+# CONGRESS_API_KEY: Congress API key

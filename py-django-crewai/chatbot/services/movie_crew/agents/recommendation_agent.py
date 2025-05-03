@@ -2,8 +2,9 @@
 Recommendation Agent for the movie crew.
 """
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from crewai import Agent
+from crewai.tools import BaseTool
 from langchain_openai import ChatOpenAI
 
 # Get the logger
@@ -13,7 +14,7 @@ class RecommendationAgent:
     """Agent for analyzing user preferences and recommending movies."""
 
     @staticmethod
-    def create(llm: ChatOpenAI) -> Agent:
+    def create(llm: ChatOpenAI, tools: Optional[List[BaseTool]] = None) -> Agent:
         """
         Create the Recommendation agent.
 
@@ -31,5 +32,6 @@ class RecommendationAgent:
                       select the best matches. You provide personalized recommendations with explanations that help
                       users understand why they might enjoy each movie.""",
             verbose=True,
-            llm=llm
+            llm=llm,
+            tools=tools or []
         )

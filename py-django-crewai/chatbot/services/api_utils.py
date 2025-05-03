@@ -42,9 +42,9 @@ class APIRequestHandler:
             Exception: If all retry attempts fail
         """
         # Use provided values or defaults from settings
-        timeout = timeout or getattr(settings, 'API_REQUEST_TIMEOUT', 15)  # Increased timeout for SerpAPI
-        max_retries = max_retries or getattr(settings, 'API_MAX_RETRIES', 4)  # Increased retries
-        backoff_factor = backoff_factor or getattr(settings, 'API_RETRY_BACKOFF_FACTOR', 1.0)  # Increased backoff factor
+        timeout = timeout or getattr(settings, 'API_REQUEST_TIMEOUT', 60)  # Increased timeout for SerpAPI
+        max_retries = max_retries or getattr(settings, 'API_MAX_RETRIES', 10)  # Increased retries
+        backoff_factor = backoff_factor or getattr(settings, 'API_RETRY_BACKOFF_FACTOR', 1.5)  # Increased backoff factor
 
         # Only add timeout parameter if it's not already present AND the function can accept it
         # Check if the function can accept a timeout parameter (either directly or via **kwargs)

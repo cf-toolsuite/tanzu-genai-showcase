@@ -520,19 +520,19 @@ footer p {
   .hero h2 {
     font-size: 2rem;
   }
-  
+
   .form-tabs {
     flex-wrap: wrap;
   }
-  
+
   .buttons {
     flex-direction: column;
   }
-  
+
   .results-list {
     grid-template-columns: 1fr;
   }
-  
+
   .mcp-tools-grid {
     grid-template-columns: 1fr;
   }

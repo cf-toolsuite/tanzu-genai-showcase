@@ -21,32 +21,32 @@ import java.util.Map;
 public class ChatbotState extends AgentState {
     @Builder.Default
     private List<ChatMessage> messages = new ArrayList<>();
-    
+
     @Builder.Default
     private Map<String, Object> data = new HashMap<>();
-    
+
     @Builder.Default
     private List<EventInfo> recommendedEvents = new ArrayList<>();
-    
+
     private CityInfo cityInfo;
-    
+
     private String userIntent;
-    
+
     private String nextAction;
-    
+
     public ChatbotState(Map<String, Object> initData) {
         super(initData);
         this.data = initData;
     }
-    
+
     public void addMessage(ChatMessage message) {
         messages.add(message);
     }
-    
+
     public void addEvents(List<EventInfo> events) {
         recommendedEvents.addAll(events);
     }
-    
+
     public void setCityInfo(CityInfo cityInfo) {
         this.cityInfo = cityInfo;
     }

@@ -6,6 +6,7 @@ This example demonstrates a movie chatbot built with Django and CrewAI that can 
 
 ## Features
 
+- Modern React frontend with optimized component architecture
 - Conversational interface to find movies based on interests or topics
 - Two conversation modes:
   - **First Run Mode**: Find movies currently in theaters with showtimes
@@ -13,19 +14,29 @@ This example demonstrates a movie chatbot built with Django and CrewAI that can 
 - Recommends top 3 movie choices based on user preferences
 - Shows nearby theaters where movies are playing with available showtimes
 - Uses CrewAI to coordinate multiple AI agents working together
-- Responsive Django web interface with real-time UI feedback
+- Responsive web interface with real-time UI feedback
 - Automatic location detection with multiple fallback mechanisms
 - Flexible deployment to Cloud Foundry with GenAI tile integration
 
 ## Architecture
 
-The application demonstrates an advanced multi-agent AI architecture:
+The application demonstrates an advanced multi-agent AI architecture with a React-based frontend:
 
 ```mermaid
 graph TD
-    User(User) --> WebUI(Web UI)
-    WebUI --> DjangoView(Django View)
-    DjangoView --> MovieCrewManager(Movie Crew Manager)
+    User(User) --> WebUI(React Web UI)
+    WebUI --> APIEndpoints(Django API Endpoints)
+    APIEndpoints --> MovieCrewManager(Movie Crew Manager)
+
+    subgraph "Frontend Architecture"
+        WebUI --> AppContextProvider(AppContext Provider)
+        AppContextProvider --> ChatComponents(Chat Components)
+        AppContextProvider --> MovieComponents(Movie Components)
+        AppContextProvider --> TheaterComponents(Theater Components)
+        ChatComponents --> APICalls(API Service Calls)
+        MovieComponents --> APICalls
+        TheaterComponents --> APICalls
+    end
 
     subgraph "CrewAI Orchestration"
         MovieCrewManager --> MovieFinder(Movie Finder Agent)
@@ -45,17 +56,34 @@ graph TD
 
 The application consists of:
 
-1. **Django Web Framework**: Handles HTTP requests, user sessions, and renders the UI
-2. **CrewAI Integration**: Orchestrates specialized AI agents working together to process requests
-3. **Multiple Agent System**:
+1. **Modern Frontend Architecture**:
+   - React-based UI using functional components and hooks
+   - Context API for state management
+   - React Query for data fetching and caching
+   - Suspense and lazy loading for performance optimization
+   - Component-based architecture for maintainability
+   - Responsive design for all devices
+
+2. **Django Backend Framework**:
+   - RESTful API endpoints for chat interactions
+   - Session management for conversation tracking
+   - Database models for conversation history and recommendations
+   - Asynchronous processing for theater and showtime data
+
+3. **CrewAI Integration**:
+   - Orchestrates specialized AI agents working together to process requests
    - **Movie Finder Agent**: Searches for movies matching user criteria using TMDb API
    - **Recommendation Agent**: Analyzes and ranks movie choices based on user preferences
    - **Theater Finder Agent**: Finds nearby theaters and real-time showtimes
-4. **Service Binding**: Connects to LLM services provided by the GenAI tile through a standard interface
+
+4. **Service Binding**:
+   - Connects to LLM services provided by the GenAI tile through a standard interface
+   - Automatic configuration based on environment
 
 ## Prerequisites
 
-- Python 3.10+ and pip
+- Python 3.12+ and pip
+- Node.js 18+ and npm
 - Cloud Foundry CLI (for deployment)
 - Access to Tanzu Platform for Cloud Foundry with GenAI tile installed
 - API keys for external services:
@@ -79,17 +107,25 @@ The application consists of:
    source venv/bin/activate  # On Windows, use: venv\Scripts\activate
    ```
 
-3. Install dependencies:
+3. Install backend dependencies:
 
    ```bash
    pip install -r requirements.txt
    ```
 
-4. Create a `.env` file with your API keys and configuration options (for local development only):
+4. Install frontend dependencies:
+
+   ```bash
+   cd frontend
+   npm install
+   cd ..
+   ```
+
+5. Create a `.env` file with your API keys and configuration options (for local development only):
 
    ```bash
    # Django secret
-   DJANGO_SECRET_KEY=any_old_django_secret
+   DJANGO_SECRET_KEY=any_old_django_hash
 
    # Required API keys
    OPENAI_API_KEY=your_llm_api_key_here
@@ -105,40 +141,93 @@ The application consists of:
    DEFAULT_SEARCH_START_YEAR=1900   # Default start year for historical movie searches
 
    # Optional API request configuration
-   API_REQUEST_TIMEOUT_SECONDS=10   # Maximum seconds to wait for API responses
-   API_MAX_RETRIES=3                # Maximum number of retry attempts for failed API requests
-   API_RETRY_BACKOFF_FACTOR=0.5     # Exponential backoff factor between retries (in seconds)
+   API_REQUEST_TIMEOUT_SECONDS=180  # Maximum seconds to wait for API responses
+   API_MAX_RETRIES=10               # Maximum number of retry attempts for failed API requests
+   API_RETRY_BACKOFF_FACTOR=1.3     # Exponential backoff factor between retries (in seconds)
+
+   # Optional SerpAPI request configuration
+   SERPAPI_REQUEST_BASE_DELAY=5.0   # Base delay between theater requests for different movies (seconds)
+   SERPAPI_PER_MOVIE_DELAY=2.0      # Additional delay per movie processed (seconds)
+   SERPAPI_MAX_RETRIES=2            # Maximum retries for SerpAPI requests
+   SERPAPI_BASE_RETRY_DELAY=3.0     # Base delay for exponential backoff during retries (seconds)
+   SERPAPI_RETRY_MULTIPLIER=1.5     # Multiplier for exponential backoff during retries
    ```
 
-5. Run migrations:
+6. Build the frontend:
+
+   ```bash
+   cd frontend
+   npm run build
+   cd ..
+   ```
+
+7. Run migrations:
 
    ```bash
    python manage.py makemigrations chatbot
    python manage.py migrate
    ```
 
-6. Start the development server:
+8. Start the development server:
 
    ```bash
    python manage.py runserver
    ```
 
-7. Open your browser to `http://localhost:8000`
+9. Open your browser to `http://localhost:8000`
 
-8. Testing both modes:
+10. For frontend development with hot reloading:
 
-   - **First Run Mode**: Default tab for finding movies currently in theaters
-   - **Casual Viewing Mode**: Switch to this tab for historical movie recommendations
+    ```bash
+    cd frontend
+    npm start
+    ```
+
+    This will start a development server at `http://localhost:8080` that proxies API requests to the Django backend.
+
+## Testing Both Conversation Modes
+
+The application offers two distinct conversation modes:
+
+- **First Run Mode**: Default tab for finding movies currently in theaters with showtimes
+  - This mode uses all three agents (Movie Finder, Recommender, Theater Finder)
+  - Shows theaters and showtimes for current movies
+  - Uses geolocation to find nearby theaters
+
+- **Casual Viewing Mode**: Switch to this tab for historical movie recommendations
+  - This mode uses two agents (Movie Finder, Recommender)
+  - Allows exploration of movies from any time period
+  - No theater information (focuses on recommendations only)
+
+Each mode maintains its own conversation history and movie recommendations for a streamlined user experience.
 
 ## Building for Production
 
-1. Create a production-ready build:
+1. Switch to frontend directory
 
    ```bash
+   cd frontend
+   ```
+
+2. Set up .env file as described in Local Development instructions.
+
+3. Ensure webpack and Django are installed.
+
+   ```bash
+   npm install --save-dev clean-webpack-plugin
+   pip3 install Django
+   ```
+
+4. Create a production-ready build:
+
+   ```bash
+   cd frontend
+   npm run build
+   cd ..
    python manage.py collectstatic --noinput
    ```
 
-2. Set up database:
+5. Set up database:
 
    - For local testing, SQLite is fine
    - For production, configure a PostgreSQL database via DATABASE_URL
@@ -162,23 +251,51 @@ The application consists of:
 2. Deploy the application:
 
    ```bash
+   # You have two options:
+
+   # 1. Download dependencies during build phase
    cf push --no-start
+
+   # Or
+
+   # 2. Download dependencies in advance into vendor directory
+   ./deploy-on-tp4cf.sh
    ```
 
 3. Bind to a GenAI service instance:
 
    ```bash
+   # Discover available GenAI tile service offering plans
+   cf marketplace -e genai
+
    # Create a GenAI service instance
    cf create-service genai PLAN_NAME movie-chatbot-llm
 
    # Bind the application to the service
    cf bind-service movie-chatbot movie-chatbot-llm
+   ```
 
-   # Start the application
+   > [!IMPORTANT]
+   > Replace `PLAN_NAME` above with an available plan from the GenAI tile service offering
+
+4. Add hash and service API keys
+
+   ```bash
+   cf set-env movie-chatbot DJANGO_SECRET_KEY any_old_django_hash
+   cf set-env movie-chatbot TMDB_API_KEY your_movie_db_api_key
+   cf set-env movie-chatbot SERPAPI_API_KEY your_serpapi_key_for_real_showtimes
+   ```
+
+   > [!IMPORTANT]
+   > Replace the hash and API key values above with authorized key values from each service. For `DJANGO_SECRET_KEY`, this can be any value, it's used for hashing purposes.
+
+5. Start application
+
+   ```bash
    cf start movie-chatbot
    ```
 
-4. Verify the deployment:
+6. Verify the deployment:
 
    ```bash
    cf apps
@@ -213,28 +330,29 @@ The application automatically integrates with the GenAI tile through service bin
    - Agents are initialized with the appropriate LLM service configuration
    - This allows the agents to make API calls to the LLM service
 
-### Service Binding Code Example
+## Frontend Architecture
 
-```python
-def get_llm_config():
-    # Check if running in Cloud Foundry with bound services
-    if cf_env.get_service(label='genai') or cf_env.get_service(name='movie-chatbot-llm'):
-        service = cf_env.get_service(label='genai') or cf_env.get_service(name='movie-chatbot-llm')
-        credentials = service.credentials
+The frontend is built with modern React practices:
 
-        return {
-            'api_key': credentials.get('api_key') or credentials.get('apiKey'),
-            'base_url': credentials.get('url') or credentials.get('baseUrl'),
-            'model': credentials.get('model') or 'gpt-4o-mini'
-        }
+1. **Component Structure**:
+   - Organized by feature (Chat, Movies, Theaters)
+   - Lazy-loaded components for performance
+   - Suspense for loading states
 
-    # Fallback to environment variables for local development
-    return {
-        'api_key': os.getenv('OPENAI_API_KEY'),
-        'base_url': os.getenv('LLM_BASE_URL'),
-        'model': os.getenv('LLM_MODEL', 'gpt-4o-mini')
-    }
-```
+2. **State Management**:
+   - React Context API for shared state
+   - React Query for API state
+   - Localized state where appropriate
+
+3. **API Integration**:
+   - Centralized API service
+   - Error handling and retry logic
+   - Response caching for improved performance
+
+4. **User Experience**:
+   - Progress indicators for long-running operations
+   - Responsive design for all devices
+   - Informative error messages with retry options
 
 ## Troubleshooting
 
@@ -291,15 +409,21 @@ To enable debug logging:
 
 ## Resources
 
-- [CrewAI Documentation](https://docs.crewai.com/)
-- [Django Documentation](https://docs.djangoproject.com/)
-- [Cloud Foundry Documentation](https://docs.cloudfoundry.org/)
-- [The Movie Database Developer Documentation](https://developer.themoviedb.org/docs/getting-started)
-- [SerpAPI Showtimes Documentation](https://serpapi.com/showtimes-results)
-- [ipapi.co Documentation](https://ipapi.co/api/)
+* [CrewAI Documentation](https://docs.crewai.com/)
+* [Django Documentation](https://docs.djangoproject.com/)
+* [React Documentation](https://react.dev/)
+* [Cloud Foundry Documentation](https://docs.cloudfoundry.org/)
+* [The Movie Database Developer Documentation](https://developer.themoviedb.org/docs/getting-started)
+* [SerpAPI Showtimes Documentation](https://serpapi.com/showtimes-results)
+* [ipapi.co Documentation](https://ipapi.co/api/)
 
-- [Architecture Guide](./docs/ARCHITECTURE.md)
-- [Developer Guide](./docs/DEVELOPMENT.md)
-- [Troubleshooting Guide](./docs/TROUBLESHOOTING.md)
-- [Deployment Guide](./docs/DEPLOYMENT-SCENARIOS.md)
-- [Contributing](./docs/CONTRIBUTING.md)
+* [Architecture Guide](./docs/ARCHITECTURE.md)
+* [Configuration Guide](./docs/CONFIGURATION.md)
+* [Developer Guide](./docs/DEVELOPMENT.md)
+* [Troubleshooting Guide](./docs/TROUBLESHOOTING.md)
+* [Deployment Guide](DEPLOY.md)
+   * [Cloud Foundry Deployment Guide](./docs/CLOUD_FOUNDRY.md)
+   * [Scenarios Guide](./docs/DEPLOYMENT_SCENARIOS.md)
+* [API Documentation](./docs/API.md)
+* [Testing Guide](./docs/TESTING.md)
+* [Contributing](./docs/CONTRIBUTING.md)

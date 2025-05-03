@@ -22,36 +22,16 @@ fi
 echo -e "${GREEN}Targeting:${NC}\n$(cf target | grep org -A 1)"
 echo
 
-# Check if service exists
-echo -e "${YELLOW}Checking for GenAI service...${NC}"
-SERVICE_EXISTS=$(cf services | grep $GENAI_SERVICE_NAME || echo "")
-
-if [[ -z "$SERVICE_EXISTS" ]]; then
-  echo -e "${YELLOW}Creating GenAI LLM service instance...${NC}"
-  cf create-service $GENAI_SERVICE_TYPE $GENAI_SERVICE_PLAN $GENAI_SERVICE_NAME
-  echo -e "${GREEN}Service created.${NC}"
-else
-  echo -e "${GREEN}GenAI service already exists.${NC}"
-fi
-
 # Deploy application
 echo -e "${YELLOW}Deploying application...${NC}"
-cf push
+cf push --no-start
 
 # Set environment variables
 cf set-env $APP_NAME AVIATIONSTACK_API_KEY $AVIATIONSTACK_API_KEY
 
-# Bind service if not already bound
-APP_SERVICES=$(cf services | grep $APP_NAME || echo "")
-if [[ -z "$APP_SERVICES" ]]; then
-  echo -e "${YELLOW}Binding GenAI service to application...${NC}"
-  cf bind-service $APP_NAME $GENAI_SERVICE_NAME
-else
-  echo -e "${GREEN}Service already bound to application.${NC}"
-fi
-
-echo -e "${YELLOW}Restarting application...${NC}"
-cf restart $APP_NAME
+# Start application
+echo -e "${YELLOW}Starting application...${NC}"
+cf start $APP_NAME
 
 # Display application information
 echo -e "${GREEN}Deployment completed successfully!${NC}"

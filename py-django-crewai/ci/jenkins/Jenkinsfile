@@ -1,0 +1,231 @@
+// Jenkins Pipeline for py-django-crewai
+// Equivalent to GitHub Actions workflow: py-django-crewai.yml
+
+pipeline {
+    agent any
+
+    tools {
+        python 'python3.12'
+        nodejs 'node18'
+    }
+
+    options {
+        // Only keep the 10 most recent builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    // Only run on changes to project files or CI configuration
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+
+    stages {
+        stage('Setup Python Environment') {
+            when {
+                anyOf {
+                    changeset 'py-django-crewai/**'
+                    changeset 'py-django-crewai/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('py-django-crewai') {
+                    // Cache pip dependencies
+                    cache(path: '${HOME}/.cache/pip', key: "${env.JOB_NAME}") {
+                        sh 'python -m pip install --upgrade pip'
+                        sh 'python -m venv venv'
+                        sh '. venv/bin/activate && pip install -r requirements.txt'
+                    }
+                }
+            }
+        }
+
+        stage('Backend Test') {
+            when {
+                anyOf {
+                    changeset 'py-django-crewai/**'
+                    changeset 'py-django-crewai/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('py-django-crewai') {
+                    sh '. venv/bin/activate && python manage.py test || echo "No tests run"'
+                }
+            }
+        }
+
+        stage('Frontend Build') {
+            when {
+                anyOf {
+                    changeset 'py-django-crewai/**'
+                    changeset 'py-django-crewai/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('py-django-crewai') {
+                    // Cache npm dependencies
+                    cache(path: 'frontend/node_modules', key: "${env.JOB_NAME}-frontend") {
+                        dir('frontend') {
+                            sh 'npm ci'
+                            sh 'npm run build'
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Collect Static Files') {
+            when {
+                anyOf {
+                    changeset 'py-django-crewai/**'
+                    changeset 'py-django-crewai/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('py-django-crewai') {
+                    sh '. venv/bin/activate && python manage.py collectstatic --noinput || echo "Static collection skipped"'
+                }
+            }
+        }
+
+        stage('Create Package') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'py-django-crewai/**'
+                        changeset 'py-django-crewai/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('py-django-crewai') {
+                    sh '''
+                        mkdir -p dist
+                        zip -r dist/py-django-crewai.zip . -x "*.git*" "*.env*" "*.pyc" "__pycache__/*" "*.github/*" "dist/*" "venv/*" "frontend/node_modules/*"
+                    '''
+                }
+            }
+        }
+
+        stage('Upload Artifacts') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'py-django-crewai/**'
+                        changeset 'py-django-crewai/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('py-django-crewai') {
+                    // Archive the artifacts in Jenkins
+                    archiveArtifacts artifacts: 'dist/*.zip', fingerprint: true
+                }
+            }
+        }
+
+        stage('Deploy to Cloud Foundry') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'py-django-crewai/**'
+                        changeset 'py-django-crewai/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            // This stage requires manual triggering
+            input {
+                message "Deploy to Cloud Foundry?"
+                ok "Yes, deploy it!"
+                parameters {
+                    string(name: 'CF_API', defaultValue: '', description: 'Cloud Foundry API Endpoint')
+                    string(name: 'CF_USERNAME', defaultValue: '', description: 'Cloud Foundry Username')
+                    password(name: 'CF_PASSWORD', defaultValue: '', description: 'Cloud Foundry Password')
+                    string(name: 'CF_ORG', defaultValue: '', description: 'Cloud Foundry Organization')
+                    string(name: 'CF_SPACE', defaultValue: '', description: 'Cloud Foundry Space')
+                    booleanParam(name: 'RANDOM_ROUTE', defaultValue: false, description: 'Use random route for the application')
+                    password(name: 'DJANGO_SECRET_KEY', defaultValue: '', description: 'Django Secret Key')
+                    password(name: 'OPENAI_API_KEY', defaultValue: '', description: 'OpenAI API Key')
+                    password(name: 'TMDB_API_KEY', defaultValue: '', description: 'TMDB API Key')
+                    password(name: 'SERPAPI_API_KEY', defaultValue: '', description: 'SerpAPI API Key')
+                }
+            }
+            steps {
+                dir('py-django-crewai') {
+                    // Install CF CLI
+                    sh '''
+                        curl -L "https://packages.cloudfoundry.org/stable?release=linux64-binary&version=v8&source=github" | tar -zx
+                        chmod +x cf
+
+                        echo "Deploying to Cloud Foundry..."
+                        ./cf api "${CF_API}"
+                        ./cf auth "${CF_USERNAME}" "${CF_PASSWORD}"
+                        ./cf target -o "${CF_ORG}" -s "${CF_SPACE}"
+
+                        # Create GenAI service if it doesn't exist
+                        if ! ./cf service movie-chatbot-llm > /dev/null 2>&1; then
+                            echo "Creating GenAI service..."
+                            ./cf create-service genai standard movie-chatbot-llm || echo "Service creation failed, it might already exist or plan is not available"
+                        else
+                            echo "GenAI service already exists"
+                        fi
+
+                        # Create database service if it doesn't exist
+                        if ! ./cf service movie-chatbot-db > /dev/null 2>&1; then
+                            echo "Creating database service..."
+                            ./cf create-service postgresql small movie-chatbot-db || echo "Service creation failed, it might already exist or plan is not available"
+                        else
+                            echo "Database service already exists"
+                        fi
+
+                        # Set environment variables
+                        APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+                        if [ -z "$APP_NAME" ]; then
+                            APP_NAME=$(basename $(pwd)) # Fallback to directory name
+                        fi
+
+                        # Push the application without starting it
+                        if [ "${RANDOM_ROUTE}" = "true" ]; then
+                            echo "Pushing with random route..."
+                            ./cf push "$APP_NAME" -f manifest.yml --no-start --random-route
+                        else
+                            echo "Pushing with route from manifest..."
+                            ./cf push "$APP_NAME" -f manifest.yml --no-start
+                        fi
+
+                        # Set environment variables
+                        if [ -n "${DJANGO_SECRET_KEY}" ]; then
+                            ./cf set-env "$APP_NAME" "DJANGO_SECRET_KEY" "${DJANGO_SECRET_KEY}"
+                        fi
+
+                        if [ -n "${OPENAI_API_KEY}" ]; then
+                            ./cf set-env "$APP_NAME" "OPENAI_API_KEY" "${OPENAI_API_KEY}"
+                        fi
+
+                        if [ -n "${TMDB_API_KEY}" ]; then
+                            ./cf set-env "$APP_NAME" "TMDB_API_KEY" "${TMDB_API_KEY}"
+                        fi
+
+                        if [ -n "${SERPAPI_API_KEY}" ]; then
+                            ./cf set-env "$APP_NAME" "SERPAPI_API_KEY" "${SERPAPI_API_KEY}"
+                        fi
+
+                        # Start the application
+                        ./cf start "$APP_NAME"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+        success {
+            archiveArtifacts artifacts: 'py-django-crewai/dist/*.zip', fingerprint: true
+        }
+    }
+}

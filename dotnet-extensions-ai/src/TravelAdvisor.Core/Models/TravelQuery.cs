@@ -32,12 +32,12 @@ namespace TravelAdvisor.Core.Models
         /// Optional additional context or requirements from the user
         /// </summary>
         public string AdditionalContext { get; set; } = string.Empty;
-        
+
         /// <summary>
         /// Indicates if there was an error processing the query
         /// </summary>
         public bool HasError { get; set; } = false;
-        
+
         /// <summary>
         /// Error message if HasError is true
         /// </summary>

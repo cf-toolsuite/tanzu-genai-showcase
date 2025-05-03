@@ -9,7 +9,7 @@ services:
             $logger: '@logger'
         calls:
             - [initialize, []]
-    
+
     # Configure the SEC filing service
     App\Service\SecFilingService:
         arguments:

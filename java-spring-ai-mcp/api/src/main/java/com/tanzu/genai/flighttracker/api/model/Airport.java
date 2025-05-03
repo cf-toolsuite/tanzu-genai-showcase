@@ -11,13 +11,13 @@ public class Airport {
     private String name;
     private String iata;
     private String icao;
-    
+
     @JsonProperty("iata_code")
     private String iataCode;
-    
+
     @JsonProperty("icao_code")
     private String icaoCode;
-    
+
     private Double latitude;
     private Double longitude;
     private String timezone;

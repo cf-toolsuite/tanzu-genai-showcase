@@ -8,6 +8,10 @@ This application demonstrates how to build a chatbot that interacts with the Con
 
 A web-based chatbot application that allows users to interact with the Congress.gov API to fetch information about bills, amendments, summaries, and members in natural language. The application uses LangChainGo to integrate with GenAI's LLM service for natural language processing.
 
+The chatbot features a toggle that allows users to switch between:
+- **API Tools Mode (enabled by default)**: Uses real-time API calls to Congress.gov for up-to-date information
+- **Model-Only Mode**: Relies on the LLM's pre-trained knowledge without making external API calls
+
 ## Prerequisites
 
 - Go 1.18+ installed locally for development
@@ -65,25 +69,45 @@ go run cmd/server/main.go
 
 The application will be available at http://localhost:8080
 
+## Using the Chatbot
+
+1. Open the application in your web browser at http://localhost:8080
+2. You'll see the chatbot interface with a toggle switch labeled "Use API Tools" in the top-right corner
+3. By default, the toggle is enabled, which means the chatbot will make real-time API calls to Congress.gov for up-to-date information
+4. You can disable the toggle if you want the chatbot to rely solely on the LLM's pre-trained knowledge without making external API calls
+5. Type your question in the input field and press Enter or click the Send button
+6. When API Tools mode is enabled, responses will include a small "🔧 Response generated using API tools" indicator
+
+### Example Questions
+
+With API Tools enabled (recommended for current information):
+
+- "Who are the current senators from Washington state?"
+- "What is the status of bill S.1260 in the 117th Congress?"
+- "List the committees in the House of Representatives"
+
+With API Tools disabled (for general knowledge questions):
+
+- "How does a bill become a law?"
+- "What is the role of the Speaker of the House?"
+- "Explain the difference between the House and Senate"
+
 ## How to Run on Cloud Foundry
 
-### 1. Build the application
+
+### 1. Push to Cloud Foundry
 
 ```bash
-go build -o congress-chatbot cmd/server/main.go
-```
-
-### 2. Push to Cloud Foundry
-
-```bash
-source .env
 cf push --no-start
 cf set-env congress-chatbot CONGRESS_API_KEY ${CONGRESS_API_KEY}
 ```
 
-### 3. Bind to LLM Service
+### 2. Bind to LLM Service
 
 ```bash
+# List available plans for the GenAI service offering
+cf marketplace -e genai
+
 # Create an LLM service instance (if not already created)
 cf create-service genai PLAN_NAME congress-llm
 ```
@@ -95,30 +119,8 @@ cf create-service genai PLAN_NAME congress-llm
 # Bind the service to your application
 cf bind-service congress-chatbot congress-llm
 
-# Restart your application to apply the binding
+# Start your application to apply the binding
 cf start congress-chatbot
-```
-
-### 4. Alternative: Manual Service Configuration
-
-If you prefer to manually configure the LLM service:
-
-```bash
-# Create a service key
-cf create-service-key congress-llm congress-llm-service-key
-
-# Get the service key details
-cf service-key congress-llm congress-llm-service-key
-```
-
-Update your application's environment variables with the service key details:
-
-```bash
-cf set-env congress-chatbot GENAI_API_KEY "the-api-key-from-service-key"
-cf set-env congress-chatbot GENAI_API_BASE_URL "the-url-from-service-key"
-
-# Restart your application to apply changes
-cf restart congress-chatbot
 ```
 
 ## Tech Stack
@@ -129,12 +131,27 @@ cf restart congress-chatbot
 - **Congress.gov API**: External API for fetching legislative data
 - **GenAI LLM Service**: Large language model service provided by Tanzu Platform for Cloud Foundry
 
+## Documentation
+
+Detailed documentation is available in the `docs/` directory:
+
+- [Architecture](docs/ARCHITECTURE.md): System architecture, components, and data flow
+- [API](docs/API.md): API endpoints and usage
+- [Development](docs/DEVELOPMENT.md): Development setup and workflow
+- [Deployment](docs/DEPLOYMENT.md): Deployment instructions and environments
+- [Testing](docs/TESTING.md): Testing strategies and procedures
+- [Troubleshooting](docs/TROUBLESHOOTING.md): Common issues and solutions
+- [Features](docs/FEATURES.md): Detailed feature descriptions
+- [Implementation](docs/IMPLEMENTATION.md): Implementation details
+- [Logging](docs/LOGGING.md): Logging configuration and usage
+
 ## Project Structure
 
 ```bash
 ├── api/            # API clients (Congress.gov)
 ├── cmd/            # Application entry points
 ├── config/         # Configuration handling
+├── docs/           # Documentation
 ├── internal/       # Private application code
 ├── pkg/            # Public libraries
 ├── .env.example    # Example environment variables

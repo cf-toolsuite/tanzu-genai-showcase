@@ -11,7 +11,7 @@
             border-radius: 0.5rem;
             margin-bottom: 2rem;
         }
-        
+
         .stats-card {
             padding: 1.5rem;
             height: 100%;
@@ -21,24 +21,24 @@
             box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
             transition: transform 0.2s;
         }
-        
+
         .stats-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 0.5rem 1rem rgba(0,0,0,0.15);
         }
-        
+
         .stats-value {
             font-size: 2.5rem;
             font-weight: 700;
             color: #0d6efd;
             margin-bottom: 0.5rem;
         }
-        
+
         .stats-label {
             font-size: 1rem;
             color: #6c757d;
         }
-        
+
         .network-visualization {
             height: 400px;
             background-color: #f8f9fa;
@@ -47,22 +47,22 @@
             position: relative;
             overflow: hidden;
         }
-        
+
         .chart-container {
             height: 300px;
         }
-        
+
         .executive-label {
             font-size: 0.875rem;
             font-weight: 600;
             margin-bottom: 0.25rem;
         }
-        
+
         .progress {
             height: 1rem;
             margin-bottom: 1rem;
         }
-        
+
         .network-node {
             display: inline-block;
             width: 50px;
@@ -73,21 +73,21 @@
             position: relative;
             box-shadow: 0 0.125rem 0.25rem rgba(0,0,0,0.075);
         }
-        
+
         .network-node.executive {
             background-color: #0d6efd;
         }
-        
+
         .network-node.company {
             background-color: #dc3545;
         }
-        
+
         .network-node.connection {
             background-color: #6c757d;
             width: 30px;
             height: 30px;
         }
-        
+
         .node-label {
             position: absolute;
             bottom: -20px;
@@ -96,20 +96,20 @@
             font-size: 0.75rem;
             white-space: nowrap;
         }
-        
+
         .network-legend {
             margin-top: 1rem;
             display: flex;
             justify-content: center;
             gap: 2rem;
         }
-        
+
         .legend-item {
             display: flex;
             align-items: center;
             gap: 0.5rem;
         }
-        
+
         .legend-color {
             width: 16px;
             height: 16px;
@@ -129,10 +129,10 @@
                 type: 'pie',
                 data: {
                     labels: [
-                        'Finance', 
-                        'Technology', 
-                        'Healthcare', 
-                        'Manufacturing', 
+                        'Finance',
+                        'Technology',
+                        'Healthcare',
+                        'Manufacturing',
                         'Retail',
                         'Other'
                     ],
@@ -166,29 +166,29 @@
                     }
                 }
             });
-            
+
             // Create a simple network visualization using HTML/CSS
             // In a real application, you would use a library like D3.js or Sigma.js
             function initNetworkVisualization() {
                 const container = document.getElementById('networkVisualization');
                 const executives = {{ executives|length }};
                 const connectionsPerExecutive = {{ (connectionStats.totalConnections / (executives > 0 ? executives : 1))|round }};
-                
+
                 // Add executive nodes
                 {% for executive in executives %}
                     const execNode = document.createElement('div');
                     execNode.className = 'network-node executive';
                     execNode.style.left = `${Math.random() * 60 + 20}%`;
                     execNode.style.top = `${Math.random() * 40 + 30}%`;
-                    
+
                     const execLabel = document.createElement('div');
                     execLabel.className = 'node-label';
                     execLabel.textContent = '{{ executive.name|slice(0, 15) }}{{ executive.name|length > 15 ? "..." : "" }}';
                     execNode.appendChild(execLabel);
-                    
+
                     container.appendChild(execNode);
                 {% endfor %}
-                
+
                 // Add company connections
                 for (let i = 0; i < {{ connectionStats.companyConnections }}; i++) {
                     const companyNode = document.createElement('div');
@@ -197,7 +197,7 @@
                     companyNode.style.top = `${Math.random() * 60 + 20}%`;
                     container.appendChild(companyNode);
                 }
-                
+
                 // Add some random connections
                 for (let i = 0; i < 20; i++) {
                     const connectionNode = document.createElement('div');
@@ -207,7 +207,7 @@
                     container.appendChild(connectionNode);
                 }
             }
-            
+
             initNetworkVisualization();
         });
     </script>
@@ -222,7 +222,7 @@
             <li class="breadcrumb-item active" aria-current="page">LinkedIn Network Analysis</li>
         </ol>
     </nav>
-    
+
     {% for label, messages in app.flashes %}
         {% for message in messages %}
             <div class="alert alert-{{ label }} alert-dismissible fade show" role="alert">
@@ -231,7 +231,7 @@
             </div>
         {% endfor %}
     {% endfor %}
-    
+
     <div class="network-header shadow-sm">
         <div class="row">
             <div class="col-md-8">
@@ -244,7 +244,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Network Stats -->
     <div class="row mb-4">
         <div class="col-md-4">
@@ -266,7 +266,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="row">
         <!-- Network Visualization -->
         <div class="col-md-8">
@@ -278,7 +278,7 @@
                     <div id="networkVisualization" class="network-visualization position-relative">
                         <!-- Network nodes will be dynamically added here by JavaScript -->
                     </div>
-                    
+
                     <div class="network-legend">
                         <div class="legend-item">
                             <div class="legend-color" style="background-color: #0d6efd;"></div>
@@ -293,14 +293,14 @@
                             <div>Second-degree Connections</div>
                         </div>
                     </div>
-                    
+
                     <p class="text-muted text-center mt-2">
                         <small>This is a simplified visualization. For detailed analytics, click on individual executives.</small>
                     </p>
                 </div>
             </div>
         </div>
-        
+
         <!-- Industry Distribution -->
         <div class="col-md-4">
             <div class="card shadow-sm mb-4">
@@ -318,7 +318,7 @@
             </div>
         </div>
     </div>
-    
+
     <!-- Executive LinkedIn Profiles -->
     <div class="card shadow-sm mb-4">
         <div class="card-header">

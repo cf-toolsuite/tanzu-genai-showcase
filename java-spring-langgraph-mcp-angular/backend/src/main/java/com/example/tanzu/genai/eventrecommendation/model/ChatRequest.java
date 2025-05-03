@@ -14,7 +14,7 @@ import jakarta.validation.constraints.NotBlank;
 public class ChatRequest {
     @NotBlank(message = "Session ID cannot be blank")
     private String sessionId;
-    
+
     @NotBlank(message = "Message content cannot be blank")
     private String message;
 }

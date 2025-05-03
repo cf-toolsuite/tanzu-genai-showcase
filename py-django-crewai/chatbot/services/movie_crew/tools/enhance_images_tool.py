@@ -3,10 +3,10 @@ Tool for enhancing movie images using TMDB API.
 """
 import json
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Union
 import tmdbsimple as tmdb
 from crewai.tools import BaseTool
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from ...tmdb_service import TMDBService
 
@@ -15,7 +15,14 @@ logger = logging.getLogger('chatbot.movie_crew')
 
 class EnhanceMoviesInput(BaseModel):
     """Input schema for EnhanceMovieImagesTool."""
-    movies_json: str = Field(default="", description="JSON string containing movies to enhance with better images")
+    movies_json: Union[str, List[Dict[str, Any]], Dict[str, Any]] = Field(default="", description="JSON string containing movies to enhance with better images")
+
+    @field_validator('movies_json')
+    def validate_movies_json(cls, v):
+        """Convert dictionaries or lists to string if needed."""
+        if isinstance(v, (list, dict)):
+            return json.dumps(v)
+        return v
 
 class EnhanceMovieImagesTool(BaseTool):
     """Tool for enhancing movie images with high-quality versions from TMDB."""
@@ -25,7 +32,7 @@ class EnhanceMovieImagesTool(BaseTool):
     args_schema: type[EnhanceMoviesInput] = EnhanceMoviesInput
     tmdb_api_key: str = Field(default="", description="TMDB API key")
 
-    def _run(self, movies_json: str = "") -> str:
+    def _run(self, movies_json: Union[str, List[Dict[str, Any]], Dict[str, Any]] = "") -> str:
         """
         Enhance movie data with high-quality images.
 
@@ -40,6 +47,10 @@ class EnhanceMovieImagesTool(BaseTool):
         start_time = time.time()
 
         try:
+            # Convert non-string inputs to JSON strings
+            if isinstance(movies_json, (list, dict)):
+                movies_json = json.dumps(movies_json)
+
             # Parse input JSON
             movies = json.loads(movies_json)
             if not movies:
@@ -65,8 +76,8 @@ class EnhanceMovieImagesTool(BaseTool):
 
             tmdb_service = TMDBService(api_key=self.tmdb_api_key)
 
-            # Enhance movies sequentially to avoid race conditions
-            enhanced_movies = tmdb_service.enhance_movies_sequential(movies)
+            # Use parallel enhancement for better performance
+            enhanced_movies = tmdb_service.enhance_movies_parallel(movies, max_workers=3)
 
             # Ensure all enhanced movies retain their TMDB ID and poster info
             for i, movie in enumerate(enhanced_movies):

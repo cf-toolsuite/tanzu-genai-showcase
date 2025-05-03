@@ -21,10 +21,10 @@ chmod +x "$SERVER_PATH"
 
 # Detect OS
 case "$(uname -s)" in
-    Linux*)     
+    Linux*)
         CONFIG_DIR="$HOME/.config/Claude"
         ;;
-    Darwin*)    
+    Darwin*)
         CONFIG_DIR="$HOME/Library/Application Support/Claude"
         ;;
     CYGWIN*|MINGW*|MSYS*)
@@ -44,17 +44,17 @@ mkdir -p "$CONFIG_DIR"
 # Check if config file exists
 if [ -f "$CONFIG_FILE" ]; then
     echo -e "${YELLOW}Found existing Claude configuration at:${NC} $CONFIG_FILE"
-    
+
     # Check if our server is already in the config
     if grep -q "flight-tracking-bot" "$CONFIG_FILE"; then
         echo -e "${GREEN}Flight tracking bot is already configured.${NC}"
         exit 0
     fi
-    
+
     # Backup existing config
     cp "$CONFIG_FILE" "$CONFIG_FILE.backup"
     echo -e "${YELLOW}Created backup at:${NC} $CONFIG_FILE.backup"
-    
+
     # Update existing config
     TMP_FILE=$(mktemp)
     jq --arg path "$SERVER_PATH" '.mcpServers."flight-tracking-bot" = {"command": "ruby", "args": [$path]}' "$CONFIG_FILE" > "$TMP_FILE" && cp "$TMP_FILE" "$CONFIG_FILE"

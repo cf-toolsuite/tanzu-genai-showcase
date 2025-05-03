@@ -4,12 +4,12 @@ require_relative '../app/tools/flight_search_tool'
 class FlightSearchToolTest < Minitest::Test
   def setup
     @tool = FlightSearchTool.new
-    
+
     # Mock the aviation stack client
     @mock_client = mock
     AviationStackClient.stubs(:new).returns(@mock_client)
   end
-  
+
   def test_search_flights_with_results
     # Sample flight data
     flight_data = {
@@ -38,34 +38,34 @@ class FlightSearchToolTest < Minitest::Test
         }
       ]
     }
-    
+
     # Set expectations for the mock client
     @mock_client.expects(:search_flights).with(flight_iata: 'BA112', limit: 5).returns(flight_data)
-    
+
     # Call the tool with the test parameters
     result = @tool.call(flight_iata: 'BA112', limit: 5)
-    
+
     # Check result contains expected flight information
     assert_includes result, 'British Airways BA112'
     assert_includes result, 'New York JFK (JFK)'
     assert_includes result, 'London Heathrow (LHR)'
     assert_includes result, 'Status: active'
   end
-  
+
   def test_search_flights_with_no_results
     # Empty flight data
     empty_data = { 'data' => [] }
-    
+
     # Set expectations for the mock client
     @mock_client.expects(:search_flights).with(dep_iata: 'XYZ', limit: 10).returns(empty_data)
-    
+
     # Call the tool with parameters that should return no results
     result = @tool.call(dep_iata: 'XYZ')
-    
+
     # Check result indicates no flights found
     assert_equal "No flights found matching your criteria.", result
   end
-  
+
   def test_flight_with_delay_information
     # Sample flight data with delay information
     flight_data = {
@@ -96,13 +96,13 @@ class FlightSearchToolTest < Minitest::Test
         }
       ]
     }
-    
+
     # Set expectations for the mock client
     @mock_client.expects(:search_flights).with(flight_status: 'delayed', limit: 10).returns(flight_data)
-    
+
     # Call the tool with the test parameters
     result = @tool.call(flight_status: 'delayed')
-    
+
     # Check result contains delay information
     assert_includes result, 'Departure delay: 45 minutes'
     assert_includes result, 'Arrival delay: 30 minutes'

@@ -1,3 +1,10 @@
 .attic/
 .history/
 .idea/
+.vscode/
+*.sqlite3
+
+# Environment variables and secrets
+.env
+.env.*
+!.env.example

@@ -10,28 +10,28 @@
             height: 400px;
             margin-bottom: 2rem;
         }
-        
+
         .metrics-card {
             height: 100%;
         }
-        
+
         .table-responsive {
             max-height: 500px;
             overflow-y: auto;
         }
-        
+
         .positive-change {
             color: #28a745;
         }
-        
+
         .negative-change {
             color: #dc3545;
         }
-        
+
         .period-selector .btn {
             margin-right: 0.25rem;
         }
-        
+
         .chart-controls {
             margin-bottom: 1rem;
         }
@@ -45,21 +45,21 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Price chart
             const priceChartCtx = document.getElementById('priceChart').getContext('2d');
-            
+
             // Convert dates to JavaScript dates
             const dates = {{ chartData.dates|json_encode|raw }};
-            
+
             // Price dataset
             const closePrices = {{ chartData.prices.close|json_encode|raw }};
             const openPrices = {{ chartData.prices.open|json_encode|raw }};
             const highPrices = {{ chartData.prices.high|json_encode|raw }};
             const lowPrices = {{ chartData.prices.low|json_encode|raw }};
-            
+
             // Create gradient for price chart background
             const priceGradient = priceChartCtx.createLinearGradient(0, 0, 0, 400);
             priceGradient.addColorStop(0, 'rgba(0, 123, 255, 0.2)');
             priceGradient.addColorStop(1, 'rgba(0, 123, 255, 0)');
-            
+
             // Create the price chart
             const priceChart = new Chart(priceChartCtx, {
                 type: 'line',
@@ -120,11 +120,11 @@
                     }
                 }
             });
-            
+
             // Volume chart
             const volumeChartCtx = document.getElementById('volumeChart').getContext('2d');
             const volumes = {{ chartData.volumes|json_encode|raw }};
-            
+
             // Create the volume chart
             const volumeChart = new Chart(volumeChartCtx, {
                 type: 'bar',
@@ -157,8 +157,8 @@
                             beginAtZero: true,
                             ticks: {
                                 callback: function(value) {
-                                    return value >= 1000000 
-                                        ? (value / 1000000).toFixed(1) + 'M' 
+                                    return value >= 1000000
+                                        ? (value / 1000000).toFixed(1) + 'M'
                                         : (value / 1000).toFixed(0) + 'K';
                                 }
                             }
@@ -166,7 +166,7 @@
                     }
                 }
             });
-            
+
             // Handle period selection
             document.querySelectorAll('.period-select').forEach(button => {
                 button.addEventListener('click', function(e) {
@@ -176,7 +176,7 @@
                     window.location.href = `{{ path('company_stockprices', {'id': company.id}) }}?period=${period}&interval=${interval}`;
                 });
             });
-            
+
             // Handle interval selection
             document.querySelectorAll('.interval-select').forEach(button => {
                 button.addEventListener('click', function(e) {
@@ -198,22 +198,22 @@
             <li class="breadcrumb-item active" aria-current="page">Stock Prices</li>
         </ol>
     </nav>
-    
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>{{ company.name }} ({{ company.tickerSymbol }})</h1>
-        
+
         {% if metrics is defined and metrics.latestPrice is defined %}
             <div class="price-display">
                 <h2 class="mb-0">${{ metrics.latestPrice|number_format(2) }}</h2>
                 <div class="{% if metrics.latestChangePercent > 0 %}positive-change{% else %}negative-change{% endif %}">
-                    {{ metrics.latestChange > 0 ? '+' : '' }}{{ metrics.latestChange|number_format(2) }} 
+                    {{ metrics.latestChange > 0 ? '+' : '' }}{{ metrics.latestChange|number_format(2) }}
                     ({{ metrics.latestChangePercent > 0 ? '+' : '' }}{{ metrics.latestChangePercent|number_format(2) }}%)
                 </div>
                 <small class="text-muted">As of {{ metrics.latestDate }}</small>
             </div>
         {% endif %}
     </div>
-    
+
     <div class="chart-controls">
         <div class="card shadow-sm">
             <div class="card-body">
@@ -240,7 +240,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="row mb-4">
         <div class="col-12">
             <div class="card shadow-sm">
@@ -255,7 +255,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="row mb-4">
         <div class="col-12">
             <div class="card shadow-sm">
@@ -270,7 +270,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="row mb-4">
         {% if metrics is defined %}
             <div class="col-md-4 mb-4">
@@ -312,7 +312,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <div class="col-md-8 mb-4">
                 <div class="card shadow-sm">
                     <div class="card-header">
@@ -360,7 +360,7 @@
             </div>
         {% endif %}
     </div>
-    
+
     <div class="d-flex justify-content-between mb-4">
         <a href="{{ path('company_show', {'id': company.id}) }}" class="btn btn-secondary">
             <i class="fas fa-arrow-left"></i> Back to Company

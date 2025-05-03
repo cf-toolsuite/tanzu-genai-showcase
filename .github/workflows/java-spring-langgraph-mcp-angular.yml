@@ -1,6 +1,7 @@
 name: java-spring-langgraph-mcp-angular CI
 
 on:
+  workflow_call:
   push:
     paths:
       - 'java-spring-langgraph-mcp-angular/**'

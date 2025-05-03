@@ -59,6 +59,7 @@ cf bind-service travel-advisor travel-advisor-llm
 ```bash
 cf set-env travel-advisor GOOGLEMAPS__APIKEY your_google_maps_api_key
 ```
+
 > [!IMPORTANT]
 > Replace `your_google_maps_api_key` above with a valid Google Maps API key with appropriate permissions.
 

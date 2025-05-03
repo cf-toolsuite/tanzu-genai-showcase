@@ -7,8 +7,7 @@ applications:
     - go_buildpack
   env:
     GOPACKAGENAME: github.com/cf-toolsuite/tanzu-genai-showcase/go-fiber-langchaingo
+    GO_INSTALL_PACKAGE_SPEC: github.com/cf-toolsuite/tanzu-genai-showcase/go-fiber-langchaingo/cmd/server
     ENV: production
   health-check-type: http
   health-check-http-endpoint: /health
-  services:
-    - congress-llm

@@ -62,8 +62,20 @@ func (h *Handler) HandleChat(c *fiber.Ctx) error {
 	ctx, cancel := context.WithTimeout(c.Context(), 60*time.Second)
 	defer cancel()
 
-	// Process the user's message
-	response, err := h.chatbotService.ProcessUserQuery(ctx, req.Message)
+	// Check if we should use tool calling
+	useTools := c.Query("useTools", "false") == "true"
+
+	var response string
+	var err error
+
+	if useTools {
+		// Process the user's message with tool calling
+		response, err = h.chatbotService.ProcessUserQueryWithTools(ctx, req.Message)
+	} else {
+		// Process the user's message with the standard approach
+		response, err = h.chatbotService.ProcessUserQuery(ctx, req.Message)
+	}
+
 	if err != nil {
 		return c.Status(fiber.StatusInternalServerError).JSON(fiber.Map{
 			"error": err.Error(),

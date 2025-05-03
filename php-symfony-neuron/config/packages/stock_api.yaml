@@ -27,14 +27,14 @@ services:
             $logger: '@logger'
         calls:
             - [initialize, []]
-            
+
     App\Service\ApiClient\NewsApiClient:
         arguments:
             $params: '@parameter_bag'
             $logger: '@logger'
         calls:
             - [initialize, []]
-            
+
     App\Service\ApiClient\SecApiClient:
         arguments:
             $params: '@parameter_bag'

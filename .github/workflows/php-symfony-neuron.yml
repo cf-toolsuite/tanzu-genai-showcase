@@ -1,6 +1,7 @@
 name: php-symfony-neuron CI
 
 on:
+  workflow_call:
   push:
     paths:
       - 'php-symfony-neuron/**'

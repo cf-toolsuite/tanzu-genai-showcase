@@ -257,13 +257,13 @@ namespace TravelAdvisor.Infrastructure.Services
                 _logger.LogInformation("Answering follow-up question with mock service: {Question}", question);
 
                 // Generate responses based on keywords in the question
-                if (question.Contains("time", StringComparison.OrdinalIgnoreCase) || 
+                if (question.Contains("time", StringComparison.OrdinalIgnoreCase) ||
                     question.Contains("long", StringComparison.OrdinalIgnoreCase) ||
                     question.Contains("duration", StringComparison.OrdinalIgnoreCase))
                 {
                     return Task.FromResult($"The journey from {query.Origin} to {query.Destination} by {recommendation.Mode} will take approximately {recommendation.DurationMinutes} minutes.");
                 }
-                else if (question.Contains("cost", StringComparison.OrdinalIgnoreCase) || 
+                else if (question.Contains("cost", StringComparison.OrdinalIgnoreCase) ||
                          question.Contains("price", StringComparison.OrdinalIgnoreCase) ||
                          question.Contains("expensive", StringComparison.OrdinalIgnoreCase))
                 {
@@ -272,24 +272,24 @@ namespace TravelAdvisor.Infrastructure.Services
                         : $"I don't have exact cost information for traveling from {query.Origin} to {query.Destination} by {recommendation.Mode}, as it can vary based on factors like fuel prices, transit fares, and other variables.";
                     return Task.FromResult(response);
                 }
-                else if (question.Contains("distance", StringComparison.OrdinalIgnoreCase) || 
+                else if (question.Contains("distance", StringComparison.OrdinalIgnoreCase) ||
                          question.Contains("far", StringComparison.OrdinalIgnoreCase) ||
                          question.Contains("miles", StringComparison.OrdinalIgnoreCase) ||
                          question.Contains("kilometers", StringComparison.OrdinalIgnoreCase))
                 {
                     return Task.FromResult($"The distance from {query.Origin} to {query.Destination} is approximately {recommendation.DistanceKm:F1} kilometers.");
                 }
-                else if (question.Contains("route", StringComparison.OrdinalIgnoreCase) || 
+                else if (question.Contains("route", StringComparison.OrdinalIgnoreCase) ||
                          question.Contains("path", StringComparison.OrdinalIgnoreCase) ||
                          question.Contains("directions", StringComparison.OrdinalIgnoreCase) ||
                          question.Contains("steps", StringComparison.OrdinalIgnoreCase))
                 {
-                    var stepsDescription = string.Join("\n", recommendation.Steps.Select(step => 
+                    var stepsDescription = string.Join("\n", recommendation.Steps.Select(step =>
                         $"- {step.Description} ({step.DistanceKm:F1} km, {step.DurationMinutes} mins)"));
-                    
+
                     return Task.FromResult($"Here's the route from {query.Origin} to {query.Destination} by {recommendation.Mode}:\n{stepsDescription}");
                 }
-                else if (question.Contains("environment", StringComparison.OrdinalIgnoreCase) || 
+                else if (question.Contains("environment", StringComparison.OrdinalIgnoreCase) ||
                          question.Contains("eco", StringComparison.OrdinalIgnoreCase) ||
                          question.Contains("green", StringComparison.OrdinalIgnoreCase))
                 {
@@ -301,7 +301,7 @@ namespace TravelAdvisor.Infrastructure.Services
                         >= 30 => "not very environmentally friendly",
                         _ => "one of the least environmentally friendly options"
                     };
-                    
+
                     return Task.FromResult($"Traveling by {recommendation.Mode} from {query.Origin} to {query.Destination} is {environmentalRating}. It has an environmental score of {recommendation.EnvironmentalScore}/100.");
                 }
                 else

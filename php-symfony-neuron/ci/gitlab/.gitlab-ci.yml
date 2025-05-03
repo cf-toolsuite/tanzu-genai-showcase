@@ -1,0 +1,207 @@
+# GitLab CI/CD for php-symfony-neuron
+# Equivalent to GitHub Actions workflow: php-symfony-neuron.yml
+
+image: php:8.3
+
+# Define stages in the pipeline
+stages:
+  - prepare
+  - validate
+  - test
+  - build
+  - upload
+  - deploy
+
+# Cache Composer packages between pipeline jobs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - vendor/
+
+# Run CI only when changes in the project files or CI configuration
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      changes:
+        - php-symfony-neuron/**/*
+        - php-symfony-neuron/ci/gitlab/.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - php-symfony-neuron/**/*
+        - php-symfony-neuron/ci/gitlab/.gitlab-ci.yml
+
+# Prepare the environment
+prepare:
+  stage: prepare
+  script:
+    - cd php-symfony-neuron
+    - apt-get update -yqq
+    - apt-get install -yqq git unzip zip libzip-dev
+    - docker-php-ext-install zip pdo pdo_mysql
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - composer install --prefer-dist --no-progress
+
+# Validate composer files
+validate:
+  stage: validate
+  script:
+    - cd php-symfony-neuron
+    - apt-get update -yqq
+    - apt-get install -yqq git unzip
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - composer validate --strict
+  needs:
+    - prepare
+
+# Run tests
+test:
+  stage: test
+  script:
+    - cd php-symfony-neuron
+    - apt-get update -yqq
+    - apt-get install -yqq git unzip libzip-dev
+    - docker-php-ext-install zip
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - |
+      if [ -d "tests" ]; then
+        vendor/bin/phpunit
+      else
+        echo "No tests directory found, skipping tests"
+      fi
+  needs:
+    - validate
+
+# Create build package
+build:
+  stage: build
+  script:
+    - cd php-symfony-neuron
+    - apt-get update -yqq
+    - apt-get install -yqq git unzip zip
+    - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+    - composer dump-autoload --optimize --no-dev
+    - mkdir -p build
+    - zip -r build/php-symfony-neuron.zip . -x ".git/*" "tests/*" ".env*" ".github/*" "build/*"
+  artifacts:
+    paths:
+      - php-symfony-neuron/build/
+    expire_in: 1 week
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - test
+
+# Upload artifacts - only on main branch
+upload:
+  stage: upload
+  script:
+    - echo "Uploading build artifacts to GitLab Package Registry"
+    - |
+      if [ -f "php-symfony-neuron/build/php-symfony-neuron.zip" ]; then
+        cd php-symfony-neuron
+        apt-get update -yqq
+        apt-get install -yqq curl
+        curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+             --upload-file build/php-symfony-neuron.zip \
+             "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/php-symfony-neuron/${CI_COMMIT_TAG:-latest}/php-symfony-neuron.zip"
+      else
+        echo "Build package not found"
+        exit 1
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - build
+
+# Deploy to Cloud Foundry - manual trigger with parameters
+deploy:
+  stage: deploy
+  image: governmentpaas/cf-cli:latest
+  variables:
+    CF_API: ""
+    CF_USERNAME: ""
+    CF_PASSWORD: ""
+    CF_ORG: ""
+    CF_SPACE: ""
+    RANDOM_ROUTE: "false"
+    STOCK_API_KEY: ""
+    NEWS_API_KEY: ""
+    EDGAR_API_KEY: ""
+    OPENAI_API_KEY: ""
+    LINKEDIN_CLIENT_ID: ""
+    LINKEDIN_CLIENT_SECRET: ""
+  script:
+    - cd php-symfony-neuron
+    - echo "Deploying to Cloud Foundry..."
+    - cf api "$CF_API"
+    - cf auth "$CF_USERNAME" "$CF_PASSWORD"
+    - cf target -o "$CF_ORG" -s "$CF_SPACE"
+
+    # Create GenAI service if it doesn't exist
+    - |
+      if ! cf service php-symfony-neuron-llm > /dev/null 2>&1; then
+        echo "Creating GenAI service..."
+        cf create-service genai standard php-symfony-neuron-llm || echo "Service creation failed, it might already exist or plan is not available"
+      else
+        echo "GenAI service already exists"
+      fi
+
+    # Create database service if it doesn't exist
+    - |
+      if ! cf service php-symfony-neuron-db > /dev/null 2>&1; then
+        echo "Creating database service..."
+        cf create-service postgresql small php-symfony-neuron-db || echo "Service creation failed, it might already exist or plan is not available"
+      else
+        echo "Database service already exists"
+      fi
+
+    # Set environment variables
+    - |
+      APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+      if [ -z "$APP_NAME" ]; then
+        APP_NAME=$(basename $(pwd)) # Fallback to directory name
+      fi
+
+      # Push the application without starting it
+      if [ "$RANDOM_ROUTE" = "true" ]; then
+        echo "Pushing with random route..."
+        cf push "$APP_NAME" -f manifest.yml --no-start --random-route
+      else
+        echo "Pushing with route from manifest..."
+        cf push "$APP_NAME" -f manifest.yml --no-start
+      fi
+
+      # Set environment variables
+      if [ -n "$STOCK_API_KEY" ]; then
+        cf set-env "$APP_NAME" "STOCK_API_KEY" "$STOCK_API_KEY"
+      fi
+
+      if [ -n "$NEWS_API_KEY" ]; then
+        cf set-env "$APP_NAME" "NEWS_API_KEY" "$NEWS_API_KEY"
+      fi
+
+      if [ -n "$EDGAR_API_KEY" ]; then
+        cf set-env "$APP_NAME" "EDGAR_API_KEY" "$EDGAR_API_KEY"
+      fi
+
+      if [ -n "$OPENAI_API_KEY" ]; then
+        cf set-env "$APP_NAME" "OPENAI_API_KEY" "$OPENAI_API_KEY"
+      fi
+
+      if [ -n "$LINKEDIN_CLIENT_ID" ]; then
+        cf set-env "$APP_NAME" "LINKEDIN_CLIENT_ID" "$LINKEDIN_CLIENT_ID"
+      fi
+
+      if [ -n "$LINKEDIN_CLIENT_SECRET" ]; then
+        cf set-env "$APP_NAME" "LINKEDIN_CLIENT_SECRET" "$LINKEDIN_CLIENT_SECRET"
+      fi
+
+      # Start the application
+      cf start "$APP_NAME"
+  environment:
+    name: production
+  when: manual
+  needs:
+    - build
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

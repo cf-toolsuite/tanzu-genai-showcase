@@ -12,14 +12,14 @@
                     <i class="fas fa-arrow-left"></i> Back to List
                 </a>
             </div>
-            
+
             {% for message in app.flashes('warning') %}
                 <div class="alert alert-warning alert-dismissible fade show" role="alert">
                     {{ message }}
                     <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
                 </div>
             {% endfor %}
-            
+
             <div class="card shadow-sm">
                 <div class="card-body">
                     {{ form_start(form) }}
@@ -31,7 +31,7 @@
                             {{ form_row(form.tickerSymbol) }}
                         </div>
                     </div>
-                    
+
                     <div class="row mb-3">
                         <div class="col-md-6">
                             {{ form_row(form.industry) }}
@@ -40,19 +40,19 @@
                             {{ form_row(form.sector) }}
                         </div>
                     </div>
-                    
+
                     <div class="row mb-3">
                         <div class="col-md-12">
                             {{ form_row(form.headquarters) }}
                         </div>
                     </div>
-                    
+
                     <div class="row mb-3">
                         <div class="col-md-12">
                             {{ form_row(form.description) }}
                         </div>
                     </div>
-                    
+
                     <div class="row mb-3">
                         <div class="col-md-6">
                             {{ form_row(form.foundedYear) }}
@@ -61,20 +61,20 @@
                             {{ form_row(form.employees) }}
                         </div>
                     </div>
-                    
+
                     <div class="row mb-3">
                         <div class="col-md-12">
                             {{ form_row(form.website) }}
                         </div>
                     </div>
-                    
+
                     <div class="form-check form-switch mb-4">
                         <input class="form-check-input" type="checkbox" id="use_ai" name="use_ai" value="yes" checked>
                         <label class="form-check-label" for="use_ai">
                             Use AI to enhance company information
                         </label>
                     </div>
-                    
+
                     <div class="d-grid gap-2">
                         <button type="submit" class="btn btn-primary">Create Company</button>
                     </div>

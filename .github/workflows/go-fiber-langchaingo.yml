@@ -1,6 +1,7 @@
 name: go-fiber-langchaingo CI
 
 on:
+  workflow_call:
   push:
     paths:
       - 'go-fiber-langchaingo/**'

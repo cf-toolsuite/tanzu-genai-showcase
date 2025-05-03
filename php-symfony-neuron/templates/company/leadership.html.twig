@@ -9,12 +9,12 @@
             margin-bottom: 2rem;
             transition: transform 0.2s;
         }
-        
+
         .executive-card:hover {
             transform: translateY(-5px);
             box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
         }
-        
+
         .executive-image {
             width: 120px;
             height: 120px;
@@ -22,7 +22,7 @@
             border-radius: 50%;
             margin-bottom: 1rem;
         }
-        
+
         .executive-placeholder {
             width: 120px;
             height: 120px;
@@ -36,35 +36,35 @@
             color: #6c757d;
             margin-bottom: 1rem;
         }
-        
+
         .executive-name {
             font-size: 1.25rem;
             font-weight: 600;
             margin-bottom: 0.25rem;
         }
-        
+
         .executive-title {
             font-size: 1rem;
             color: #6c757d;
             margin-bottom: 1rem;
         }
-        
+
         .section-heading {
             margin-bottom: 1.5rem;
             padding-bottom: 0.5rem;
             border-bottom: 1px solid #dee2e6;
         }
-        
+
         .bio-section {
             margin-bottom: 1.5rem;
         }
-        
+
         .bio-heading {
             font-size: 1.1rem;
             font-weight: 600;
             margin-bottom: 0.5rem;
         }
-        
+
         .linkedin-badge {
             display: inline-flex;
             align-items: center;
@@ -76,17 +76,17 @@
             transition: background-color 0.2s;
             margin-top: 0.5rem;
         }
-        
+
         .linkedin-badge:hover {
             background-color: #005e93;
             color: white;
             text-decoration: none;
         }
-        
+
         .linkedin-icon {
             margin-right: 0.5rem;
         }
-        
+
         .connection-count {
             display: inline-block;
             font-size: 0.875rem;
@@ -105,7 +105,7 @@
             <li class="breadcrumb-item active" aria-current="page">Leadership</li>
         </ol>
     </nav>
-    
+
     {% for label, messages in app.flashes %}
         {% for message in messages %}
             <div class="alert alert-{{ label }} alert-dismissible fade show" role="alert">
@@ -114,21 +114,21 @@
             </div>
         {% endfor %}
     {% endfor %}
-    
+
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>{{ company.name }} Leadership</h1>
-        
+
         <div class="d-flex">
             <button id="generate-executives" class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#generateModal">
                 <i class="fas fa-magic me-2"></i> Generate Executives
             </button>
-            
+
             <a href="{{ path('linkedin_company_network', {'id': company.id}) }}" class="btn btn-primary">
                 <i class="fab fa-linkedin me-2"></i> LinkedIn Network Analysis
             </a>
         </div>
     </div>
-    
+
     {% if executives is empty %}
         <div class="alert alert-info">
             <h4 class="alert-heading">No Executive Profiles Found</h4>
@@ -150,10 +150,10 @@
                                     {{ executive.name|first }}
                                 </div>
                             {% endif %}
-                            
+
                             <h3 class="executive-name">{{ executive.name }}</h3>
                             <p class="executive-title">{{ executive.title }}</p>
-                            
+
                             {% if executive.linkedinId %}
                                 <a href="{{ executive.linkedinProfileUrl }}" target="_blank" class="linkedin-badge d-inline-block">
                                     <i class="fab fa-linkedin linkedin-icon"></i> LinkedIn Profile
@@ -166,7 +166,7 @@
                                     <i class="fab fa-linkedin me-1"></i> Link LinkedIn Profile
                                 </a>
                             {% endif %}
-                            
+
                             <div class="bio-section text-start mt-3">
                                 {% if executive.education %}
                                     <div class="mb-2">
@@ -174,7 +174,7 @@
                                         <p>{{ executive.education }}</p>
                                     </div>
                                 {% endif %}
-                                
+
                                 {% if executive.previousCompanies %}
                                     <div class="mb-2">
                                         <h5 class="bio-heading">Previous Companies</h5>
@@ -182,14 +182,14 @@
                                     </div>
                                 {% endif %}
                             </div>
-                            
+
                             <a href="#" class="btn btn-outline-secondary w-100 mt-2" data-bs-toggle="modal" data-bs-target="#executiveModal{{ executive.id }}">
                                 View Full Profile
                             </a>
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- Modal for executive details -->
                 <div class="modal fade" id="executiveModal{{ executive.id }}" tabindex="-1" aria-labelledby="executiveModalLabel{{ executive.id }}" aria-hidden="true">
                     <div class="modal-dialog modal-lg">
@@ -208,10 +208,10 @@
                                                 {{ executive.name|first }}
                                             </div>
                                         {% endif %}
-                                        
+
                                         <h3 class="mb-2">{{ executive.name }}</h3>
                                         <p class="text-muted mb-3">{{ executive.title }}</p>
-                                        
+
                                         {% if executive.linkedinId %}
                                             <div class="d-grid gap-2">
                                                 <a href="{{ executive.linkedinProfileUrl }}" target="_blank" class="btn btn-primary">
@@ -230,19 +230,19 @@
                                     <div class="col-md-8">
                                         <h5 class="section-heading">Biography</h5>
                                         <p>{{ executive.biography|nl2br }}</p>
-                                        
+
                                         <div class="row mt-4">
                                             <div class="col-md-6">
                                                 <h5 class="section-heading">Education</h5>
                                                 <p>{{ executive.education|default('Not specified') }}</p>
-                                                
+
                                                 <h5 class="section-heading">Previous Experience</h5>
                                                 <p>{{ executive.previousCompanies|default('Not specified') }}</p>
                                             </div>
                                             <div class="col-md-6">
                                                 <h5 class="section-heading">Achievements</h5>
                                                 <p>{{ executive.achievements|default('Not specified')|nl2br }}</p>
-                                                
+
                                                 <h5 class="section-heading">Leadership Style</h5>
                                                 <p>{{ executive.leadership|default('Not specified')|nl2br }}</p>
                                             </div>
@@ -259,7 +259,7 @@
             {% endfor %}
         </div>
     {% endif %}
-    
+
     <!-- Modal for generating executives -->
     <div class="modal fade" id="generateModal" tabindex="-1" aria-labelledby="generateModalLabel" aria-hidden="true">
         <div class="modal-dialog">
@@ -292,7 +292,7 @@
                     // Show loading indicator
                     this.innerHTML = '<span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Generating...';
                     this.disabled = true;
-                    
+
                     // Send AJAX request to generate executives
                     fetch('{{ path('company_generate_leadership', {'id': company.id}) }}', {
                         method: 'POST',

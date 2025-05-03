@@ -58,16 +58,16 @@ public class McpConfig {
                     PromptTemplate promptTemplate = new PromptTemplate("""
                             You are a helpful assistant providing information about events and activities.
                             When users ask about events or activities in specific cities, suggest they try the search_events functionality.
-                            
+
                             User message: {message}
                             """);
-                            
+
                     Message systemMessage = new SystemMessage(promptTemplate.render(Map.of("message", userMessage)));
                     Message userMessageObj = new UserMessage(userMessage);
-                    
+
                     Prompt prompt = new Prompt(List.of(systemMessage, userMessageObj));
                     ChatResponse response = chatModel.call(prompt);
-                    
+
                     return response.getResult().getOutput().getContent();
                 })
                 .build();

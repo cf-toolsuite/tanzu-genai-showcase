@@ -1,0 +1,102 @@
+name: Deploy js-langchain-react to TP4CF
+
+on:
+  workflow_call:
+    inputs:
+      cf_api:
+        required: true
+        type: string
+        description: 'Cloud Foundry API Endpoint'
+      cf_username:
+        required: false
+        type: string
+        description: 'Cloud Foundry Username (not required if using SSO)'
+      use_sso:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to use SSO authentication instead of username/password'
+      cf_org:
+        required: true
+        type: string
+        description: 'Cloud Foundry Target Organization'
+      cf_space:
+        required: true
+        type: string
+        description: 'Cloud Foundry Target Space'
+      genai_plan:
+        required: false
+        type: string
+        description: 'GenAI Service Plan Name (if needed by app)'
+      random_route:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to use a random route for the application'
+    secrets:
+      CF_PASSWORD:
+        required: false
+        description: 'Cloud Foundry Password (not required if using SSO)'
+      CF_SSO_REFRESH_TOKEN:
+        required: false
+        description: 'Cloud Foundry SSO Refresh Token (not required if using username/password)'
+      NEWS_API_KEY:
+        required: false
+        description: 'News API Key'
+      LLM_API_KEY:
+        required: false
+        description: 'LLM API Key'
+
+jobs:
+  build:
+    uses: ./.github/workflows/js-langchain-react.yml
+
+  authenticate:
+    needs: build
+    uses: ./.github/workflows/cf-auth.yml
+    with:
+      cf_api: ${{ inputs.cf_api }}
+      cf_username: ${{ inputs.cf_username }}
+      use_sso: ${{ inputs.use_sso }}
+    secrets:
+      CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+      CF_SSO_REFRESH_TOKEN: ${{ secrets.CF_SSO_REFRESH_TOKEN }}
+
+  setup_org_space:
+    needs: authenticate
+    uses: ./.github/workflows/cf-org-space.yml
+    with:
+      cf_org: ${{ inputs.cf_org }}
+      cf_space: ${{ inputs.cf_space }}
+
+  create_services:
+    needs: setup_org_space
+    uses: ./.github/workflows/cf-create-services.yml
+    with:
+      genai_service_name: 'news-aggregator-llm'
+      genai_plan: ${{ inputs.genai_plan }}
+
+  set_env_vars:
+    needs: create_services
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create env vars file
+        run: |
+          echo '{
+            "NEWS_API_KEY": "${{ secrets.NEWS_API_KEY }}",
+            "API_KEY": "${{ secrets.LLM_API_KEY }}"
+          }' > env_vars.json
+          cat env_vars.json
+      - name: Upload env vars file
+        uses: actions/upload-artifact@v4
+        with:
+          name: env-vars
+          path: env_vars.json
+          retention-days: 1
+
+  deploy:
+    needs: set_env_vars
+    uses: ./.github/workflows/cf-deploy.yml
+    with:
+      project_path: 'js-langchain-react'
+      random_route: ${{ inputs.random_route }}

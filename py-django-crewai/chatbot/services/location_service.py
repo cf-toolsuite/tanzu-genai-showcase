@@ -26,7 +26,7 @@ class LocationService:
             timeout: Timeout for Nominatim requests in seconds (defaults to settings.API_REQUEST_TIMEOUT)
         """
         # Use timeout from parameters or settings
-        timeout = timeout or getattr(settings, 'API_REQUEST_TIMEOUT', 30)
+        timeout = timeout or getattr(settings, 'API_REQUEST_TIMEOUT', 60)
         logger.info(f"Initializing LocationService with timeout={timeout}s")
         self.geolocator = Nominatim(user_agent=user_agent, timeout=timeout)
 

@@ -3,23 +3,23 @@
     <h2>Chat with Event Recommendation Assistant</h2>
     <button class="clear-btn" (click)="clearChat()" [disabled]="loading">New Chat</button>
   </div>
-  
+
   <div class="messages-container" #messagesContainer>
     <div *ngIf="!session" class="loading-container">
       <p>Creating chat session...</p>
     </div>
-    
+
     <div *ngIf="error" class="error-message">
       {{ error }}
     </div>
-    
+
     <div class="messages-list" *ngIf="session">
-      <div *ngFor="let message of session.messages" 
+      <div *ngFor="let message of session.messages"
            [ngClass]="['message', message.role]">
         <div class="message-content">{{ message.content }}</div>
         <div class="message-time">{{ message.timestamp | date:'short' }}</div>
       </div>
-      
+
       <div *ngIf="loading" class="message assistant loading">
         <div class="typing-indicator">
           <span></span>
@@ -29,29 +29,29 @@
       </div>
     </div>
   </div>
-  
+
   <!-- Display city info if available -->
   <div *ngIf="displayedCity" class="city-info-container">
     <app-city-info [cityInfo]="displayedCity"></app-city-info>
   </div>
-  
+
   <!-- Display recommended events if available -->
   <div *ngIf="displayedEvents && displayedEvents.length > 0" class="events-container">
     <h3>Recommended Events</h3>
     <div class="events-list">
-      <app-event-card *ngFor="let event of displayedEvents" 
+      <app-event-card *ngFor="let event of displayedEvents"
                      [event]="event">
       </app-event-card>
     </div>
   </div>
-  
+
   <div class="input-container">
-    <input type="text" 
-           [(ngModel)]="currentMessage" 
+    <input type="text"
+           [(ngModel)]="currentMessage"
            placeholder="Ask about events in a city..."
            (keyup.enter)="sendMessage()"
            [disabled]="loading || !session">
-    <button (click)="sendMessage()" 
+    <button (click)="sendMessage()"
             [disabled]="loading || !currentMessage.trim() || !session">
       <span *ngIf="!loading">Send</span>
       <span *ngIf="loading">...</span>

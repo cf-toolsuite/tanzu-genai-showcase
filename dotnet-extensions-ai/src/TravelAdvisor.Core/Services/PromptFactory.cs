@@ -93,17 +93,115 @@ namespace TravelAdvisor.Core.Services
             if (response == null)
                 return string.Empty;
 
-            // Try to get the Content property via reflection
-            var content = GetPropertyValue<string>(response, "Content");
-            if (!string.IsNullOrEmpty(content))
-                return content;
-
-            // Try to get the content property using case-insensitive property access
-            var property = response.GetType().GetProperty("content", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
-            if (property != null)
+            try
             {
-                var value = property.GetValue(response);
-                return value?.ToString() ?? string.Empty;
+                // Debug: Log the response type
+                Console.WriteLine($"Response type: {response.GetType().FullName}");
+
+                // Try to get the Content property via reflection
+                var content = GetPropertyValue<string>(response, "Content");
+                if (!string.IsNullOrEmpty(content))
+                    return content;
+
+                // Try to get the content property using case-insensitive property access
+                var property = response.GetType().GetProperty("content", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (property != null)
+                {
+                    var value = property.GetValue(response);
+                    return value?.ToString() ?? string.Empty;
+                }
+
+                // Try to get the content from a dictionary of properties (used in newer versions)
+                // Check if there's a method to get properties
+                var getPropertiesMethod = response.GetType().GetMethod("GetProperties");
+                if (getPropertiesMethod != null)
+                {
+                    var properties = getPropertiesMethod.Invoke(response, null) as IDictionary<string, object>;
+                    if (properties != null)
+                    {
+                        Console.WriteLine($"Properties found: {string.Join(", ", properties.Keys)}");
+                        if (properties.TryGetValue("content", out var contentValue))
+                        {
+                            return contentValue?.ToString() ?? string.Empty;
+                        }
+                    }
+                }
+
+                // Try to access properties through indexer
+                var indexerProperty = response.GetType().GetProperty("Item", new[] { typeof(string) });
+                if (indexerProperty != null)
+                {
+                    var contentValue = indexerProperty.GetValue(response, new object[] { "content" });
+                    if (contentValue != null)
+                    {
+                        return contentValue.ToString() ?? string.Empty;
+                    }
+                }
+
+                // Try to access choices collection (common in OpenAI responses)
+                var choicesProperty = response.GetType().GetProperty("Choices", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                if (choicesProperty != null)
+                {
+                    var choices = choicesProperty.GetValue(response) as System.Collections.IEnumerable;
+                    if (choices != null)
+                    {
+                        foreach (var choice in choices)
+                        {
+                            // Try to get message from choice
+                            var messageProperty = choice.GetType().GetProperty("Message", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                            if (messageProperty != null)
+                            {
+                                var message = messageProperty.GetValue(choice);
+                                if (message != null)
+                                {
+                                    // Try to get content from message
+                                    var messageContentProperty = message.GetType().GetProperty("Content", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                                    if (messageContentProperty != null)
+                                    {
+                                        var messageContent = messageContentProperty.GetValue(message)?.ToString();
+                                        if (!string.IsNullOrEmpty(messageContent))
+                                            return messageContent;
+                                    }
+                                }
+                            }
+
+                            // Try to get text directly from choice
+                            var textProperty = choice.GetType().GetProperty("Text", BindingFlags.Public | BindingFlags.Instance | BindingFlags.IgnoreCase);
+                            if (textProperty != null)
+                            {
+                                var text = textProperty.GetValue(choice)?.ToString();
+                                if (!string.IsNullOrEmpty(text))
+                                    return text;
+                            }
+                        }
+                    }
+                }
+
+                // Last resort: try to convert the entire response to string
+                var responseString = response.ToString();
+                if (!string.IsNullOrEmpty(responseString) && responseString != response.GetType().FullName)
+                {
+                    return responseString;
+                }
+
+                // If we get here, log all properties for debugging
+                Console.WriteLine("Failed to extract content. Dumping all properties:");
+                foreach (var prop in response.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+                {
+                    try
+                    {
+                        var value = prop.GetValue(response);
+                        Console.WriteLine($"Property: {prop.Name}, Value: {value}");
+                    }
+                    catch (Exception ex)
+                    {
+                        Console.WriteLine($"Error accessing property {prop.Name}: {ex.Message}");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Error extracting content from response: {ex.Message}");
             }
 
             return string.Empty;

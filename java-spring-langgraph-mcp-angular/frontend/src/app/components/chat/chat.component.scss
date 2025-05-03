@@ -14,13 +14,13 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  
+
   h2 {
     margin: 0;
     font-size: 18px;
     font-weight: 500;
   }
-  
+
   .clear-btn {
     background-color: transparent;
     color: #6c757d;
@@ -28,7 +28,7 @@
     padding: 6px 12px;
     font-size: 14px;
     border-radius: 4px;
-    
+
     &:hover {
       background-color: #f8f9fa;
     }
@@ -68,42 +68,42 @@
   border-radius: 10px;
   margin-bottom: 16px;
   position: relative;
-  
+
   .message-content {
     margin-bottom: 6px;
   }
-  
+
   .message-time {
     font-size: 11px;
     opacity: 0.7;
     text-align: right;
   }
-  
+
   &.user {
     align-self: flex-end;
     background-color: #2c7be5;
     color: white;
     border-radius: 10px 10px 0 10px;
-    
+
     .message-time {
       color: rgba(255, 255, 255, 0.8);
     }
   }
-  
+
   &.assistant {
     align-self: flex-start;
     background-color: #f2f4f8;
     color: #333;
     border-radius: 10px 10px 10px 0;
   }
-  
+
   &.loading {
     padding: 14px;
-    
+
     .typing-indicator {
       display: flex;
       align-items: center;
-      
+
       span {
         height: 10px;
         width: 10px;
@@ -113,11 +113,11 @@
         margin: 0 2px;
         opacity: 0.7;
         animation: typing 1.4s infinite both;
-        
+
         &:nth-child(2) {
           animation-delay: 0.2s;
         }
-        
+
         &:nth-child(3) {
           animation-delay: 0.4s;
         }
@@ -129,18 +129,18 @@
 .events-container {
   padding: 0 20px 10px;
   border-top: 1px solid #e5e9f2;
-  
+
   h3 {
     font-size: 16px;
     margin: 16px 0 12px;
   }
-  
+
   .events-list {
     display: flex;
     overflow-x: auto;
     gap: 16px;
     padding-bottom: 10px;
-    
+
     app-event-card {
       min-width: 280px;
       max-width: 280px;
@@ -157,25 +157,25 @@
   display: flex;
   padding: 16px 20px;
   border-top: 1px solid #e5e9f2;
-  
+
   input {
     flex: 1;
     padding: 12px 16px;
     border: 1px solid #dee2e6;
     border-radius: 24px;
     font-size: 14px;
-    
+
     &:focus {
       outline: none;
       border-color: #2c7be5;
     }
-    
+
     &:disabled {
       background-color: #f8f9fa;
       cursor: not-allowed;
     }
   }
-  
+
   button {
     margin-left: 10px;
     padding: 12px 20px;
@@ -184,11 +184,11 @@
     color: white;
     border: none;
     font-size: 14px;
-    
+
     &:hover:not(:disabled) {
       background-color: #1a68d1;
     }
-    
+
     &:disabled {
       background-color: #a3c8f8;
       cursor: not-allowed;

@@ -104,7 +104,8 @@ namespace TravelAdvisor.Infrastructure.Services
                     }
                 }
 
-                var jsonResponse = ChatMessageContentBuilder.GetContentFromResponse(response);
+                // Extract content from the response
+                var jsonResponse = GetContentFromResponse(response);
 
                 // Parse the JSON response
                 if (string.IsNullOrEmpty(jsonResponse))
@@ -124,8 +125,14 @@ namespace TravelAdvisor.Infrastructure.Services
                 try
                 {
                     // Attempt to clean the response in case it has extra text before or after the JSON
+                    // or if it contains markdown code blocks
                     jsonResponse = CleanJsonResponse(jsonResponse);
+                    jsonResponse = CleanMarkdownCodeBlocks(jsonResponse);
 
+                    // Log the cleaned JSON for debugging
+                    _logger.LogDebug($"Cleaned JSON response: {jsonResponse}");
+
+                    // Try to deserialize the JSON response
                     var travelQuery = JsonSerializer.Deserialize<TravelQuery>(jsonResponse,
                         new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
 
@@ -310,7 +317,7 @@ namespace TravelAdvisor.Infrastructure.Services
                 // Get response from AI
                 var response = await _chatClient.GetResponseAsync(history, new ChatOptions { Temperature = 0.7f });
 
-                return ChatMessageContentBuilder.GetContentFromResponse(response) ??
+                return GetContentFromResponse(response) ??
                        "I'm sorry, I couldn't generate a detailed explanation for this recommendation.";
             }
             catch (Exception ex)
@@ -328,12 +335,20 @@ namespace TravelAdvisor.Infrastructure.Services
         {
             try
             {
+                _logger.LogInformation("Processing follow-up question: {Question}", question);
+
                 // Create message history for answering the follow-up question
                 var history = new List<ChatMessage>
                 {
                     new ChatMessage(ChatRole.System, @"
                         You are a travel advisor assistant. Answer the user's follow-up question about the recommended travel mode.
-                        Provide a helpful, accurate, and concise answer to the user's question.
+                        Provide a helpful, accurate, and concise answer to the user's question in plain text format.
+
+                        IMPORTANT:
+                        - Respond with natural language only, not with function calls or JSON.
+                        - Do not use code blocks, markdown formatting, or structured data formats.
+                        - Provide a direct, conversational response as if you were speaking to the user.
+
                         If you don't have specific information to answer the question, acknowledge that and suggest what information might be helpful.
                     "),
                     new ChatMessage(ChatRole.User, $@"
@@ -368,13 +383,46 @@ namespace TravelAdvisor.Infrastructure.Services
                 // Get response from AI
                 var response = await _chatClient.GetResponseAsync(history, new ChatOptions { Temperature = 0.7f });
 
-                return ChatMessageContentBuilder.GetContentFromResponse(response) ??
-                       "I'm sorry, I couldn't answer your follow-up question. Could you try rephrasing it?";
+                // Check if the response contains an error (e.g., service unavailable)
+                var errorProperty = response.GetType().GetProperty("Error");
+                if (errorProperty != null)
+                {
+                    var errorValue = errorProperty.GetValue(response) as string;
+                    if (!string.IsNullOrEmpty(errorValue))
+                    {
+                        _logger.LogWarning("Error received from chat client when answering follow-up question: {Error}", errorValue);
+                        return $"I'm sorry, I couldn't answer your follow-up question due to a service issue. Error: {errorValue}";
+                    }
+                }
+
+                var content = GetContentFromResponse(response);
+
+                // Check if the response is empty or contains an error message
+                if (string.IsNullOrEmpty(content))
+                {
+                    _logger.LogWarning("Empty response received from chat client when answering follow-up question");
+                    return "I'm sorry, I couldn't answer your follow-up question due to a service issue. Please try again later.";
+                }
+
+                // Check if the response contains a service unavailable message
+                if (content.Contains("Service temporarily unavailable"))
+                {
+                    _logger.LogWarning("Service unavailable message received from chat client when answering follow-up question");
+                    return "I'm sorry, the AI service is temporarily unavailable. Please try again later.";
+                }
+
+                return content;
+            }
+            catch (InvalidOperationException ex) when (ex.Message.Contains("USE_MOCK_DATA is false"))
+            {
+                // Special handling for the case when USE_MOCK_DATA is false but we're trying to use mock data
+                _logger.LogError(ex, "AI service configuration error when answering follow-up question");
+                return "I'm sorry, there's an issue with the AI service configuration. Please contact the administrator to verify the API key and settings.";
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, "Error answering follow-up question");
-                return "I'm sorry, I couldn't answer your follow-up question. Could you try rephrasing it?";
+                return "I'm sorry, I couldn't answer your follow-up question due to a technical issue. Please try again later.";
             }
         }
 
@@ -804,5 +852,211 @@ namespace TravelAdvisor.Infrastructure.Services
         }
 
         #endregion
+
+        /// <summary>
+        /// Helper method to extract content from a ChatResponse
+        /// </summary>
+        private string? GetContentFromResponse(ChatResponse response)
+        {
+            try
+            {
+                // Check if the response has any messages
+                if (response.Messages.Count == 0)
+                {
+                    _logger.LogWarning("Response contains no messages");
+                    return null;
+                }
+
+                // Get the last message (usually the assistant's response)
+                var lastMessage = response.Messages[response.Messages.Count - 1];
+                string? textContent = lastMessage.Text;
+
+                // If the content is null or empty, return null
+                if (string.IsNullOrEmpty(textContent))
+                {
+                    _logger.LogWarning("Response message has empty text content");
+                    return null;
+                }
+
+                // Check if the content appears to be JSON (function call format)
+                if (textContent.TrimStart().StartsWith("{") && textContent.TrimEnd().EndsWith("}"))
+                {
+                    _logger.LogInformation("Response appears to be in JSON format, attempting to parse");
+
+                    try
+                    {
+                        // Try to parse the JSON
+                        using var jsonDoc = JsonDocument.Parse(textContent);
+                        var root = jsonDoc.RootElement;
+
+                        // Check if this is a function call format (has "name" and "arguments" fields)
+                        if (root.TryGetProperty("name", out var nameElement))
+                        {
+                            string functionName = nameElement.GetString() ?? "";
+                            _logger.LogInformation($"Detected function call format with function name: {functionName}");
+
+                            // Handle different function types
+                            return HandleFunctionCall(functionName, root);
+                        }
+                    }
+                    catch (JsonException jsonEx)
+                    {
+                        // If JSON parsing fails, log the error but continue with the original text
+                        _logger.LogWarning(jsonEx, "Failed to parse response as JSON, will use original text");
+                    }
+                }
+
+                // Clean up the text content by removing markdown code blocks if present
+                textContent = CleanMarkdownCodeBlocks(textContent);
+
+                // Replace verbose function call messages with minimal emoji
+                return ReplaceVerboseFunctionCallMessages(textContent);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error extracting content from response");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Handles function call format responses by converting them to natural language
+        /// </summary>
+        private string HandleFunctionCall(string functionName, JsonElement root)
+        {
+            try
+            {
+                // Extract arguments if available
+                JsonElement arguments = root.TryGetProperty("arguments", out var args) ? args : default;
+
+                // Handle different function types
+                switch (functionName)
+                {
+                    case "getTravelSafetyTips":
+                        return GenerateTravelSafetyTips(arguments);
+
+                    case "getWeatherInfo":
+                        return "When traveling at night, check the weather forecast before departing as conditions can change and affect visibility and road safety.";
+
+                    case "getTrafficInfo":
+                        return "Traffic conditions are typically lighter at night, but be aware that some roads may be closed for maintenance during late hours.";
+
+                    default:
+                        // For unknown functions, provide a generic response
+                        return $"I found some information about {functionName}, but I need to present it in a more readable format. Please ask a more specific question.";
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error handling function call {functionName}");
+                return "I apologize, but I encountered an error processing your question. Could you please rephrase it?";
+            }
+        }
+
+        /// <summary>
+        /// Generates travel safety tips for night travel
+        /// </summary>
+        private string GenerateTravelSafetyTips(JsonElement arguments)
+        {
+            // Create a comprehensive response about night travel safety
+            return @"If you're making this trip at night, here are some important considerations:
+
+1. Visibility: Nighttime reduces visibility significantly. If biking, ensure you have proper front and rear lights, reflective clothing, and consider routes with good street lighting.
+
+2. Safety: Some areas may be less safe at night. Stick to well-lit, populated routes when possible.
+
+3. Public Transportation: Bus schedules often reduce frequency at night, so check the schedule beforehand to avoid long waits.
+
+4. Driving Considerations:
+   - Be extra cautious of wildlife that may be more active at night
+   - Reduce your speed slightly to account for reduced visibility
+   - Ensure your headlights are working properly
+   - Be aware of drowsiness if driving late
+
+5. Ride-sharing options like Uber or Lyft might be good alternatives if you're concerned about night travel.
+
+6. Weather: Night temperatures can drop significantly, so dress appropriately if walking or biking.
+
+7. Phone battery: Ensure your phone is fully charged for emergencies.
+
+Would you like more specific information about any of these considerations?";
+        }
+
+        /// <summary>
+        /// Replaces verbose function call messages with minimal emoji
+        /// </summary>
+        private string ReplaceVerboseFunctionCallMessages(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            // Pattern for "no function calls were necessary" message
+            if (text.Contains("No function calls were necessary") ||
+                text.Contains("all information provided was internally generated"))
+            {
+                // Remove the entire note
+                text = System.Text.RegularExpressions.Regex.Replace(
+                    text,
+                    @"\s*\(Note:.*?function calls.*?data\.\)\s*$",
+                    " 🧠");
+            }
+            // Pattern for "function calls were used" message
+            else if (text.Contains("function call") ||
+                     text.Contains("tool was used"))
+            {
+                // Remove the entire note
+                text = System.Text.RegularExpressions.Regex.Replace(
+                    text,
+                    @"\s*\(Note:.*?function.*?used.*?\)\s*$",
+                    " 🛠️");
+            }
+
+            return text;
+        }
+
+        /// <summary>
+        /// Cleans markdown code blocks from text
+        /// </summary>
+        private string CleanMarkdownCodeBlocks(string text)
+        {
+            // Check if the text contains markdown code blocks
+            if (text.Contains("```"))
+            {
+                try
+                {
+                    // Remove code block markers and any language specifier
+                    var lines = text.Split('\n');
+                    var cleanedLines = new List<string>();
+                    bool insideCodeBlock = false;
+
+                    foreach (var line in lines)
+                    {
+                        if (line.Trim().StartsWith("```"))
+                        {
+                            insideCodeBlock = !insideCodeBlock;
+                            // Skip the code block marker line
+                            continue;
+                        }
+
+                        // Skip language specifier line if it's right after opening code block
+                        if (insideCodeBlock && line.Trim() == "json")
+                        {
+                            continue;
+                        }
+
+                        cleanedLines.Add(line);
+                    }
+
+                    return string.Join("\n", cleanedLines).Trim();
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Error cleaning markdown code blocks, returning original text");
+                    return text;
+                }
+            }
+
+            return text;
+        }
     }
 }

@@ -17,19 +17,19 @@ import reactor.core.publisher.Mono;
 public class ChatController {
 
     private final ChatService chatService;
-    
+
     @Autowired
     public ChatController(ChatService chatService) {
         this.chatService = chatService;
     }
-    
+
     @PostMapping("/sessions")
     public ResponseEntity<ChatSession> createSession() {
         log.info("Creating new chat session");
         ChatSession session = chatService.createSession();
         return ResponseEntity.ok(session);
     }
-    
+
     @GetMapping("/sessions/{sessionId}")
     public ResponseEntity<ChatSession> getSession(@PathVariable String sessionId) {
         log.info("Getting chat session with ID: {}", sessionId);
@@ -39,7 +39,7 @@ public class ChatController {
         }
         return ResponseEntity.ok(session);
     }
-    
+
     @PostMapping("/messages")
     public Mono<ResponseEntity<ChatResponse>> sendMessage(@Valid @RequestBody ChatRequest request) {
         log.info("Processing message for session ID: {}", request.getSessionId());

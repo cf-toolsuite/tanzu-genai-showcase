@@ -14,8 +14,8 @@
     <PackageReference Include="Azure.AI.OpenAI" Version="2.2.0-beta.4" />
     <PackageReference Include="Azure.Core" Version="1.44.1" />
     <PackageReference Include="GoogleApi" Version="5.8.4" />
-    <PackageReference Include="Microsoft.Extensions.AI" Version="9.3.0-preview.1.25161.3" />
-    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="9.3.0-preview.1.25161.3" />
+    <PackageReference Include="Microsoft.Extensions.AI" Version="9.4.0-preview.1.25207.5" />
+    <PackageReference Include="Microsoft.Extensions.AI.OpenAI" Version="9.4.0-preview.1.25207.5" />
     <PackageReference Include="Microsoft.Extensions.Configuration" Version="9.0.3" />
     <PackageReference Include="Microsoft.Extensions.Configuration.Binder" Version="9.0.3" />
     <PackageReference Include="Microsoft.Extensions.Http" Version="9.0.3" />

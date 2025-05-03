@@ -16,7 +16,7 @@ A .NET 9 Blazor application showcasing the integration of LLMs with the Tanzu Pl
 
 - **.NET 9**: The latest version of the .NET framework
 - **Blazor Server**: For interactive web UI
-- **Semantic Kernel**: Microsoft's framework for LLM integration
+- **Microsoft.Extensions.AI**: Microsoft's framework for LLM integration
 - **Steeltoe**: Libraries for Cloud Foundry integration
 - **Tailwind CSS**: Utility-first CSS framework for modern UI
 
@@ -40,7 +40,7 @@ A .NET 9 Blazor application showcasing the integration of LLMs with the Tanzu Pl
 dotnet build
 
 # Run the web project
-dotnet run --project cd src/TravelAdvisor.Web
+dotnet run --project src/TravelAdvisor.Web
 ```
 
 4. Open your browser to `https://localhost:5000`
@@ -69,8 +69,20 @@ The application is designed to be deployed to Tanzu Platform for Cloud Foundry:
 
 See the [Deployment Guide](docs/DEPLOYMENT.md) for detailed instructions.
 
+## Documentation
+
+For detailed information about the application, refer to the following documentation:
+
+- [Architecture Overview](docs/ARCHITECTURE.md): System architecture, components, and data flow
+- [API Documentation](docs/API.md): Detailed API reference and usage examples
+- [Configuration Guide](docs/CONFIGURATION.md): Environment variables and configuration options
+- [Developer Guide](docs/DEVELOPER.md): Setup, development workflow, and best practices
+- [Deployment Guide](docs/DEPLOYMENT.md): Deployment instructions for Tanzu Platform
+- [User Guide](docs/USER.md): End-user instructions for using the application
+- [Extension Guide](docs/EXTENSION.md): How to extend the application with custom features
+
 ## Acknowledgments
 
-- Microsoft for Semantic Kernel
+- Microsoft for Microsoft.Extensions.AI
 - Steeltoe team for Cloud Foundry integration libraries
 - Tailwind CSS team for the UI framework

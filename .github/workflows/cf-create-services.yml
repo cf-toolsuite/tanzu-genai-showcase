@@ -1,0 +1,84 @@
+name: Cloud Foundry Service Creation
+
+on:
+  workflow_call:
+    inputs:
+      genai_service_name:
+        required: false
+        type: string
+        description: 'Name of the GenAI service to create'
+      genai_plan:
+        required: false
+        type: string
+        description: 'GenAI Service Plan Name'
+      db_service_name:
+        required: false
+        type: string
+        description: 'Name of the database service to create'
+      db_service_type:
+        required: false
+        type: string
+        default: 'postgresql'
+        description: 'Database Service Type (e.g., postgresql, mysql)'
+      db_plan:
+        required: false
+        type: string
+        description: 'Database Service Plan Name'
+      ups_name:
+        required: false
+        type: string
+        description: 'Name of the user-provided service to create'
+      ups_credentials:
+        required: false
+        type: string
+        description: 'JSON string of credentials for the user-provided service'
+    secrets:
+      UPS_CREDENTIALS:
+        required: false
+        description: 'Secret credentials for user-provided service'
+
+jobs:
+  create_services:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create GenAI Service
+        if: inputs.genai_service_name != '' && inputs.genai_plan != ''
+        run: |
+          if ! cf service "${{ inputs.genai_service_name }}"; then
+            echo "Creating GenAI service: ${{ inputs.genai_service_name }}"
+            cf create-service genai "${{ inputs.genai_plan }}" "${{ inputs.genai_service_name }}" -t genai,llm || echo "Service creation might have failed or already exists"
+          else
+            echo "GenAI service ${{ inputs.genai_service_name }} already exists."
+          fi
+        continue-on-error: true
+
+      - name: Create Database Service
+        if: inputs.db_service_name != '' && inputs.db_plan != ''
+        run: |
+          if ! cf service "${{ inputs.db_service_name }}"; then
+            echo "Creating DB service: ${{ inputs.db_service_name }}"
+            cf create-service "${{ inputs.db_service_type }}" "${{ inputs.db_plan }}" "${{ inputs.db_service_name }}" || echo "DB Service creation might have failed or already exists"
+          else
+            echo "DB service ${{ inputs.db_service_name }} already exists."
+          fi
+        continue-on-error: true
+
+      - name: Create User-Provided Service
+        if: inputs.ups_name != ''
+        run: |
+          if ! cf service "${{ inputs.ups_name }}"; then
+            echo "Creating user-provided service: ${{ inputs.ups_name }}"
+
+            # Use provided credentials JSON if available, otherwise use secret
+            if [[ -n "${{ inputs.ups_credentials }}" ]]; then
+              cf create-user-provided-service "${{ inputs.ups_name }}" -p '${{ inputs.ups_credentials }}' || echo "UPS creation might have failed or already exists"
+            elif [[ -n "${{ secrets.UPS_CREDENTIALS }}" ]]; then
+              cf create-user-provided-service "${{ inputs.ups_name }}" -p '${{ secrets.UPS_CREDENTIALS }}' || echo "UPS creation might have failed or already exists"
+            else
+              echo "No credentials provided for user-provided service"
+              exit 1
+            fi
+          else
+            echo "UPS ${{ inputs.ups_name }} already exists."
+          fi
+        continue-on-error: true

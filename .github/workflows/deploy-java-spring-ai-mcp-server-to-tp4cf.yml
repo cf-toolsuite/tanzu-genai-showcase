@@ -1,0 +1,115 @@
+name: Deploy java-spring-ai-mcp/server to TP4CF
+
+on:
+  workflow_call:
+    inputs:
+      cf_api:
+        required: true
+        type: string
+        description: 'Cloud Foundry API Endpoint'
+      cf_username:
+        required: false
+        type: string
+        description: 'Cloud Foundry Username (not required if using SSO)'
+      use_sso:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to use SSO authentication instead of username/password'
+      cf_org:
+        required: true
+        type: string
+        description: 'Cloud Foundry Target Organization'
+      cf_space:
+        required: true
+        type: string
+        description: 'Cloud Foundry Target Space'
+      random_route:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to use a random route for the application'
+    secrets:
+      CF_PASSWORD:
+        required: false
+        description: 'Cloud Foundry Password (not required if using SSO)'
+      CF_SSO_REFRESH_TOKEN:
+        required: false
+        description: 'Cloud Foundry SSO Refresh Token (not required if using username/password)'
+      AVIATION_STACK_ACCESS_KEY:
+        required: false
+        description: 'Aviation Stack Access Key'
+
+jobs:
+  build:
+    uses: ./.github/workflows/java-spring-ai-mcp.yml
+
+  authenticate:
+    needs: build
+    uses: ./.github/workflows/cf-auth.yml
+    with:
+      cf_api: ${{ inputs.cf_api }}
+      cf_username: ${{ inputs.cf_username }}
+      use_sso: ${{ inputs.use_sso }}
+    secrets:
+      CF_PASSWORD: ${{ secrets.CF_PASSWORD }}
+      CF_SSO_REFRESH_TOKEN: ${{ secrets.CF_SSO_REFRESH_TOKEN }}
+
+  setup_org_space:
+    needs: authenticate
+    uses: ./.github/workflows/cf-org-space.yml
+    with:
+      cf_org: ${{ inputs.cf_org }}
+      cf_space: ${{ inputs.cf_space }}
+
+  create_ups:
+    needs: setup_org_space
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install CF CLI v8
+        run: |
+          wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | sudo apt-key add -
+          echo "deb https://packages.cloudfoundry.org/debian stable main" | sudo tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+          sudo apt-get update
+          sudo apt-get install cf8-cli
+
+      - name: Create User-Provided Service
+        run: |
+          # Re-authenticate since this is a new job
+          cf api "${{ inputs.cf_api }}"
+          if [[ "${{ inputs.use_sso }}" == "true" ]]; then
+            cf auth --sso-passcode "${{ secrets.CF_SSO_REFRESH_TOKEN }}"
+          else
+            cf auth "${{ inputs.cf_username }}" "${{ secrets.CF_PASSWORD }}"
+          fi
+          cf target -o "${{ inputs.cf_org }}" -s "${{ inputs.cf_space }}"
+
+          # Create UPS
+          if ! cf service aviation-stack-service-credentials; then
+            echo "Creating user-provided service: aviation-stack-service-credentials"
+            cf create-user-provided-service aviation-stack-service-credentials -p '{"access_key":"${{ secrets.AVIATION_STACK_ACCESS_KEY }}"}' || echo "UPS creation might have failed or already exists"
+          else
+            echo "UPS aviation-stack-service-credentials already exists."
+          fi
+
+  set_env_vars:
+    needs: create_ups
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create env vars file
+        run: |
+          echo '{"AVIATION_STACK_ACCESS_KEY": "${{ secrets.AVIATION_STACK_ACCESS_KEY }}"}' > env_vars.json
+          cat env_vars.json
+      - name: Upload env vars file
+        uses: actions/upload-artifact@v4
+        with:
+          name: env-vars
+          path: env_vars.json
+          retention-days: 1
+
+  deploy:
+    needs: set_env_vars
+    uses: ./.github/workflows/cf-deploy.yml
+    with:
+      project_path: 'java-spring-ai-mcp/server'
+      random_route: ${{ inputs.random_route }}

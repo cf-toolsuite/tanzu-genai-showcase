@@ -156,42 +156,42 @@
     // Tab switching functionality
     const tabBtns = document.querySelectorAll('.tab-btn');
     const tabContents = document.querySelectorAll('.tab-content');
-    
+
     tabBtns.forEach(btn => {
       btn.addEventListener('click', () => {
         // Remove active class from all tabs
         tabBtns.forEach(b => b.classList.remove('active'));
         tabContents.forEach(c => c.classList.remove('active'));
-        
+
         // Add active class to clicked tab and corresponding content
         btn.classList.add('active');
         const tabId = btn.getAttribute('data-tab') + '-tab';
         document.getElementById(tabId).classList.add('active');
       });
     });
-    
+
     // Set current date as default for schedules
     const today = new Date().toISOString().split('T')[0];
     document.getElementById('schedule-date').value = today;
-    
+
     // Form submission handling
     const form = document.getElementById('flight-search-form');
     const resultsContainer = document.getElementById('search-results');
-    
+
     form.addEventListener('submit', async (e) => {
       e.preventDefault();
-      
+
       // Show loading state
       resultsContainer.innerHTML = '<div class="loading"><i data-feather="loader"></i><p>Loading results...</p></div>';
       feather.replace();
-      
+
       // Determine which tab is active
       const activeTab = document.querySelector('.tab-btn.active').getAttribute('data-tab');
-      
+
       // Prepare data based on active tab
       let endpoint = '/api/search';
       let params = new URLSearchParams();
-      
+
       switch (activeTab) {
         case 'flight-number':
           params.append('flight_iata', document.getElementById('flight-iata').value);
@@ -208,15 +208,15 @@
           const date = document.getElementById('schedule-date').value;
           const airport = document.getElementById('schedule-airport').value;
           const type = document.getElementById('schedule-type').value;
-          
+
           if (date) params.append('date', date);
           if (airport) params.append('iataCode', airport);
           if (type) params.append('type', type);
-          
+
           // Determine if we're using current or future schedules
           const today = new Date().toISOString().split('T')[0];
           const selectedDate = new Date(date).toISOString().split('T')[0];
-          
+
           if (selectedDate > today) {
             endpoint = '/api/future-schedules';
           } else {
@@ -224,17 +224,17 @@
           }
           break;
       }
-      
+
       try {
         // Make the API request
         const response = await fetch(`${endpoint}?${params.toString()}`);
-        
+
         if (!response.ok) {
           throw new Error(`HTTP error! Status: ${response.status}`);
         }
-        
+
         const data = await response.json();
-        
+
         // Display results
         displayResults(data, activeTab);
       } catch (error) {
@@ -247,7 +247,7 @@
         feather.replace();
       }
     });
-    
+
     // Function to display results based on search type
     function displayResults(data, searchType) {
       if (!data || data.length === 0) {
@@ -260,9 +260,9 @@
         feather.replace();
         return;
       }
-      
+
       let html = '<div class="results-list">';
-      
+
       switch (searchType) {
         case 'flight-number':
         case 'route':
@@ -275,16 +275,16 @@
           html += createScheduleResultsHTML(data);
           break;
       }
-      
+
       html += '</div>';
       resultsContainer.innerHTML = html;
       feather.replace();
     }
-    
+
     // Helper functions to create HTML for different result types
     function createFlightResultsHTML(flights) {
       let html = '';
-      
+
       flights.forEach(flight => {
         html += `
           <div class="result-card">
@@ -328,13 +328,13 @@
           </div>
         `;
       });
-      
+
       return html;
     }
-    
+
     function createAirportResultsHTML(airports) {
       let html = '';
-      
+
       airports.forEach(airport => {
         html += `
           <div class="result-card">
@@ -359,17 +359,17 @@
           </div>
         `;
       });
-      
+
       return html;
     }
-    
+
     function createScheduleResultsHTML(schedules) {
       let html = '';
-      
+
       schedules.forEach(schedule => {
         // Handle future schedules format which is different from regular flights
         const isFutureSchedule = schedule.departure && schedule.departure.iataCode;
-        
+
         if (isFutureSchedule) {
           html += `
             <div class="result-card">
@@ -450,14 +450,14 @@
           `;
         }
       });
-      
+
       return html;
     }
-    
+
     // Utility functions for formatting
     function formatTime(isoString) {
       if (!isoString) return '';
-      
+
       try {
         const date = new Date(isoString);
         return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
@@ -465,10 +465,10 @@
         return isoString;
       }
     }
-    
+
     function formatDate(dateString) {
       if (!dateString) return '';
-      
+
       try {
         const date = new Date(dateString);
         return date.toLocaleDateString([], { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });

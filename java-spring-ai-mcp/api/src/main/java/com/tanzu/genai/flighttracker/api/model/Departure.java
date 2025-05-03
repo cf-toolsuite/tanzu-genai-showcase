@@ -18,10 +18,10 @@ public class Departure {
     private String scheduled;
     private String estimated;
     private String actual;
-    
+
     @JsonProperty("iata_code")
     private String iataCode;
-    
+
     @JsonProperty("icao_code")
     private String icaoCode;
 }

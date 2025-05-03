@@ -1,0 +1,131 @@
+# GitLab CI/CD for go-fiber-langchaingo
+# Equivalent to GitHub Actions workflow: go-fiber-langchaingo.yml
+
+image: golang:latest
+
+# Define stages in the pipeline
+stages:
+  - test
+  - build
+  - upload
+  - deploy
+
+# Cache Go module dependencies
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .go/pkg/mod/
+
+# Run CI only when changes in the project files or CI configuration
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      changes:
+        - go-fiber-langchaingo/**/*
+        - go-fiber-langchaingo/ci/gitlab/.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - go-fiber-langchaingo/**/*
+        - go-fiber-langchaingo/ci/gitlab/.gitlab-ci.yml
+
+# Set environment variables for the pipeline
+variables:
+  GOPATH: $CI_PROJECT_DIR/.go
+  GO111MODULE: "on"
+
+# Test the application
+test:
+  stage: test
+  script:
+    - cd go-fiber-langchaingo
+    - go test ./... -v
+
+# Build the application
+build:
+  stage: build
+  script:
+    - cd go-fiber-langchaingo
+    - mkdir -p bin
+    - make build || go build -o ./bin/app ./cmd/server
+  artifacts:
+    paths:
+      - go-fiber-langchaingo/bin/
+    expire_in: 1 week
+
+# Upload artifacts - only on main branch
+upload:
+  stage: upload
+  script:
+    - echo "Uploading build artifacts to GitLab Package Registry"
+    - |
+      if [ -f "go-fiber-langchaingo/bin/app" ]; then
+        # Upload the binary to GitLab Package Registry using the API
+        cd go-fiber-langchaingo
+        curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+             --upload-file bin/app \
+             "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/go-fiber-langchaingo/${CI_COMMIT_TAG:-latest}/app"
+      else
+        echo "Build artifact not found"
+        exit 1
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - build
+
+# Deploy to Cloud Foundry - manual trigger with parameters
+deploy:
+  stage: deploy
+  image: governmentpaas/cf-cli:latest
+  variables:
+    CF_API: ""
+    CF_USERNAME: ""
+    CF_PASSWORD: ""
+    CF_ORG: ""
+    CF_SPACE: ""
+    RANDOM_ROUTE: "false"
+    CONGRESS_API_KEY: ""
+  script:
+    - cd go-fiber-langchaingo
+    - echo "Deploying to Cloud Foundry..."
+    - cf api "$CF_API"
+    - cf auth "$CF_USERNAME" "$CF_PASSWORD"
+    - cf target -o "$CF_ORG" -s "$CF_SPACE"
+
+    # Create GenAI service if it doesn't exist
+    - |
+      if ! cf service congress-llm > /dev/null 2>&1; then
+        echo "Creating GenAI service..."
+        cf create-service genai standard congress-llm || echo "Service creation failed, it might already exist or plan is not available"
+      else
+        echo "GenAI service already exists"
+      fi
+
+    # Set environment variables
+    - |
+      APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+      if [ -z "$APP_NAME" ]; then
+        APP_NAME=$(basename $(pwd)) # Fallback to directory name
+      fi
+
+      # Push the application without starting it
+      if [ "$RANDOM_ROUTE" = "true" ]; then
+        echo "Pushing with random route..."
+        cf push "$APP_NAME" -f manifest.yml --no-start --random-route
+      else
+        echo "Pushing with route from manifest..."
+        cf push "$APP_NAME" -f manifest.yml --no-start
+      fi
+
+      # Set environment variables
+      if [ -n "$CONGRESS_API_KEY" ]; then
+        cf set-env "$APP_NAME" "CONGRESS_API_KEY" "$CONGRESS_API_KEY"
+      fi
+
+      # Start the application
+      cf start "$APP_NAME"
+  environment:
+    name: production
+  when: manual
+  needs:
+    - build

@@ -11,18 +11,18 @@
             border-radius: 0.5rem;
             margin-bottom: 2rem;
         }
-        
+
         .result-item {
             position: relative;
             transition: transform 0.2s;
         }
-        
+
         .result-item:hover {
             transform: translateY(-5px);
             box-shadow: 0 .5rem 1rem rgba(0,0,0,.15);
             z-index: 10;
         }
-        
+
         .stock-badge {
             font-size: 0.875rem;
             padding: 0.25rem 0.5rem;
@@ -31,7 +31,7 @@
             color: #495057;
             margin-right: 0.5rem;
         }
-        
+
         .sector-badge {
             font-size: 0.875rem;
             padding: 0.25rem 0.5rem;
@@ -39,11 +39,11 @@
             background-color: #007bff;
             color: white;
         }
-        
+
         .api-result {
             border-left: 5px solid #6c757d;
         }
-        
+
         .db-result {
             border-left: 5px solid #28a745;
         }
@@ -67,10 +67,10 @@
             </div>
         {% endfor %}
     {% endfor %}
-    
+
     <div class="search-header">
         <h1 class="mb-4">Company Search</h1>
-        
+
         {{ form_start(form, {'attr': {'class': 'row g-3'}}) }}
             <div class="col-md-9">
                 {{ form_widget(form.searchTerm, {'attr': {'class': 'form-control form-control-lg', 'placeholder': 'Enter company name or ticker symbol...'}}) }}
@@ -82,25 +82,25 @@
                 </button>
             </div>
         {{ form_end(form) }}
-        
+
         <div class="mt-3 text-muted">
             <small>
-                Search for companies by name or ticker symbol. Results include both companies in our database 
+                Search for companies by name or ticker symbol. Results include both companies in our database
                 and companies found via external financial data providers.
             </small>
         </div>
     </div>
-    
+
     {% if searchTerm %}
         <h2 class="mb-4">Search Results for "{{ searchTerm }}"</h2>
-        
+
         {% if dbResults is empty and apiResults is empty %}
             <div class="alert alert-info">
                 <h4 class="alert-heading">No results found</h4>
                 <p>Your search for "{{ searchTerm }}" did not match any companies in our database or external sources.</p>
                 <hr>
                 <p class="mb-0">
-                    Try searching for a different company name or ticker symbol. You can also 
+                    Try searching for a different company name or ticker symbol. You can also
                     <a href="{{ path('company_new') }}" class="alert-link">add a new company</a> to the database.
                 </p>
             </div>
@@ -115,13 +115,13 @@
                                     <h5 class="card-title mb-0">{{ company.name }}</h5>
                                     <span class="stock-badge">{{ company.tickerSymbol }}</span>
                                 </div>
-                                
+
                                 <div class="mb-3">
                                     <span class="sector-badge">{{ company.sector }}</span>
                                 </div>
-                                
+
                                 <p class="card-text text-muted">{{ company.description|length > 100 ? company.description|slice(0, 100) ~ '...' : company.description }}</p>
-                                
+
                                 <div class="mt-3">
                                     <small class="text-muted">
                                         <i class="fas fa-building me-1"></i> {{ company.headquarters }}
@@ -141,7 +141,7 @@
                         </div>
                     </div>
                 {% endfor %}
-                
+
                 <!-- API Results -->
                 {% for result in apiResults %}
                     <div class="col">
@@ -151,13 +151,13 @@
                                     <h5 class="card-title mb-0">{{ result.name }}</h5>
                                     <span class="stock-badge">{{ result.symbol }}</span>
                                 </div>
-                                
+
                                 <div class="mb-3">
                                     <span class="sector-badge">{{ result.sector|default('Unknown') }}</span>
                                 </div>
-                                
+
                                 <p class="card-text text-muted">{{ result.description|default('No description available.')|length > 100 ? result.description|slice(0, 100) ~ '...' : result.description|default('No description available.') }}</p>
-                                
+
                                 <div class="mt-3">
                                     <small class="text-muted">
                                         <i class="fas fa-building me-1"></i> {{ result.exchange|default('Unknown Exchange') }}
@@ -182,7 +182,7 @@
             </div>
         {% endif %}
     {% endif %}
-    
+
     <div class="mt-5 mb-4">
         <a href="{{ path('company_new') }}" class="btn btn-outline-primary">
             <i class="fas fa-plus me-2"></i> Add New Company

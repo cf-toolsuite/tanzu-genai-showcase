@@ -9,44 +9,44 @@
             margin-bottom: 1.5rem;
             transition: transform 0.2s;
         }
-        
+
         .news-card:hover {
             transform: translateY(-5px);
         }
-        
+
         .news-image {
             height: 180px;
             object-fit: cover;
             width: 100%;
         }
-        
+
         .news-source {
             font-size: 0.8rem;
             color: #6c757d;
         }
-        
+
         .news-date {
             font-size: 0.8rem;
             color: #6c757d;
         }
-        
+
         .sentiment-positive {
             color: #28a745;
         }
-        
+
         .sentiment-negative {
             color: #dc3545;
         }
-        
+
         .sentiment-neutral {
             color: #6c757d;
         }
-        
+
         .market-news-item {
             padding: 0.75rem;
             border-bottom: 1px solid #dee2e6;
         }
-        
+
         .market-news-item:last-child {
             border-bottom: none;
         }
@@ -62,11 +62,11 @@
             <li class="breadcrumb-item active" aria-current="page">News</li>
         </ol>
     </nav>
-    
+
     <div class="row mb-4">
         <div class="col-md-8">
             <h1 class="mb-4">{{ company.name }} News</h1>
-            
+
             <div class="card shadow-sm mb-4">
                 <div class="card-body">
                     <form method="get" class="row g-3 align-items-end">
@@ -101,7 +101,7 @@
             </a>
         </div>
     </div>
-    
+
     <div class="row">
         <!-- Company News -->
         <div class="col-md-8">
@@ -124,12 +124,12 @@
                                 <div class="card-body">
                                     <h5 class="card-title">{{ article.title }}</h5>
                                     <p class="card-text">{{ article.description|length > 100 ? article.description|slice(0, 100) ~ '...' : article.description }}</p>
-                                    
+
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div class="news-source">
                                             <i class="fas fa-newspaper fa-fw"></i> {{ article.source }}
                                         </div>
-                                        
+
                                         {% if article.sentiment is defined and article.sentiment != 0 %}
                                             <div class="sentiment-badge">
                                                 {% if article.sentiment > 0.25 %}
@@ -142,11 +142,11 @@
                                             </div>
                                         {% endif %}
                                     </div>
-                                    
+
                                     <div class="news-date mt-2">
                                         <i class="far fa-calendar-alt fa-fw"></i> {{ article.publishedAt is instanceof('DateTime') ? article.publishedAt|date('M d, Y') : article.publishedAt|date('M d, Y') }}
                                     </div>
-                                    
+
                                     <a href="{{ article.url }}" target="_blank" class="btn btn-primary btn-sm mt-3">Read More</a>
                                 </div>
                             </div>
@@ -155,7 +155,7 @@
                 </div>
             {% endif %}
         </div>
-        
+
         <!-- Market News Sidebar -->
         <div class="col-md-4">
             <div class="card shadow-sm mb-4">
@@ -185,7 +185,7 @@
                     {% endif %}
                 </div>
             </div>
-            
+
             <div class="card shadow-sm">
                 <div class="card-header">
                     <h5 class="mb-0">Financial Data</h5>

@@ -472,13 +472,13 @@ span.font-medium {
 }
 
 /* New styling for buttons to match the Advisor page */
-.btn-primary, 
+.btn-primary,
 a.btn-primary,
 .btn-lg,
 button[class*="bg-primary"],
-a[href*="journey"], 
+a[href*="journey"],
 button[href*="journey"],
-a[href*="planning"], 
+a[href*="planning"],
 button[href*="planning"],
 .d-grid .btn {
     padding: 0.5rem 1rem !important;
@@ -497,13 +497,13 @@ button[href*="planning"],
 }
 
 /* Hover state for buttons */
-.btn-primary:hover, 
+.btn-primary:hover,
 a.btn-primary:hover,
 .btn-lg:hover,
 button[class*="bg-primary"]:hover,
-a[href*="journey"]:hover, 
+a[href*="journey"]:hover,
 button[href*="journey"]:hover,
-a[href*="planning"]:hover, 
+a[href*="planning"]:hover,
 button[href*="planning"]:hover,
 .d-grid .btn:hover {
     background-color: var(--primary-dark) !important;
@@ -513,13 +513,13 @@ button[href*="planning"]:hover,
 }
 
 /* Active state for buttons */
-.btn-primary:active, 
+.btn-primary:active,
 a.btn-primary:active,
 .btn-lg:active,
 button[class*="bg-primary"]:active,
-a[href*="journey"]:active, 
+a[href*="journey"]:active,
 button[href*="journey"]:active,
-a[href*="planning"]:active, 
+a[href*="planning"]:active,
 button[href*="planning"]:active,
 .d-grid .btn:active {
     background-color: var(--primary-dark) !important;
@@ -528,13 +528,13 @@ button[href*="planning"]:active,
 }
 
 /* Focus state for buttons */
-.btn-primary:focus, 
+.btn-primary:focus,
 a.btn-primary:focus,
 .btn-lg:focus,
 button[class*="bg-primary"]:focus,
-a[href*="journey"]:focus, 
+a[href*="journey"]:focus,
 button[href*="journey"]:focus,
-a[href*="planning"]:focus, 
+a[href*="planning"]:focus,
 button[href*="planning"]:focus,
 .d-grid .btn:focus {
     outline: none !important;
@@ -565,7 +565,7 @@ button[href*="planning"]:focus,
 }
 
 /* Target the purple blobs/logos that might be hiding text */
-img[src*="logo"], svg[class*="logo"], [class*="logo"], [class*="blob"], 
+img[src*="logo"], svg[class*="logo"], [class*="logo"], [class*="blob"],
 footer img, footer svg, footer [class*="logo"] {
     max-width: 120px !important;
     max-height: 60px !important;
@@ -705,7 +705,7 @@ footer p, footer div p, [class*="powered"] p {
     .d-flex.justify-content-center.align-items-center.flex-wrap.gap-3 {
         justify-content: center !important;
     }
-    
+
     .badge.bg-primary.bg-opacity-10.text-primary {
         margin: 3px !important;
         font-size: 0.85rem !important; /* Slightly smaller font on mobile */

@@ -158,6 +158,42 @@ func (c *CongressClient) SearchMembers(query string, offset, limit int) (map[str
 	return c.makeRequest(endpoint, params)
 }
 
+// GetSenatorsByState retrieves senators from a specific state
+func (c *CongressClient) GetSenatorsByState(stateCode string) (map[string]interface{}, error) {
+	endpoint := fmt.Sprintf("%s/member", c.baseURL)
+
+	params := url.Values{}
+	params.Add("api_key", c.apiKey)
+	params.Add("format", "json")
+
+	// Use a more specific query to filter by state and chamber
+	query := fmt.Sprintf("state:%s AND chamber:senate", stateCode)
+	params.Add("query", query)
+
+	// Limit to 2 results since each state has 2 senators
+	params.Add("limit", "2")
+
+	return c.makeRequest(endpoint, params)
+}
+
+// GetRepresentativesByState retrieves representatives from a specific state
+func (c *CongressClient) GetRepresentativesByState(stateCode string) (map[string]interface{}, error) {
+	endpoint := fmt.Sprintf("%s/member", c.baseURL)
+
+	params := url.Values{}
+	params.Add("api_key", c.apiKey)
+	params.Add("format", "json")
+
+	// Use a more specific query to filter by state and chamber
+	query := fmt.Sprintf("state:%s AND chamber:house", stateCode)
+	params.Add("query", query)
+
+	// Set a reasonable limit
+	params.Add("limit", "50")
+
+	return c.makeRequest(endpoint, params)
+}
+
 // GetMember retrieves a specific member of Congress by bioguideId
 func (c *CongressClient) GetMember(bioguideId string) (map[string]interface{}, error) {
 	endpoint := fmt.Sprintf("%s/member/%s", c.baseURL, bioguideId)

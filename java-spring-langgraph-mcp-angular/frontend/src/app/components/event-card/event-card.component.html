@@ -3,31 +3,31 @@
     <div class="event-type">{{ event.type }}</div>
     <div class="event-price" *ngIf="event.priceRange">{{ event.priceRange }}</div>
   </div>
-  
+
   <h3 class="event-title">{{ event.name }}</h3>
-  
+
   <div class="event-details">
     <div class="detail">
       <span class="icon">📍</span>
       <span>{{ event.venue }}, {{ event.city }}</span>
     </div>
-    
+
     <div class="detail">
       <span class="icon">🗓️</span>
       <span>{{ getFormattedDate(event.startDateTime) }}</span>
     </div>
-    
+
     <div class="detail" *ngIf="event.genre">
       <span class="icon">🎭</span>
       <span>{{ event.genre }}{{ event.subGenre ? ' - ' + event.subGenre : '' }}</span>
     </div>
-    
+
     <div class="detail" *ngIf="event.familyFriendly !== undefined">
       <span class="icon">👪</span>
       <span>{{ event.familyFriendly ? 'Family Friendly' : 'Adults Only' }}</span>
     </div>
   </div>
-  
+
   <div class="event-action">
     <a [href]="event.url" target="_blank" class="event-link">View Details</a>
   </div>

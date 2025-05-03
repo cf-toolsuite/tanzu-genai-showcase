@@ -116,9 +116,9 @@ Document your code with PHPDoc comments:
  *
  * @param string $companyName The name of the company to analyze
  * @param string $reportType The type of report to generate (e.g., '10-K', 'quarterly')
- * 
+ *
  * @return array The generated financial analysis data
- * 
+ *
  * @throws \Exception If the AI service fails to generate the analysis
  */
 public function generateFinancialAnalysis(string $companyName, string $reportType): array

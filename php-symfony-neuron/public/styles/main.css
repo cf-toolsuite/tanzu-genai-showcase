@@ -147,16 +147,16 @@ main {
     .card-title {
         font-size: 1.25rem;
     }
-    
+
     .company-logo, .executive-photo {
         width: 80px;
         height: 80px;
     }
-    
+
     .company-logo i, .executive-photo i {
         font-size: 40px;
     }
-    
+
     .metric-value {
         font-size: 1.5rem;
     }

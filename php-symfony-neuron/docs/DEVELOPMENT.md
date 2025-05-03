@@ -182,7 +182,7 @@ class CompanyRepository extends ServiceEntityRepository
            ->setParameter('term', '%' . $term . '%')
            ->setParameter('exact', $term)
            ->orderBy('c.name', 'ASC');
-        
+
         return $qb->getQuery()->getResult();
     }
 }
@@ -319,10 +319,10 @@ class NeuronAiServiceTest extends TestCase
     public function testGenerateCompanyInfo()
     {
         $service = new NeuronAiService('fake-api-key');
-        
+
         // Test with mock responses
         $result = $service->generateCompanyInfo('Test Company');
-        
+
         $this->assertArrayHasKey('industry', $result);
         $this->assertArrayHasKey('description', $result);
         // Additional assertions...
@@ -353,12 +353,12 @@ class CompanyControllerTest extends WebTestCase
         $client->request('GET', '/company/search');
 
         $this->assertResponseIsSuccessful();
-        
+
         // Test form submission
         $client->submitForm('Search', [
             'company_search[searchTerm]' => 'AAPL'
         ]);
-        
+
         $this->assertResponseIsSuccessful();
         $this->assertSelectorTextContains('h2', 'Search Results');
     }

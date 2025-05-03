@@ -3,11 +3,11 @@
         <a class="navbar-brand" href="{{ path('homepage') }}">
             <i class="bi bi-building"></i> Company Research
         </a>
-        
+
         <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarMain" aria-controls="navbarMain" aria-expanded="false" aria-label="Toggle navigation">
             <span class="navbar-toggler-icon"></span>
         </button>
-        
+
         <div class="collapse navbar-collapse" id="navbarMain">
             <ul class="navbar-nav me-auto mb-2 mb-lg-0">
                 <li class="nav-item">
@@ -26,7 +26,7 @@
                     <a class="nav-link {{ app.request.get('_route') == 'dashboard' ? 'active' : '' }}" href="{{ path('dashboard') }}">Dashboard</a>
                 </li>
             </ul>
-            
+
             <form class="d-flex" role="search" action="{{ path('company_search') }}" method="get">
                 <input class="form-control me-2" type="search" name="searchTerm" placeholder="Search companies..." aria-label="Search">
                 <button class="btn btn-light" type="submit">Search</button>

@@ -9,62 +9,62 @@
             margin-bottom: 1.5rem;
             transition: transform 0.2s;
         }
-        
+
         .insider-card:hover {
             transform: translateY(-5px);
         }
-        
+
         .transaction-purchase {
             color: #28a745;
         }
-        
+
         .transaction-sale {
             color: #dc3545;
         }
-        
+
         .transaction-badge {
             font-size: 0.8rem;
             padding: 0.3rem 0.6rem;
             border-radius: 50px;
         }
-        
+
         .badge-purchase {
             background-color: #28a745;
             color: white;
         }
-        
+
         .badge-sale {
             background-color: #dc3545;
             color: white;
         }
-        
+
         .badge-grant {
             background-color: #17a2b8;
             color: white;
         }
-        
+
         .badge-disposition {
             background-color: #6c757d;
             color: white;
         }
-        
+
         .badge-other {
             background-color: #6c757d;
             color: white;
         }
-        
+
         .transaction-detail {
             margin-bottom: 0.5rem;
             padding: 0.75rem;
             border-radius: 0.25rem;
             background-color: #f8f9fa;
         }
-        
+
         .owner-title {
             font-size: 0.9rem;
             color: #6c757d;
         }
-        
+
         .filing-date {
             font-size: 0.8rem;
             color: #6c757d;
@@ -81,7 +81,7 @@
             <li class="breadcrumb-item active" aria-current="page">Insider Trading</li>
         </ol>
     </nav>
-    
+
     <div class="row mb-4">
         <div class="col-md-8">
             <h1 class="mb-4">{{ company.name }} Insider Trading</h1>
@@ -92,7 +92,7 @@
             </a>
         </div>
     </div>
-    
+
     <div class="row mb-4">
         <div class="col-12">
             <div class="alert alert-info">
@@ -110,7 +110,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="row">
         <!-- Form 4 Filings -->
         <div class="col-md-12">
@@ -134,7 +134,7 @@
                         </div>
                     </div>
                 </form>
-                
+
                 <div class="card shadow-sm">
                     <div class="card-header">
                         <h5 class="mb-0">Recent Form 4 Filings</h5>
@@ -164,7 +164,7 @@
                                     <div class="row">
                                         <div class="col-md-12">
                                             <h6>Transactions</h6>
-                                            
+
                                             {% for transaction in filing.transactions %}
                                                 <div class="transaction-detail">
                                                     <div class="row">
@@ -180,7 +180,7 @@
                                                                 {% elseif transaction.transactionType == 'D' %}
                                                                     {% set badgeClass = 'badge-disposition' %}
                                                                 {% endif %}
-                                                                
+
                                                                 <span class="transaction-badge {{ badgeClass }}">
                                                                     {{ transaction.transactionType }}
                                                                 </span>
@@ -234,7 +234,7 @@
                                                     </div>
                                                 </div>
                                             {% endfor %}
-                                            
+
                                             <div class="text-end mt-3">
                                                 <a href="{{ filing.formUrl }}" target="_blank" class="btn btn-sm btn-outline-secondary">
                                                     <i class="fas fa-external-link-alt"></i> View Form 4 on SEC Website
@@ -250,7 +250,7 @@
             {% endif %}
         </div>
     </div>
-    
+
     <!-- Related Links -->
     <div class="row mt-4">
         <div class="col-md-12">

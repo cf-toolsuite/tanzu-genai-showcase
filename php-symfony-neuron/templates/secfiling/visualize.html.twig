@@ -9,7 +9,7 @@
             height: 400px;
             margin-bottom: 2rem;
         }
-        
+
         .metric-card {
             border-radius: 0.5rem;
             padding: 1.5rem;
@@ -17,40 +17,40 @@
             background-color: #f8f9fa;
             border-left: 5px solid #007bff;
         }
-        
+
         .metric-value {
             font-size: 2rem;
             font-weight: bold;
             color: #212529;
         }
-        
+
         .metric-label {
             color: #6c757d;
             font-size: 1rem;
         }
-        
+
         .metric-change {
             font-size: 1rem;
             font-weight: 500;
         }
-        
+
         .metric-change-positive {
             color: #28a745;
         }
-        
+
         .metric-change-negative {
             color: #dc3545;
         }
-        
+
         .tab-pane {
             padding: 1.5rem;
         }
-        
+
         .visualization-nav {
             margin-bottom: 1.5rem;
         }
     </style>
-    
+
     <!-- Include Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.7.1/dist/chart.min.js"></script>
 {% endblock %}
@@ -66,7 +66,7 @@
             <li class="breadcrumb-item active" aria-current="page">Financial Visualization</li>
         </ol>
     </nav>
-    
+
     <div class="row mb-4">
         <div class="col-md-8">
             <h1>Financial Data Visualization</h1>
@@ -78,7 +78,7 @@
             </a>
         </div>
     </div>
-    
+
     <!-- Visualization Tabs -->
     <ul class="nav nav-tabs visualization-nav" id="visualizationTabs" role="tablist">
         <li class="nav-item" role="presentation">
@@ -97,7 +97,7 @@
             </button>
         </li>
     </ul>
-    
+
     <div class="tab-content" id="visualizationTabsContent">
         <!-- Financial Overview Tab -->
         <div class="tab-pane fade show active" id="overview" role="tabpanel" aria-labelledby="overview-tab">
@@ -155,14 +155,14 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="chart-container">
                         <canvas id="overviewChart"></canvas>
                     </div>
                 </div>
             </div>
         </div>
-        
+
         <!-- Income Metrics Tab -->
         <div class="tab-pane fade" id="income" role="tabpanel" aria-labelledby="income-tab">
             <div class="card shadow-sm mb-4">
@@ -173,7 +173,7 @@
                     <div class="chart-container">
                         <canvas id="incomeChart"></canvas>
                     </div>
-                    
+
                     <h5 class="mt-4">Revenue & Net Income (5 Year Trend)</h5>
                     <div class="table-responsive">
                         <table class="table table-bordered">
@@ -211,7 +211,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Balance Sheet Tab -->
         <div class="tab-pane fade" id="balance" role="tabpanel" aria-labelledby="balance-tab">
             <div class="card shadow-sm mb-4">
@@ -251,11 +251,11 @@
                             </div>
                         </div>
                     </div>
-                    
+
                     <div class="chart-container">
                         <canvas id="balanceChart"></canvas>
                     </div>
-                    
+
                     <h5 class="mt-4">Assets & Liabilities (5 Year Trend)</h5>
                     <div class="table-responsive">
                         <table class="table table-bordered">
@@ -314,7 +314,7 @@
             const netIncome = {{ data.netIncome|json_encode|raw }};
             const assets = {{ data.assets|json_encode|raw }};
             const liabilities = {{ data.liabilities|json_encode|raw }};
-            
+
             // Overview Chart
             const overviewCtx = document.getElementById('overviewChart').getContext('2d');
             const overviewChart = new Chart(overviewCtx, {
@@ -370,7 +370,7 @@
                     }
                 }
             });
-            
+
             // Income Chart
             const incomeCtx = document.getElementById('incomeChart').getContext('2d');
             const incomeChart = new Chart(incomeCtx, {
@@ -430,13 +430,13 @@
                     }
                 }
             });
-            
+
             // Balance Sheet Chart
             const balanceCtx = document.getElementById('balanceChart').getContext('2d');
-            
+
             // Calculate net worth (assets - liabilities)
             const netWorth = years.map((year, index) => assets[index] - liabilities[index]);
-            
+
             const balanceChart = new Chart(balanceCtx, {
                 type: 'bar',
                 data: {

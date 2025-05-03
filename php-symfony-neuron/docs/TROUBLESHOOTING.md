@@ -76,7 +76,7 @@ This document provides solutions to common issues that may arise when working wi
    ```bash
    # Development permissions (not for production)
    sudo chmod -R 777 var/cache var/log
-   
+
    # Better approach
    sudo setfacl -R -m u:www-data:rwX -m u:$(whoami):rwX var/cache var/log
    sudo setfacl -dR -m u:www-data:rwX -m u:$(whoami):rwX var/cache var/log

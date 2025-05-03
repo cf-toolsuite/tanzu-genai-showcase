@@ -1,6 +1,7 @@
-name: py-django-crewai CI
+name: py-django-crewai CI/CD
 
 on:
+  workflow_call:
   push:
     paths:
       - 'py-django-crewai/**'
@@ -11,7 +12,7 @@ on:
       - '.github/workflows/py-django-crewai.yml'
 
 jobs:
-  build:
+  backend-test:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -26,28 +27,82 @@ jobs:
         python-version: '3.12'
         cache: 'pip'
 
-    - name: Install dependencies
+    - name: Install backend dependencies
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
 
-    - name: Run tests
+    - name: Run backend tests
       run: |
         python manage.py test || echo "No tests run"
 
+  frontend-build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: py-django-crewai
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install frontend dependencies
+      run: |
+        cd frontend
+        npm install
+
+    - name: Build frontend
+      run: |
+        ./build_frontend.sh
+
+    - name: Set up Python for static collection
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.12'
+        cache: 'pip'
+
     - name: Collect static files
       run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
         python manage.py collectstatic --noinput || echo "Static collection skipped"
 
-    - name: Create package
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      run: |
-        mkdir -p dist
-        zip -r dist/py-django-crewai.zip . -x "*.git*" "*.env*" "*.pyc" "__pycache__/*" "*.github/*" "dist/*"
-
-    - name: Upload artifacts
-      if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    - name: Upload build artifacts
       uses: actions/upload-artifact@v4
       with:
-        name: py-django-crewai-artifacts
+        name: frontend-build
+        path: |
+          py-django-crewai/frontend/dist
+          py-django-crewai/static
+
+  package:
+    needs: [backend-test, frontend-build]
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: py-django-crewai
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Download frontend build
+      uses: actions/download-artifact@v4
+      with:
+        name: frontend-build
+        path: py-django-crewai
+
+    - name: Create package
+      run: |
+        mkdir -p dist
+        zip -r dist/py-django-crewai.zip . -x "*.git*" "*.env*" "*.pyc" "__pycache__/*" "*.github/*" "dist/*" "frontend/node_modules/*"
+
+    - name: Upload package artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: py-django-crewai-package
         path: py-django-crewai/dist

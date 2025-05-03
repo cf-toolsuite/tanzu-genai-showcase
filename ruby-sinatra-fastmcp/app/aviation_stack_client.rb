@@ -7,6 +7,12 @@ class AviationStackClient
 
   def initialize(api_key = VcapServices.get_api_key('AVIATIONSTACK_API_KEY'))
     @api_key = api_key
+
+    # Raise a clear error if no API key is found
+    if @api_key.nil?
+      raise "AviationStack API key not found. Please ensure AVIATIONSTACK_API_KEY is set in your environment or provided through a service binding."
+    end
+
     @conn = Faraday.new(url: BASE_URL) do |f|
       f.request :url_encoded
       f.adapter Faraday.default_adapter
@@ -20,11 +26,11 @@ class AviationStackClient
   end
 
   def get_flight_status(flight_iata, params = {})
-    params = { 
+    params = {
       access_key: @api_key,
-      flight_iata: flight_iata 
+      flight_iata: flight_iata
     }.merge(params)
-    
+
     response = @conn.get('flights', params)
     handle_response(response)
   end
@@ -63,11 +69,11 @@ class AviationStackClient
 
   def handle_response(response)
     result = JSON.parse(response.body)
-    
+
     if result['error']
       raise "AviationStack API Error: #{result['error']['code']} - #{result['error']['message']}"
     end
-    
+
     result
   end
 end

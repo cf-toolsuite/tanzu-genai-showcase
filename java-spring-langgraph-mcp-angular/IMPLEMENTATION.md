@@ -8,7 +8,7 @@ The application follows a client-server architecture:
 
 1. **Frontend**: Angular application that provides the user interface for the chatbot
 2. **Backend**: Spring Boot application that handles the AI logic, API calls, and serves the Angular frontend
-3. **External Services**: 
+3. **External Services**:
    - Ticketmaster MCP server for event data
    - API Ninjas Cities API for city information
 

@@ -47,31 +47,31 @@ The application follows these architectural patterns:
 graph TD
     User[User] --> WebUI[Web UI]
     WebUI --> SymfonyController[Symfony Controller Layer]
-    
+
     subgraph "Application"
         SymfonyController --> CompanyController[Company Controller]
         SymfonyController --> ReportController[Report Controller]
         SymfonyController --> FinancialController[Financial Controller]
         SymfonyController --> SecurityController[Security Controller]
-        
+
         CompanyController --> CompanyService[Company Service]
         CompanyController --> NeuronAiService[Neuron AI Service]
         ReportController --> ReportService[Report Service]
         ReportController --> ReportExportService[Report Export Service]
         FinancialController --> StockDataService[Stock Data Service]
         FinancialController --> FinancialAnalysisService[Financial Analysis Service]
-        
+
         CompanyService --> CompanyRepository[Company Repository]
         ReportService --> ReportRepository[Report Repository]
         StockDataService --> ExternalAPI[External Financial APIs]
-        
+
         NeuronAiService --> GenAIAdapter[GenAI Adapter]
     end
-    
+
     CompanyRepository --> Database[(Database)]
     ReportRepository --> Database
     GenAIAdapter --> LLMService[LLM Service]
-    
+
     subgraph "External Services"
         ExternalAPI
         LLMService
@@ -140,28 +140,28 @@ sequenceDiagram
     User->>Controller: Search for company
     Controller->>DB: Search existing companies
     DB->>Controller: Return database results
-    
+
     alt No results in database
         Controller->>StockService: Search external sources
         StockService->>External: API request for company info
         External->>StockService: Return company data
         StockService->>Controller: Return API results
         Controller->>User: Display combined results
-        
+
         opt User imports company
             User->>Controller: Select import
             Controller->>StockService: Import company data
             StockService->>External: Fetch detailed company data
             External->>StockService: Return detailed data
             StockService->>DB: Save company entity
-            
+
             opt AI Enhancement
                 Controller->>AI: Request additional company info
                 AI->>External: Query LLM service
                 External->>AI: Return enhanced data
                 AI->>DB: Update company with AI data
             end
-            
+
             DB->>Controller: Return saved company
             Controller->>User: Display company details
         end
@@ -186,12 +186,12 @@ sequenceDiagram
     StockService->>External: Request financial data
     External->>StockService: Return financial data
     StockService->>DB: Store historical data
-    
+
     Controller->>AI: Generate financial analysis
     AI->>External: Query LLM service with financial context
     External->>AI: Return analysis
     AI->>Controller: Return structured analysis data
-    
+
     Controller->>DB: Save financial analysis
     Controller->>User: Display financial data and analysis
 ```
@@ -211,14 +211,14 @@ sequenceDiagram
     Controller->>ReportService: Generate report
     ReportService->>DB: Fetch company data
     DB->>ReportService: Return company data
-    
+
     ReportService->>AI: Generate report sections
     AI->>ReportService: Return AI-generated content
-    
+
     ReportService->>DB: Save report draft
     ReportService->>Controller: Return report data
     Controller->>User: Display report preview
-    
+
     opt Export Report
         User->>Controller: Request export (PDF/Excel)
         Controller->>ExportService: Generate export file
@@ -284,7 +284,7 @@ public function __construct(
 public function generateCompanyInfo(string $companyName): array
 {
     $prompt = $this->buildCompanyInfoPrompt($companyName);
-    
+
     try {
         $response = $this->callLlmApi($prompt);
         return $this->parseCompanyInfoResponse($response);
@@ -306,14 +306,14 @@ public function getCompanyNews(string $symbol, int $limit = 10): array
         $response = $this->apiClient->get("/company/news/{$symbol}", [
             'query' => ['limit' => $limit]
         ]);
-        
+
         return $this->processNewsResponse($response);
     } catch (\Exception $e) {
         $this->logger->error('Failed to fetch company news', [
             'symbol' => $symbol,
             'error' => $e->getMessage()
         ]);
-        
+
         return [];
     }
 }
@@ -327,14 +327,14 @@ When deployed to Cloud Foundry, the application can automatically bind to LLM se
 // Service configuration example
 if (isset($_ENV['VCAP_SERVICES'])) {
     $vcapServices = json_decode($_ENV['VCAP_SERVICES'], true);
-    
+
     // Look for GenAI service binding
     if (isset($vcapServices['genai'])) {
         $genaiService = $vcapServices['genai'][0];
         $apiKey = $genaiService['credentials']['api_key'] ?? null;
         $baseUrl = $genaiService['credentials']['base_url'] ?? null;
         $model = $genaiService['credentials']['model'] ?? 'gpt-4o-mini';
-        
+
         // Configure the NeuronAiService with these credentials
     }
 }

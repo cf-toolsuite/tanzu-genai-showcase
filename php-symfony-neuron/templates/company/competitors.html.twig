@@ -12,14 +12,14 @@
             </a>
         </div>
     </div>
-    
+
     {% if competitorAnalyses is empty %}
         <div class="alert alert-info">
             <p>No competitor analysis is available for this company yet.</p>
             <hr>
             <p class="mb-0">Competitor analysis can be generated using AI or added manually with industry insights.</p>
         </div>
-        
+
         <div class="text-center my-5">
             <button class="btn btn-primary" id="generateCompetitors">
                 <i class="fas fa-robot"></i> Generate Competitor Analysis with AI
@@ -50,7 +50,7 @@
                         <p>{{ competitorAnalyses|first.marketPosition|u.truncate(200, '...') }}</p>
                     </div>
                 </div>
-                
+
                 <!-- Market Share Chart -->
                 <div class="mb-4">
                     <h6>Market Share</h6>
@@ -60,7 +60,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Competitive Landscape -->
         <div class="card shadow-sm mb-4">
             <div class="card-header">
@@ -110,7 +110,7 @@
                                             {% elseif competitor.threatLevel == "High" %}
                                                 {% set badgeClass = "bg-danger" %}
                                             {% endif %}
-                                            
+
                                             <span class="badge {{ badgeClass }}">{{ competitor.threatLevel }}</span>
                                         </td>
                                     </tr>
@@ -121,7 +121,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- SWOT Analysis -->
         <div class="card shadow-sm mb-4">
             <div class="card-header">
@@ -199,30 +199,30 @@
         // Export buttons
         const exportPdfBtn = document.getElementById('exportCompetitorsPdf');
         const exportExcelBtn = document.getElementById('exportCompetitorsExcel');
-        
+
         if (exportPdfBtn) {
             exportPdfBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 alert('PDF export functionality will be implemented here');
             });
         }
-        
+
         if (exportExcelBtn) {
             exportExcelBtn.addEventListener('click', function(e) {
                 e.preventDefault();
                 alert('Excel export functionality will be implemented here');
             });
         }
-        
+
         // Generate button
         const generateBtn = document.getElementById('generateCompetitors');
-        
+
         if (generateBtn) {
             generateBtn.addEventListener('click', function() {
                 const btn = this;
                 btn.disabled = true;
                 btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Generating Analysis...';
-                
+
                 // Make AJAX request to generate competitor analysis
                 fetch('{{ path('company_generate_competitors', {'id': company.id}) }}', {
                     method: 'POST',
@@ -254,7 +254,7 @@
                 });
             });
         }
-        
+
         // Initialize market share chart if it exists
         {% if competitorAnalyses is defined and competitorAnalyses is not empty %}
             // Prepare market share data
@@ -264,7 +264,7 @@
                 { name: "{{ competitor.name }}", share: {{ competitor.marketShare|default(10) }} }{% if not loop.last %},{% endif %}
                 {% endfor %}
             ];
-            
+
             // Initialize the market share chart
             const marketShareChart = document.getElementById('marketShareChart');
             if (marketShareChart) {

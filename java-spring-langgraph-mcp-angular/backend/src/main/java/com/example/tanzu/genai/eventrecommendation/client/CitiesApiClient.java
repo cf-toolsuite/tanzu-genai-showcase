@@ -13,10 +13,10 @@ import java.util.List;
 @Slf4j
 @Component
 public class CitiesApiClient {
-    
+
     private final WebClient webClient;
     private final String apiKey;
-    
+
     public CitiesApiClient(
             WebClient.Builder webClientBuilder,
             @Value("${cities.api.url}") String apiUrl,
@@ -26,7 +26,7 @@ public class CitiesApiClient {
                 .build();
         this.apiKey = apiKey;
     }
-    
+
     public Mono<List<CityInfo>> getCityByName(String name) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder.queryParam("name", name).build())
@@ -35,7 +35,7 @@ public class CitiesApiClient {
                 .bodyToMono(new ParameterizedTypeReference<List<CityInfo>>() {})
                 .doOnError(e -> log.error("Error fetching city data for {}: {}", name, e.getMessage()));
     }
-    
+
     public Mono<List<CityInfo>> getCityByNameAndCountry(String name, String country) {
         return webClient.get()
                 .uri(uriBuilder -> uriBuilder

@@ -5,19 +5,19 @@
       <span class="capital-badge" *ngIf="cityInfo.isCapital">Capital City</span>
     </h3>
   </div>
-  
+
   <div class="city-stats">
     <div class="stat">
       <div class="stat-label">Population</div>
       <div class="stat-value">{{ formatPopulation(cityInfo.population) }}</div>
     </div>
-    
+
     <div class="stat">
       <div class="stat-label">Coordinates</div>
       <div class="stat-value">{{ cityInfo.latitude.toFixed(2) }}, {{ cityInfo.longitude.toFixed(2) }}</div>
     </div>
   </div>
-  
+
   <div class="city-description">
     <p>Discover events in {{ cityInfo.name }}, a{{cityInfo.isCapital ? ' capital' : ''}} city in {{ cityInfo.country }} with a population of {{ formatPopulation(cityInfo.population) }}.</p>
   </div>

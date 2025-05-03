@@ -9,11 +9,11 @@
             transition: transform 0.2s;
             margin-bottom: 1rem;
         }
-        
+
         .filing-card:hover {
             transform: translateY(-5px);
         }
-        
+
         .filing-type-badge {
             font-size: 0.8rem;
             padding: 0.3rem 0.6rem;
@@ -21,36 +21,36 @@
             background-color: #e9ecef;
             color: #495057;
         }
-        
+
         .filing-type-10K {
             background-color: #007bff;
             color: white;
         }
-        
+
         .filing-type-10Q {
             background-color: #6c757d;
             color: white;
         }
-        
+
         .filing-type-8K {
             background-color: #28a745;
             color: white;
         }
-        
+
         .filing-nav {
             position: sticky;
             top: 1rem;
         }
-        
+
         .filing-type-count {
             font-size: 0.9rem;
             color: #6c757d;
         }
-        
+
         .import-btn {
             margin-bottom: 1rem;
         }
-        
+
         .filing-date {
             font-size: 0.85rem;
             color: #6c757d;
@@ -67,7 +67,7 @@
             <li class="breadcrumb-item active" aria-current="page">SEC Filings</li>
         </ol>
     </nav>
-    
+
     {% for label, messages in app.flashes %}
         {% for message in messages %}
             <div class="alert alert-{{ label }} alert-dismissible fade show" role="alert">
@@ -76,7 +76,7 @@
             </div>
         {% endfor %}
     {% endfor %}
-    
+
     <div class="row mb-4">
         <div class="col-md-8">
             <h1>SEC Filings for {{ company.name }}</h1>
@@ -88,7 +88,7 @@
             </a>
         </div>
     </div>
-    
+
     <div class="row">
         <!-- Sidebar -->
         <div class="col-md-3">
@@ -98,21 +98,21 @@
                         <i class="fas fa-sync-alt"></i> Import 10-K Reports
                     </button>
                 </form>
-                
+
                 <div class="card shadow-sm mb-4">
                     <div class="card-header">
                         <h5 class="mb-0">Filing Types</h5>
                     </div>
                     <div class="list-group list-group-flush">
-                        <a href="{{ path('secfiling_company_index', {'id': company.id}) }}" 
+                        <a href="{{ path('secfiling_company_index', {'id': company.id}) }}"
                            class="list-group-item list-group-item-action d-flex justify-content-between align-items-center
                            {{ selectedFormType is null ? 'active' : '' }}">
                             All Types
                             <span class="badge bg-primary rounded-pill">{{ filings|length }}</span>
                         </a>
-                        
+
                         {% for type, count in counts %}
-                            <a href="{{ path('secfiling_company_index', {'id': company.id, 'formType': type}) }}" 
+                            <a href="{{ path('secfiling_company_index', {'id': company.id, 'formType': type}) }}"
                                class="list-group-item list-group-item-action d-flex justify-content-between align-items-center
                                {{ selectedFormType == type ? 'active' : '' }}">
                                 {{ type }}
@@ -121,7 +121,7 @@
                         {% endfor %}
                     </div>
                 </div>
-                
+
                 <div class="card shadow-sm">
                     <div class="card-header">
                         <h5 class="mb-0">Show Entries</h5>
@@ -131,7 +131,7 @@
                             {% if selectedFormType %}
                                 <input type="hidden" name="formType" value="{{ selectedFormType }}">
                             {% endif %}
-                            
+
                             <div class="mb-0">
                                 <select name="limit" class="form-select" onchange="this.form.submit()">
                                     <option value="10" {{ limit == 10 ? 'selected' : '' }}>10 entries</option>
@@ -145,7 +145,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Main Content -->
         <div class="col-md-9">
             {% if filings is empty %}
@@ -168,11 +168,11 @@
                                     Filed: {{ filing.filingDate|date('M d, Y') }}
                                 </div>
                             </div>
-                            
+
                             <p class="card-text text-muted">
                                 {{ filing.description|default('Annual report for the fiscal year ended ' ~ filing.reportDate|date('M d, Y')) }}
                             </p>
-                            
+
                             <div class="d-flex justify-content-between mt-3">
                                 <span>
                                     {% if filing.isProcessed %}
@@ -183,14 +183,14 @@
                                         <span class="badge bg-secondary">Not Downloaded</span>
                                     {% endif %}
                                 </span>
-                                
+
                                 <div>
                                     {% if filing.isProcessed %}
                                         <a href="{{ path('secfiling_visualize', {'id': filing.id}) }}" class="btn btn-sm btn-outline-primary">
                                             <i class="fas fa-chart-bar"></i> Visualize
                                         </a>
                                     {% endif %}
-                                    
+
                                     <a href="{{ path('secfiling_show', {'id': filing.id}) }}" class="btn btn-sm btn-primary">
                                         <i class="fas fa-eye"></i> View
                                     </a>

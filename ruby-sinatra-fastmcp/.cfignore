@@ -5,7 +5,6 @@
 *.log
 tmp/
 .bundle/
-vendor/bundle/
 test/
 README.md
 FAQ.md

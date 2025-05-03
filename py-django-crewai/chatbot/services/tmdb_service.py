@@ -75,20 +75,62 @@ class TMDBService:
         logger.info(f"Sequential enhancement completed in {elapsed_time:.2f} seconds")
         return result_movies
 
-    # Keeping this for backward compatibility, but it redirects to sequential processing
     def enhance_movies_parallel(self, movies: List[Dict[str, Any]], max_workers: int = 3) -> List[Dict[str, Any]]:
         """
-        Legacy method - now redirects to sequential processing to avoid race conditions.
+        Enhance multiple movies in parallel for better performance.
+        This implementation avoids race conditions by using a thread-safe approach.
 
         Args:
             movies: List of movie dictionaries to enhance
-            max_workers: No longer used
+            max_workers: Maximum number of worker threads
 
         Returns:
             List of enhanced movie dictionaries
         """
-        logger.warning("enhance_movies_parallel is deprecated - using sequential processing instead")
-        return self.enhance_movies_sequential(movies)
+        start_time = time.time()
+        logger.info(f"Starting parallel enhancement of {len(movies)} movies with {max_workers} workers")
+
+        # Handle empty list case
+        if not movies:
+            return []
+
+        # Create a copy of the movies list to avoid modifying the original
+        movies_copy = list(movies)
+
+        # Create a dictionary to store results by original index
+        result_dict = {}
+
+        def enhance_movie_task(idx, movie):
+            """Thread worker function to enhance a single movie"""
+            try:
+                logger.info(f"Parallel enhancing movie {idx+1}/{len(movies)}: {movie.get('title', 'Unknown')}")
+                enhanced_movie = self.enhance_movie_data(dict(movie))  # Create a copy to avoid race conditions
+                logger.info(f"Successfully enhanced movie {enhanced_movie.get('title', 'Unknown')} in parallel")
+                return idx, enhanced_movie
+            except Exception as e:
+                logger.error(f"Error enhancing movie at index {idx} in parallel: {str(e)}")
+                # Return the original movie on error
+                return idx, movie
+
+        # Use ThreadPoolExecutor for parallel processing
+        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
+            # Submit all tasks
+            future_to_idx = {
+                executor.submit(enhance_movie_task, idx, movie): idx
+                for idx, movie in enumerate(movies_copy)
+            }
+
+            # Process results as they complete
+            for future in concurrent.futures.as_completed(future_to_idx):
+                idx, enhanced_movie = future.result()
+                result_dict[idx] = enhanced_movie
+
+        # Reconstruct the result list in the original order
+        result_movies = [result_dict[idx] for idx in range(len(movies_copy))]
+
+        elapsed_time = time.time() - start_time
+        logger.info(f"Parallel enhancement completed in {elapsed_time:.2f} seconds")
+        return result_movies
 
     def _make_request(self, endpoint: str, params: Dict[str, Any] = None) -> Dict[str, Any]:
         """
@@ -261,12 +303,12 @@ class TMDBService:
             # If we have posters, return the first one (usually the primary poster)
             if images and 'posters' in images and images['posters']:
                 poster = images['posters'][0]  # Use the first poster
-                return f"{self.IMAGE_BASE_URL}{size_path}{poster['file_path']}"
+                return f"{self.IMAGE_BASE_URL}{size_path}{poster['file_path']}?language=en"
 
             # If no posters in images response, try the movie details which should have a poster_path
             movie = self.get_movie_details(movie_id)
             if movie and 'poster_path' in movie and movie['poster_path']:
-                return f"{self.IMAGE_BASE_URL}{size_path}{movie['poster_path']}"
+                return f"{self.IMAGE_BASE_URL}{size_path}{movie['poster_path']}?language=en"
 
             # No poster found
             return ""
@@ -303,11 +345,11 @@ class TMDBService:
             if movie_details:
                 # Update poster with high-quality version
                 if 'poster_path' in movie_details and movie_details['poster_path']:
-                    enhanced_data['poster_url'] = f"{self.IMAGE_BASE_URL}original{movie_details['poster_path']}"
+                    enhanced_data['poster_url'] = f"{self.IMAGE_BASE_URL}original{movie_details['poster_path']}?language=en"
 
                 # Add backdrop if available
                 if 'backdrop_path' in movie_details and movie_details['backdrop_path']:
-                    enhanced_data['backdrop_url'] = f"{self.IMAGE_BASE_URL}original{movie_details['backdrop_path']}"
+                    enhanced_data['backdrop_url'] = f"{self.IMAGE_BASE_URL}original{movie_details['backdrop_path']}?language=en"
 
                 # Add genres if available
                 if 'genres' in movie_details and movie_details['genres']:
@@ -326,18 +368,18 @@ class TMDBService:
             images = self.get_movie_images(movie_id)
             if images and 'posters' in images and images['posters']:
                 # Use the first poster (usually the primary one)
-                enhanced_data['poster_url'] = f"{self.IMAGE_BASE_URL}original{images['posters'][0]['file_path']}"
+                enhanced_data['poster_url'] = f"{self.IMAGE_BASE_URL}original{images['posters'][0]['file_path']}?language=en"
 
                 # Add additional poster URLs at different sizes
                 enhanced_data['poster_urls'] = {
-                    size: f"{self.IMAGE_BASE_URL}{self.POSTER_SIZES[size]}{images['posters'][0]['file_path']}"
+                    size: f"{self.IMAGE_BASE_URL}{self.POSTER_SIZES[size]}{images['posters'][0]['file_path']}?language=en"
                     for size in self.POSTER_SIZES
                 }
 
                 # Add a list of all poster URLs if more than one is available
                 if len(images['posters']) > 1:
                     enhanced_data['all_posters'] = [
-                        f"{self.IMAGE_BASE_URL}original{poster['file_path']}"
+                        f"{self.IMAGE_BASE_URL}original{poster['file_path']}?language=en"
                         for poster in images['posters'][:5]  # Limit to first 5 posters
                     ]
 

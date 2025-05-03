@@ -8,32 +8,32 @@
         .section-card {
             margin-bottom: 2rem;
         }
-        
+
         .filing-sidebar {
             position: sticky;
             top: 1rem;
         }
-        
+
         .section-nav .nav-link {
             padding: 0.5rem 1rem;
             border-radius: 0;
             color: #495057;
         }
-        
+
         .section-nav .nav-link.active {
             background-color: #f8f9fa;
             color: #007bff;
             font-weight: bold;
             border-left: 3px solid #007bff;
         }
-        
+
         .filing-header {
             padding: 1.5rem;
             background-color: #f8f9fa;
             border-radius: 0.5rem;
             margin-bottom: 2rem;
         }
-        
+
         .filing-section {
             font-family: "Courier New", monospace;
             white-space: pre-wrap;
@@ -45,22 +45,22 @@
             border-radius: 0.25rem;
             background-color: #f8f9fa;
         }
-        
+
         .key-findings {
             background-color: #e9ecef;
             padding: 1rem;
             border-radius: 0.25rem;
             margin-top: 1rem;
         }
-        
+
         .key-findings ul {
             margin-bottom: 0;
         }
-        
+
         .section-actions {
             margin-top: 1rem;
         }
-        
+
         .badge-filed {
             background-color: #6c757d;
             color: white;
@@ -77,18 +77,18 @@
     <script>
         document.addEventListener('DOMContentLoaded', function() {
             const summarizeButtons = document.querySelectorAll('.summarize-btn');
-            
+
             summarizeButtons.forEach(button => {
                 button.addEventListener('click', function() {
                     const sectionId = this.dataset.section;
                     const summaryTarget = document.getElementById('summary-' + sectionId);
                     const findingsTarget = document.getElementById('findings-' + sectionId);
                     const loadingSpinner = document.getElementById('loading-' + sectionId);
-                    
+
                     // Show loading spinner
                     loadingSpinner.classList.remove('d-none');
                     this.disabled = true;
-                    
+
                     // Make AJAX request to summarize section
                     fetch('{{ path('secfiling_summarize_section', {'id': filing.id}) }}', {
                         method: 'POST',
@@ -102,7 +102,7 @@
                     .then(data => {
                         if (data.success) {
                             summaryTarget.textContent = data.summary;
-                            
+
                             // Format key findings
                             const findings = data.keyFindings.split('\n').filter(line => line.trim() !== '');
                             let findingsHtml = '<ul>';
@@ -110,9 +110,9 @@
                                 findingsHtml += '<li>' + finding.replace(/^\d+\.\s*/, '') + '</li>';
                             });
                             findingsHtml += '</ul>';
-                            
+
                             findingsTarget.innerHTML = findingsHtml;
-                            
+
                             // Show the containers
                             document.getElementById('summary-container-' + sectionId).classList.remove('d-none');
                             document.getElementById('findings-container-' + sectionId).classList.remove('d-none');
@@ -145,7 +145,7 @@
             <li class="breadcrumb-item active" aria-current="page">{{ filing.formType }} ({{ filing.fiscalYear }})</li>
         </ol>
     </nav>
-    
+
     {% for label, messages in app.flashes %}
         {% for message in messages %}
             <div class="alert alert-{{ label }} alert-dismissible fade show" role="alert">
@@ -154,18 +154,18 @@
             </div>
         {% endfor %}
     {% endfor %}
-    
+
     <div class="filing-header">
         <div class="row">
             <div class="col-md-8">
                 <h2>{{ filing.formType }}: {{ company.name }}</h2>
                 <h5 class="text-muted">{{ company.tickerSymbol }} - {{ filing.fiscalYear }}</h5>
-                
+
                 <div class="mt-3">
                     <span class="badge-filed">
                         <i class="far fa-calendar-alt"></i> Filed: {{ filing.filingDate|date('M d, Y') }}
                     </span>
-                    
+
                     {% if filing.reportDate %}
                         <span class="badge-filed">
                             <i class="fas fa-calendar-check"></i> Report Date: {{ filing.reportDate|date('M d, Y') }}
@@ -177,13 +177,13 @@
                 <a href="{{ path('secfiling_company_index', {'id': company.id}) }}" class="btn btn-secondary mb-2">
                     <i class="fas fa-arrow-left"></i> Back to Filings
                 </a>
-                
+
                 {% if filing.content %}
                     <a href="{{ path('secfiling_download', {'id': filing.id}) }}" class="btn btn-outline-primary mb-2">
                         <i class="fas fa-download"></i> Download Full Text
                     </a>
                 {% endif %}
-                
+
                 {% if not filing.isProcessed and filing.content %}
                     <form method="post" action="{{ path('secfiling_process', {'id': filing.id}) }}" class="d-inline">
                         <button type="submit" class="btn btn-primary mb-2">
@@ -191,7 +191,7 @@
                         </button>
                     </form>
                 {% endif %}
-                
+
                 {% if filing.isProcessed %}
                     <a href="{{ path('secfiling_visualize', {'id': filing.id}) }}" class="btn btn-success mb-2">
                         <i class="fas fa-chart-bar"></i> Visualize Data
@@ -200,7 +200,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="row">
         <!-- Sidebar - Section Navigation -->
         <div class="col-md-3">
@@ -211,29 +211,29 @@
                     </div>
                     <div class="section-nav nav flex-column">
                         <a class="nav-link" href="#filing-overview">Overview</a>
-                        
+
                         {% if filing.sections.item1 is defined and filing.sections.item1 %}
                             <a class="nav-link" href="#item1">Item 1: Business</a>
                         {% endif %}
-                        
+
                         {% if filing.sections.item1a is defined and filing.sections.item1a %}
                             <a class="nav-link" href="#item1a">Item 1A: Risk Factors</a>
                         {% endif %}
-                        
+
                         {% if filing.sections.item7 is defined and filing.sections.item7 %}
                             <a class="nav-link" href="#item7">Item 7: MD&A</a>
                         {% endif %}
-                        
+
                         {% if filing.sections.item8 is defined and filing.sections.item8 %}
                             <a class="nav-link" href="#item8">Item 8: Financial Statements</a>
                         {% endif %}
-                        
+
                         {% if filing.content %}
                             <a class="nav-link" href="#full-text">Full Text</a>
                         {% endif %}
                     </div>
                 </div>
-                
+
                 <div class="card shadow-sm">
                     <div class="card-header">
                         <h5 class="mb-0">Filing Status</h5>
@@ -249,19 +249,19 @@
                                 <span class="badge bg-secondary">Not Downloaded</span>
                             {% endif %}
                         </p>
-                        
+
                         <p class="mb-1">
                             <strong>Accession Number:</strong><br>
                             {{ filing.accessionNumber }}
                         </p>
-                        
+
                         {% if filing.fileNumber %}
                             <p class="mb-1">
                                 <strong>File Number:</strong><br>
                                 {{ filing.fileNumber }}
                             </p>
                         {% endif %}
-                        
+
                         <p class="mb-0">
                             <strong>External Links:</strong><br>
                             {% if filing.htmlUrl %}
@@ -269,7 +269,7 @@
                                     <i class="fas fa-external-link-alt"></i> HTML Version
                                 </a>
                             {% endif %}
-                            
+
                             {% if filing.documentUrl %}
                                 <a href="{{ filing.documentUrl }}" target="_blank" class="btn btn-sm btn-outline-secondary mt-1">
                                     <i class="fas fa-external-link-alt"></i> SEC Document
@@ -280,7 +280,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Main Content - Filing Sections -->
         <div class="col-md-9">
             <!-- Overview/Summary Section -->
@@ -293,7 +293,7 @@
                         {% if filing.description %}
                             <p>{{ filing.description }}</p>
                         {% endif %}
-                        
+
                         {% if filing.summary %}
                             <h5>Executive Summary</h5>
                             <p>{{ filing.summary|nl2br }}</p>
@@ -301,7 +301,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Item 1: Business -->
             {% if filing.sections.item1 is defined and filing.sections.item1 %}
                 <div id="item1" class="section-card">
@@ -314,15 +314,15 @@
 {% if filing.sections.item1|length > 5000 %}...
 <em>(content truncated for display - see full text for complete section)</em>{% endif %}
                             </div>
-                            
+
                             <!-- Summary and Key Findings -->
                             {% set sectionKey = 'item1' %}
-                            
+
                             <div id="summary-container-{{ sectionKey }}" {% if not filing.keyFindings[sectionKey] is defined or filing.keyFindings[sectionKey] is empty %}class="d-none"{% endif %}>
                                 <h5 class="mt-4">Summary</h5>
                                 <div id="summary-{{ sectionKey }}">{{ filing.keyFindings[sectionKey] is defined ? filing.keyFindings[sectionKey] : '' }}</div>
                             </div>
-                            
+
                             <div id="findings-container-{{ sectionKey }}" {% if not filing.keyFindings[sectionKey] is defined or filing.keyFindings[sectionKey] is empty %}class="d-none"{% endif %} class="key-findings">
                                 <h6>Key Findings</h6>
                                 <div id="findings-{{ sectionKey }}">
@@ -337,7 +337,7 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            
+
                             <!-- Section Actions -->
                             <div class="section-actions">
                                 <button class="btn btn-outline-primary summarize-btn" data-section="{{ sectionKey }}">
@@ -351,7 +351,7 @@
                     </div>
                 </div>
             {% endif %}
-            
+
             <!-- Item 1A: Risk Factors -->
             {% if filing.sections.item1a is defined and filing.sections.item1a %}
                 <div id="item1a" class="section-card">
@@ -364,15 +364,15 @@
 {% if filing.sections.item1a|length > 5000 %}...
 <em>(content truncated for display - see full text for complete section)</em>{% endif %}
                             </div>
-                            
+
                             <!-- Summary and Key Findings -->
                             {% set sectionKey = 'item1a' %}
-                            
+
                             <div id="summary-container-{{ sectionKey }}" {% if not filing.keyFindings[sectionKey] is defined or filing.keyFindings[sectionKey] is empty %}class="d-none"{% endif %}>
                                 <h5 class="mt-4">Summary</h5>
                                 <div id="summary-{{ sectionKey }}">{{ filing.keyFindings[sectionKey] is defined ? filing.keyFindings[sectionKey] : '' }}</div>
                             </div>
-                            
+
                             <div id="findings-container-{{ sectionKey }}" {% if not filing.keyFindings[sectionKey] is defined or filing.keyFindings[sectionKey] is empty %}class="d-none"{% endif %} class="key-findings">
                                 <h6>Key Findings</h6>
                                 <div id="findings-{{ sectionKey }}">
@@ -387,7 +387,7 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            
+
                             <!-- Section Actions -->
                             <div class="section-actions">
                                 <button class="btn btn-outline-primary summarize-btn" data-section="{{ sectionKey }}">
@@ -401,7 +401,7 @@
                     </div>
                 </div>
             {% endif %}
-            
+
             <!-- Item 7: Management's Discussion and Analysis -->
             {% if filing.sections.item7 is defined and filing.sections.item7 %}
                 <div id="item7" class="section-card">
@@ -414,15 +414,15 @@
 {% if filing.sections.item7|length > 5000 %}...
 <em>(content truncated for display - see full text for complete section)</em>{% endif %}
                             </div>
-                            
+
                             <!-- Summary and Key Findings -->
                             {% set sectionKey = 'item7' %}
-                            
+
                             <div id="summary-container-{{ sectionKey }}" {% if not filing.keyFindings[sectionKey] is defined or filing.keyFindings[sectionKey] is empty %}class="d-none"{% endif %}>
                                 <h5 class="mt-4">Summary</h5>
                                 <div id="summary-{{ sectionKey }}">{{ filing.keyFindings[sectionKey] is defined ? filing.keyFindings[sectionKey] : '' }}</div>
                             </div>
-                            
+
                             <div id="findings-container-{{ sectionKey }}" {% if not filing.keyFindings[sectionKey] is defined or filing.keyFindings[sectionKey] is empty %}class="d-none"{% endif %} class="key-findings">
                                 <h6>Key Findings</h6>
                                 <div id="findings-{{ sectionKey }}">
@@ -437,7 +437,7 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            
+
                             <!-- Section Actions -->
                             <div class="section-actions">
                                 <button class="btn btn-outline-primary summarize-btn" data-section="{{ sectionKey }}">
@@ -451,7 +451,7 @@
                     </div>
                 </div>
             {% endif %}
-            
+
             <!-- Item 8: Financial Statements -->
             {% if filing.sections.item8 is defined and filing.sections.item8 %}
                 <div id="item8" class="section-card">
@@ -464,15 +464,15 @@
 {% if filing.sections.item8|length > 5000 %}...
 <em>(content truncated for display - see full text for complete section)</em>{% endif %}
                             </div>
-                            
+
                             <!-- Summary and Key Findings -->
                             {% set sectionKey = 'item8' %}
-                            
+
                             <div id="summary-container-{{ sectionKey }}" {% if not filing.keyFindings[sectionKey] is defined or filing.keyFindings[sectionKey] is empty %}class="d-none"{% endif %}>
                                 <h5 class="mt-4">Summary</h5>
                                 <div id="summary-{{ sectionKey }}">{{ filing.keyFindings[sectionKey] is defined ? filing.keyFindings[sectionKey] : '' }}</div>
                             </div>
-                            
+
                             <div id="findings-container-{{ sectionKey }}" {% if not filing.keyFindings[sectionKey] is defined or filing.keyFindings[sectionKey] is empty %}class="d-none"{% endif %} class="key-findings">
                                 <h6>Key Findings</h6>
                                 <div id="findings-{{ sectionKey }}">
@@ -487,7 +487,7 @@
                                     {% endif %}
                                 </div>
                             </div>
-                            
+
                             <!-- Section Actions -->
                             <div class="section-actions">
                                 <button class="btn btn-outline-primary summarize-btn" data-section="{{ sectionKey }}">
@@ -501,7 +501,7 @@
                     </div>
                 </div>
             {% endif %}
-            
+
             <!-- Full Text -->
             {% if filing.content %}
                 <div id="full-text" class="section-card">
@@ -511,7 +511,7 @@
                         </div>
                         <div class="card-body">
                             <p class="text-muted">This is the complete text of the filing. You may prefer to <a href="{{ path('secfiling_download', {'id': filing.id}) }}">download the file</a> instead.</p>
-                            
+
                             <div class="filing-section">{{ filing.content|slice(0, 10000) }}
 {% if filing.content|length > 10000 %}...
 <em>(content truncated for display - download the full text for complete filing)</em>{% endif %}

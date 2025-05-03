@@ -1,0 +1,218 @@
+// Jenkins Pipeline for java-spring-ai-mcp
+// Equivalent to GitHub Actions workflow: java-spring-ai-mcp.yml
+
+pipeline {
+    agent any
+
+    tools {
+        jdk 'jdk21'
+        maven 'maven3'
+    }
+
+    options {
+        // Only keep the 10 most recent builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    // Only run on changes to project files or CI configuration
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+
+    stages {
+        stage('Build') {
+            when {
+                anyOf {
+                    changeset 'java-spring-ai-mcp/**'
+                    changeset 'java-spring-ai-mcp/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('java-spring-ai-mcp') {
+                    // Cache Maven dependencies
+                    cache(path: '${HOME}/.m2/repository', key: "${env.JOB_NAME}") {
+                        sh 'mvn -B package --file pom.xml'
+                    }
+                }
+            }
+        }
+
+        stage('Upload Artifacts') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'java-spring-ai-mcp/**'
+                        changeset 'java-spring-ai-mcp/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            steps {
+                dir('java-spring-ai-mcp') {
+                    // Archive the artifacts in Jenkins
+                    archiveArtifacts artifacts: 'client/target/*.jar', fingerprint: true
+                    archiveArtifacts artifacts: 'server/target/*.jar', fingerprint: true
+                    archiveArtifacts artifacts: 'api/target/*.jar', fingerprint: true
+                }
+            }
+        }
+
+        stage('Deploy Client to Cloud Foundry') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'java-spring-ai-mcp/**'
+                        changeset 'java-spring-ai-mcp/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            // This stage requires manual triggering
+            input {
+                message "Deploy Client to Cloud Foundry?"
+                ok "Yes, deploy it!"
+                parameters {
+                    string(name: 'CF_API', defaultValue: '', description: 'Cloud Foundry API Endpoint')
+                    string(name: 'CF_USERNAME', defaultValue: '', description: 'Cloud Foundry Username')
+                    password(name: 'CF_PASSWORD', defaultValue: '', description: 'Cloud Foundry Password')
+                    string(name: 'CF_ORG', defaultValue: '', description: 'Cloud Foundry Organization')
+                    string(name: 'CF_SPACE', defaultValue: '', description: 'Cloud Foundry Space')
+                    booleanParam(name: 'RANDOM_ROUTE', defaultValue: false, description: 'Use random route for the application')
+                    password(name: 'OPENAI_API_KEY', defaultValue: '', description: 'OpenAI API Key')
+                }
+            }
+            steps {
+                dir('java-spring-ai-mcp/client') {
+                    // Install CF CLI
+                    sh '''
+                        wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | sudo apt-key add -
+                        echo "deb https://packages.cloudfoundry.org/debian stable main" | sudo tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+                        sudo apt-get update
+                        sudo apt-get install -y cf8-cli
+                    '''
+
+                    // Deploy to Cloud Foundry
+                    sh '''
+                        echo "Deploying client to Cloud Foundry..."
+                        cf api "${CF_API}"
+                        cf auth "${CF_USERNAME}" "${CF_PASSWORD}"
+                        cf target -o "${CF_ORG}" -s "${CF_SPACE}"
+
+                        # Create GenAI service if it doesn't exist
+                        if ! cf service tracker-llm-service > /dev/null 2>&1; then
+                            echo "Creating GenAI service..."
+                            cf create-service genai standard tracker-llm-service || echo "Service creation failed, it might already exist or plan is not available"
+                        else
+                            echo "GenAI service already exists"
+                        fi
+
+                        # Set environment variables
+                        APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+                        if [ -z "$APP_NAME" ]; then
+                            APP_NAME=$(basename $(pwd)) # Fallback to directory name
+                        fi
+
+                        # Push the application without starting it
+                        if [ "${RANDOM_ROUTE}" = "true" ]; then
+                            echo "Pushing with random route..."
+                            cf push "$APP_NAME" -f manifest.yml --no-start --random-route
+                        else
+                            echo "Pushing with route from manifest..."
+                            cf push "$APP_NAME" -f manifest.yml --no-start
+                        fi
+
+                        # Set environment variables
+                        if [ -n "${OPENAI_API_KEY}" ]; then
+                            cf set-env "$APP_NAME" "SPRING_AI_OPENAI_API_KEY" "${OPENAI_API_KEY}"
+                        fi
+
+                        # Start the application
+                        cf start "$APP_NAME"
+                    '''
+                }
+            }
+        }
+
+        stage('Deploy Server to Cloud Foundry') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'java-spring-ai-mcp/**'
+                        changeset 'java-spring-ai-mcp/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            // This stage requires manual triggering
+            input {
+                message "Deploy Server to Cloud Foundry?"
+                ok "Yes, deploy it!"
+                parameters {
+                    string(name: 'CF_API', defaultValue: '', description: 'Cloud Foundry API Endpoint')
+                    string(name: 'CF_USERNAME', defaultValue: '', description: 'Cloud Foundry Username')
+                    password(name: 'CF_PASSWORD', defaultValue: '', description: 'Cloud Foundry Password')
+                    string(name: 'CF_ORG', defaultValue: '', description: 'Cloud Foundry Organization')
+                    string(name: 'CF_SPACE', defaultValue: '', description: 'Cloud Foundry Space')
+                    booleanParam(name: 'RANDOM_ROUTE', defaultValue: false, description: 'Use random route for the application')
+                    password(name: 'AVIATION_STACK_ACCESS_KEY', defaultValue: '', description: 'Aviation Stack API Key')
+                }
+            }
+            steps {
+                dir('java-spring-ai-mcp/server') {
+                    // Install CF CLI
+                    sh '''
+                        wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | sudo apt-key add -
+                        echo "deb https://packages.cloudfoundry.org/debian stable main" | sudo tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+                        sudo apt-get update
+                        sudo apt-get install -y cf8-cli
+                    '''
+
+                    // Deploy to Cloud Foundry
+                    sh '''
+                        echo "Deploying server to Cloud Foundry..."
+                        cf api "${CF_API}"
+                        cf auth "${CF_USERNAME}" "${CF_PASSWORD}"
+                        cf target -o "${CF_ORG}" -s "${CF_SPACE}"
+
+                        # Create UPS if it doesn't exist
+                        if ! cf service aviation-stack-service-credentials > /dev/null 2>&1; then
+                            echo "Creating user-provided service: aviation-stack-service-credentials"
+                            cf create-user-provided-service aviation-stack-service-credentials -p '{"access_key":"'"${AVIATION_STACK_ACCESS_KEY}"'"}' || echo "UPS creation might have failed or already exists"
+                        else
+                            echo "UPS aviation-stack-service-credentials already exists."
+                        fi
+
+                        # Set environment variables
+                        APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+                        if [ -z "$APP_NAME" ]; then
+                            APP_NAME=$(basename $(pwd)) # Fallback to directory name
+                        fi
+
+                        # Push the application without starting it
+                        if [ "${RANDOM_ROUTE}" = "true" ]; then
+                            echo "Pushing with random route..."
+                            cf push "$APP_NAME" -f manifest.yml --no-start --random-route
+                        else
+                            echo "Pushing with route from manifest..."
+                            cf push "$APP_NAME" -f manifest.yml --no-start
+                        fi
+
+                        # Set environment variables
+                        if [ -n "${AVIATION_STACK_ACCESS_KEY}" ]; then
+                            cf set-env "$APP_NAME" "AVIATION_STACK_ACCESS_KEY" "${AVIATION_STACK_ACCESS_KEY}"
+                        fi
+
+                        # Start the application
+                        cf start "$APP_NAME"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

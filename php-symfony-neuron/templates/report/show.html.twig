@@ -31,7 +31,7 @@
             </div>
         </div>
     </div>
-    
+
     <div class="row">
         <div class="col-md-3">
             <!-- Table of Contents -->
@@ -54,7 +54,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="col-md-9">
             <!-- Report Content -->
             <div class="card shadow-sm mb-4">
@@ -65,35 +65,35 @@
                             {{ report.executiveSummary|raw|nl2br }}
                         </div>
                     </section>
-                    
+
                     <section id="company-overview" class="mb-5">
                         <h2 class="border-bottom pb-2">Company Overview</h2>
                         <div class="mt-3">
                             {{ report.companyOverview|raw|nl2br }}
                         </div>
                     </section>
-                    
+
                     <section id="industry-analysis" class="mb-5">
                         <h2 class="border-bottom pb-2">Industry Analysis</h2>
                         <div class="mt-3">
                             {{ report.industryAnalysis|raw|nl2br }}
                         </div>
                     </section>
-                    
+
                     <section id="financial-analysis" class="mb-5">
                         <h2 class="border-bottom pb-2">Financial Analysis</h2>
                         <div class="mt-3">
                             {{ report.financialAnalysis|raw|nl2br }}
                         </div>
                     </section>
-                    
+
                     <section id="competitive-analysis" class="mb-5">
                         <h2 class="border-bottom pb-2">Competitive Analysis</h2>
                         <div class="mt-3">
                             {{ report.competitiveAnalysis|raw|nl2br }}
                         </div>
                     </section>
-                    
+
                     <section id="swot-analysis" class="mb-5">
                         <h2 class="border-bottom pb-2">SWOT Analysis</h2>
                         <div class="mt-3">
@@ -133,21 +133,21 @@
                             </div>
                         </div>
                     </section>
-                    
+
                     <section id="investment-highlights" class="mb-5">
                         <h2 class="border-bottom pb-2">Investment Highlights</h2>
                         <div class="mt-3">
                             {{ report.investmentHighlights|raw|nl2br }}
                         </div>
                     </section>
-                    
+
                     <section id="risks-challenges" class="mb-5">
                         <h2 class="border-bottom pb-2">Risks & Challenges</h2>
                         <div class="mt-3">
                             {{ report.risksAndChallenges|raw|nl2br }}
                         </div>
                     </section>
-                    
+
                     <section id="conclusion" class="mb-5">
                         <h2 class="border-bottom pb-2">Conclusion</h2>
                         <div class="mt-3">
@@ -165,31 +165,31 @@
     document.addEventListener('DOMContentLoaded', function() {
         // Scrollspy for table of contents
         const tocLinks = document.querySelectorAll('#toc a');
-        
+
         tocLinks.forEach(link => {
             link.addEventListener('click', function(e) {
                 e.preventDefault();
                 const targetId = this.getAttribute('href');
                 const targetElement = document.querySelector(targetId);
-                
+
                 window.scrollTo({
                     top: targetElement.offsetTop - 20,
                     behavior: 'smooth'
                 });
             });
         });
-        
+
         // Export functionality
         document.getElementById('exportPdf').addEventListener('click', function(e) {
             e.preventDefault();
             window.location.href = '{{ path('report_export_pdf', {'id': report.id}) }}';
         });
-        
+
         document.getElementById('exportExcel').addEventListener('click', function(e) {
             e.preventDefault();
             window.location.href = '{{ path('report_export_excel', {'id': report.id}) }}';
         });
-        
+
         document.getElementById('exportWord').addEventListener('click', function(e) {
             e.preventDefault();
             window.location.href = '{{ path('report_export_word', {'id': report.id}) }}';
@@ -204,12 +204,12 @@
         padding: 0.25rem 0;
         color: #495057;
     }
-    
+
     #toc .nav-link:hover,
     #toc .nav-link:focus {
         color: #007bff;
     }
-    
+
     section {
         scroll-margin-top: 2rem;
     }

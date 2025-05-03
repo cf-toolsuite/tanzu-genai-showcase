@@ -2,72 +2,72 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 500">
   <!-- Background -->
   <rect width="800" height="500" fill="#f8f9fa" />
-  
+
   <!-- Client Side -->
   <rect x="50" y="50" width="250" height="180" rx="10" ry="10" fill="#e9ecef" stroke="#495057" stroke-width="2" />
   <text x="175" y="80" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold">Frontend</text>
   <text x="175" y="100" font-family="Arial" font-size="14" text-anchor="middle">Angular 17</text>
-  
+
   <!-- Angular Components -->
   <rect x="80" y="120" width="180" height="30" rx="5" ry="5" fill="#f9fafb" stroke="#5a6268" stroke-width="1" />
   <text x="170" y="140" font-family="Arial" font-size="12" text-anchor="middle">Chat Component</text>
-  
+
   <rect x="80" y="160" width="80" height="30" rx="5" ry="5" fill="#f9fafb" stroke="#5a6268" stroke-width="1" />
   <text x="120" y="180" font-family="Arial" font-size="12" text-anchor="middle">Events</text>
-  
+
   <rect x="180" y="160" width="80" height="30" rx="5" ry="5" fill="#f9fafb" stroke="#5a6268" stroke-width="1" />
   <text x="220" y="180" font-family="Arial" font-size="12" text-anchor="middle">City Info</text>
-  
+
   <!-- Server Side -->
   <rect x="500" y="50" width="250" height="280" rx="10" ry="10" fill="#e3f2fd" stroke="#2c7be5" stroke-width="2" />
   <text x="625" y="80" font-family="Arial" font-size="18" text-anchor="middle" font-weight="bold">Backend</text>
   <text x="625" y="100" font-family="Arial" font-size="14" text-anchor="middle">Spring Boot 3.2</text>
-  
+
   <!-- Spring Boot Components -->
   <rect x="530" y="120" width="190" height="30" rx="5" ry="5" fill="#e1f5fe" stroke="#0288d1" stroke-width="1" />
   <text x="625" y="140" font-family="Arial" font-size="12" text-anchor="middle">Spring AI MCP Client</text>
-  
+
   <rect x="530" y="160" width="190" height="30" rx="5" ry="5" fill="#e1f5fe" stroke="#0288d1" stroke-width="1" />
   <text x="625" y="180" font-family="Arial" font-size="12" text-anchor="middle">LangGraph4j Agent</text>
-  
+
   <rect x="530" y="200" width="190" height="30" rx="5" ry="5" fill="#e1f5fe" stroke="#0288d1" stroke-width="1" />
   <text x="625" y="220" font-family="Arial" font-size="12" text-anchor="middle">Cities API Client</text>
-  
+
   <rect x="530" y="240" width="190" height="30" rx="5" ry="5" fill="#e1f5fe" stroke="#0288d1" stroke-width="1" />
   <text x="625" y="260" font-family="Arial" font-size="12" text-anchor="middle">REST API Controller</text>
-  
+
   <rect x="530" y="280" width="190" height="30" rx="5" ry="5" fill="#e1f5fe" stroke="#0288d1" stroke-width="1" />
   <text x="625" y="300" font-family="Arial" font-size="12" text-anchor="middle">Chat Service</text>
-  
+
   <!-- External Services -->
   <rect x="500" y="380" width="110" height="80" rx="10" ry="10" fill="#fff3cd" stroke="#ffc107" stroke-width="2" />
   <text x="555" y="410" font-family="Arial" font-size="14" text-anchor="middle" font-weight="bold">Ticketmaster</text>
   <text x="555" y="430" font-family="Arial" font-size="12" text-anchor="middle">MCP Server</text>
-  
+
   <rect x="640" y="380" width="110" height="80" rx="10" ry="10" fill="#d1e7dd" stroke="#198754" stroke-width="2" />
   <text x="695" y="410" font-family="Arial" font-size="14" text-anchor="middle" font-weight="bold">API Ninjas</text>
   <text x="695" y="430" font-family="Arial" font-size="12" text-anchor="middle">Cities API</text>
-  
+
   <!-- Tanzu Platform -->
   <rect x="150" y="380" width="300" height="80" rx="10" ry="10" fill="#cfe2ff" stroke="#0d6efd" stroke-width="2" />
   <text x="300" y="410" font-family="Arial" font-size="16" text-anchor="middle" font-weight="bold">Tanzu Platform for Cloud Foundry</text>
   <text x="300" y="430" font-family="Arial" font-size="12" text-anchor="middle">with GenAI tile for LLM services</text>
-  
+
   <!-- Connection lines -->
   <!-- Frontend to Backend -->
   <line x1="300" y1="140" x2="500" y2="140" stroke="#212529" stroke-width="2" />
   <polygon points="490,135 500,140 490,145" fill="#212529" />
   <text x="400" y="130" font-family="Arial" font-size="12" text-anchor="middle">HTTP/REST</text>
-  
+
   <!-- Backend to External Services -->
   <line x1="550" y1="330" x2="550" y2="380" stroke="#212529" stroke-width="2" />
   <polygon points="545,370 550,380 555,370" fill="#212529" />
   <text x="520" y="355" font-family="Arial" font-size="12" text-anchor="middle">MCP</text>
-  
+
   <line x1="650" y1="330" x2="695" y2="380" stroke="#212529" stroke-width="2" />
   <polygon points="687,372 695,380 698,369" fill="#212529" />
   <text x="680" y="355" font-family="Arial" font-size="12" text-anchor="middle">HTTP</text>
-  
+
   <!-- Deployment -->
   <line x1="300" y1="230" x2="300" y2="380" stroke="#0d6efd" stroke-width="2" stroke-dasharray="5,5" />
   <polygon points="295,370 300,380 305,370" fill="#0d6efd" />

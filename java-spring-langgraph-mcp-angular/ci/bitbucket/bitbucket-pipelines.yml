@@ -1,0 +1,151 @@
+# BitBucket Pipelines for java-spring-langgraph-mcp-angular
+# Equivalent to GitHub Actions workflow: java-spring-langgraph-mcp-angular.yml
+
+definitions:
+  caches:
+    maven: ~/.m2/repository
+    npm: ~/.npm
+
+pipelines:
+  default:
+    - parallel:
+        - step:
+            name: Build Backend
+            image: bellsoft/liberica-openjdk-debian:21
+            caches:
+              - maven
+            script:
+              - cd java-spring-langgraph-mcp-angular/backend
+              - mvn -B package --file pom.xml
+            artifacts:
+              - java-spring-langgraph-mcp-angular/backend/target/*.jar
+        - step:
+            name: Build Frontend
+            image: node:18
+            caches:
+              - npm
+            script:
+              - cd java-spring-langgraph-mcp-angular/frontend
+              - npm install
+              - npm run build -- --configuration production
+            artifacts:
+              - java-spring-langgraph-mcp-angular/frontend/dist/**
+
+  branches:
+    main:
+      - parallel:
+          - step:
+              name: Build Backend
+              image: bellsoft/liberica-openjdk-debian:21
+              caches:
+                - maven
+              script:
+                - cd java-spring-langgraph-mcp-angular/backend
+                - mvn -B package --file pom.xml
+              artifacts:
+                - java-spring-langgraph-mcp-angular/backend/target/*.jar
+          - step:
+              name: Build Frontend
+              image: node:18
+              caches:
+                - npm
+              script:
+                - cd java-spring-langgraph-mcp-angular/frontend
+                - npm install
+                - npm run build -- --configuration production
+              artifacts:
+                - java-spring-langgraph-mcp-angular/frontend/dist/**
+      - step:
+          name: Upload Artifacts
+          script:
+            # Upload backend artifacts
+            - cd java-spring-langgraph-mcp-angular/backend
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'target/*.jar'
+                TARGET: 'artifacts/java-spring-langgraph-mcp-angular-backend-${BITBUCKET_BUILD_NUMBER}.jar'
+
+            # Upload frontend artifacts
+            - cd ../frontend
+            - tar -czf frontend.tar.gz dist/
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'frontend.tar.gz'
+                TARGET: 'artifacts/java-spring-langgraph-mcp-angular-frontend-${BITBUCKET_BUILD_NUMBER}.tar.gz'
+      - step:
+          name: Deploy to Cloud Foundry
+          deployment: production
+          trigger: manual
+          script:
+            - apt-get update && apt-get install -y wget gnupg2 apt-transport-https
+            - wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | apt-key add -
+            - echo "deb https://packages.cloudfoundry.org/debian stable main" | tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+            - apt-get update && apt-get install -y cf8-cli jq
+            - cd java-spring-langgraph-mcp-angular
+            - echo "Deploying to Cloud Foundry..."
+            - cf api $CF_API
+            - cf auth $CF_USERNAME $CF_PASSWORD
+            - cf target -o $CF_ORG -s $CF_SPACE
+
+            # Create GenAI service if it doesn't exist
+            - |
+              if ! cf service genai-llm-service > /dev/null 2>&1; then
+                echo "Creating GenAI service..."
+                cf create-service genai standard genai-llm-service || echo "Service creation failed, it might already exist or plan is not available"
+              else
+                echo "GenAI service already exists"
+              fi
+
+            # Set environment variables
+            - |
+              APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+              if [ -z "$APP_NAME" ]; then
+                APP_NAME=$(basename $(pwd)) # Fallback to directory name
+              fi
+
+              # Push the application without starting it
+              if [ "$RANDOM_ROUTE" = "true" ]; then
+                echo "Pushing with random route..."
+                cf push "$APP_NAME" -f manifest.yml --no-start --random-route
+              else
+                echo "Pushing with route from manifest..."
+                cf push "$APP_NAME" -f manifest.yml --no-start
+              fi
+
+              # Set environment variables
+              if [ -n "$TICKETMASTER_API_KEY" ]; then
+                cf set-env "$APP_NAME" "TICKETMASTER_API_KEY" "$TICKETMASTER_API_KEY"
+              fi
+
+              if [ -n "$CITIES_API_KEY" ]; then
+                cf set-env "$APP_NAME" "CITIES_API_KEY" "$CITIES_API_KEY"
+              fi
+
+              if [ -n "$OPENAI_API_KEY" ]; then
+                cf set-env "$APP_NAME" "SPRING_AI_OPENAI_API_KEY" "$OPENAI_API_KEY"
+              fi
+
+              # Start the application
+              cf start "$APP_NAME"
+
+clone:
+  depth: full
+
+options:
+  max-time: 30
+
+# Custom deployment variables
+# These can be set in the Bitbucket repository settings
+# CF_API: Cloud Foundry API endpoint
+# CF_USERNAME: Cloud Foundry username
+# CF_PASSWORD: Cloud Foundry password
+# CF_ORG: Cloud Foundry organization
+# CF_SPACE: Cloud Foundry space
+# RANDOM_ROUTE: Whether to use a random route (true/false)
+# TICKETMASTER_API_KEY: Ticketmaster API key
+# CITIES_API_KEY: Cities API key
+# OPENAI_API_KEY: OpenAI API key

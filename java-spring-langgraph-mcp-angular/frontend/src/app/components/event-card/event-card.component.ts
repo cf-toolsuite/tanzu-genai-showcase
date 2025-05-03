@@ -11,7 +11,7 @@ import { EventInfo } from '../../models/event-info.model';
 })
 export class EventCardComponent {
   @Input() event!: EventInfo;
-  
+
   getFormattedDate(dateString: string): string {
     const date = new Date(dateString);
     return date.toLocaleDateString('en-US', {

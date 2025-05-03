@@ -1,0 +1,181 @@
+# BitBucket Pipelines for php-symfony-neuron
+# Equivalent to GitHub Actions workflow: php-symfony-neuron.yml
+
+image: php:8.3
+
+definitions:
+  caches:
+    composer: vendor
+
+pipelines:
+  default:
+    - step:
+        name: Prepare and Validate
+        caches:
+          - composer
+        script:
+          - cd php-symfony-neuron
+          - apt-get update -yqq
+          - apt-get install -yqq git unzip zip libzip-dev
+          - docker-php-ext-install zip pdo pdo_mysql
+          - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+          - composer validate --strict
+          - composer install --prefer-dist --no-progress
+    - step:
+        name: Test
+        caches:
+          - composer
+        script:
+          - cd php-symfony-neuron
+          - apt-get update -yqq
+          - apt-get install -yqq git unzip zip libzip-dev
+          - docker-php-ext-install zip
+          - |
+            if [ -d "tests" ]; then
+              vendor/bin/phpunit
+            else
+              echo "No tests directory found, skipping tests"
+            fi
+
+  branches:
+    main:
+      - step:
+          name: Prepare and Validate
+          caches:
+            - composer
+          script:
+            - cd php-symfony-neuron
+            - apt-get update -yqq
+            - apt-get install -yqq git unzip zip libzip-dev
+            - docker-php-ext-install zip pdo pdo_mysql
+            - curl -sS https://getcomposer.org/installer | php -- --install-dir=/usr/local/bin --filename=composer
+            - composer validate --strict
+            - composer install --prefer-dist --no-progress
+      - step:
+          name: Test
+          caches:
+            - composer
+          script:
+            - cd php-symfony-neuron
+            - |
+              if [ -d "tests" ]; then
+                vendor/bin/phpunit
+              else
+                echo "No tests directory found, skipping tests"
+              fi
+      - step:
+          name: Build and Upload
+          caches:
+            - composer
+          script:
+            - cd php-symfony-neuron
+            - apt-get update -yqq
+            - apt-get install -yqq git unzip zip
+            - composer dump-autoload --optimize --no-dev
+            - mkdir -p build
+            - zip -r build/php-symfony-neuron.zip . -x ".git/*" "tests/*" ".env*" ".github/*" "build/*"
+            - pipe: atlassian/bitbucket-upload-file:0.3.2
+              variables:
+                BITBUCKET_USERNAME: $BITBUCKET_USERNAME
+                BITBUCKET_APP_PASSWORD: $BITBUCKET_APP_PASSWORD
+                FILENAME: 'build/php-symfony-neuron.zip'
+                TARGET: 'artifacts/php-symfony-neuron-${BITBUCKET_BUILD_NUMBER}.zip'
+          artifacts:
+            - php-symfony-neuron/build/**
+      - step:
+          name: Deploy to Cloud Foundry
+          deployment: production
+          trigger: manual
+          script:
+            - apt-get update && apt-get install -y wget gnupg2 apt-transport-https
+            - wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | apt-key add -
+            - echo "deb https://packages.cloudfoundry.org/debian stable main" | tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+            - apt-get update && apt-get install -y cf8-cli jq
+            - cd php-symfony-neuron
+            - echo "Deploying to Cloud Foundry..."
+            - cf api $CF_API
+            - cf auth $CF_USERNAME $CF_PASSWORD
+            - cf target -o $CF_ORG -s $CF_SPACE
+
+            # Create GenAI service if it doesn't exist
+            - |
+              if ! cf service php-symfony-neuron-llm > /dev/null 2>&1; then
+                echo "Creating GenAI service..."
+                cf create-service genai standard php-symfony-neuron-llm || echo "Service creation failed, it might already exist or plan is not available"
+              else
+                echo "GenAI service already exists"
+              fi
+
+            # Create database service if it doesn't exist
+            - |
+              if ! cf service php-symfony-neuron-db > /dev/null 2>&1; then
+                echo "Creating database service..."
+                cf create-service postgresql small php-symfony-neuron-db || echo "Service creation failed, it might already exist or plan is not available"
+              else
+                echo "Database service already exists"
+              fi
+
+            # Set environment variables
+            - |
+              APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+              if [ -z "$APP_NAME" ]; then
+                APP_NAME=$(basename $(pwd)) # Fallback to directory name
+              fi
+
+              # Push the application without starting it
+              if [ "$RANDOM_ROUTE" = "true" ]; then
+                echo "Pushing with random route..."
+                cf push "$APP_NAME" -f manifest.yml --no-start --random-route
+              else
+                echo "Pushing with route from manifest..."
+                cf push "$APP_NAME" -f manifest.yml --no-start
+              fi
+
+              # Set environment variables
+              if [ -n "$STOCK_API_KEY" ]; then
+                cf set-env "$APP_NAME" "STOCK_API_KEY" "$STOCK_API_KEY"
+              fi
+
+              if [ -n "$NEWS_API_KEY" ]; then
+                cf set-env "$APP_NAME" "NEWS_API_KEY" "$NEWS_API_KEY"
+              fi
+
+              if [ -n "$EDGAR_API_KEY" ]; then
+                cf set-env "$APP_NAME" "EDGAR_API_KEY" "$EDGAR_API_KEY"
+              fi
+
+              if [ -n "$OPENAI_API_KEY" ]; then
+                cf set-env "$APP_NAME" "OPENAI_API_KEY" "$OPENAI_API_KEY"
+              fi
+
+              if [ -n "$LINKEDIN_CLIENT_ID" ]; then
+                cf set-env "$APP_NAME" "LINKEDIN_CLIENT_ID" "$LINKEDIN_CLIENT_ID"
+              fi
+
+              if [ -n "$LINKEDIN_CLIENT_SECRET" ]; then
+                cf set-env "$APP_NAME" "LINKEDIN_CLIENT_SECRET" "$LINKEDIN_CLIENT_SECRET"
+              fi
+
+              # Start the application
+              cf start "$APP_NAME"
+
+clone:
+  depth: full
+
+options:
+  max-time: 20
+
+# Custom deployment variables
+# These can be set in the Bitbucket repository settings
+# CF_API: Cloud Foundry API endpoint
+# CF_USERNAME: Cloud Foundry username
+# CF_PASSWORD: Cloud Foundry password
+# CF_ORG: Cloud Foundry organization
+# CF_SPACE: Cloud Foundry space
+# RANDOM_ROUTE: Whether to use a random route (true/false)
+# STOCK_API_KEY: Stock API key
+# NEWS_API_KEY: News API key
+# EDGAR_API_KEY: Edgar API key
+# OPENAI_API_KEY: OpenAI API key
+# LINKEDIN_CLIENT_ID: LinkedIn Client ID
+# LINKEDIN_CLIENT_SECRET: LinkedIn Client Secret

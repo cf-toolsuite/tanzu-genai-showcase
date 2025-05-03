@@ -16,10 +16,10 @@ public class ChatMessage {
     private String role; // "user" or "assistant"
     private String content;
     private LocalDateTime timestamp;
-    
+
     @Builder.Default
     private MessageType type = MessageType.TEXT;
-    
+
     public enum MessageType {
         TEXT,
         EVENT_RECOMMENDATION,

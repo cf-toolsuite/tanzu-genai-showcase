@@ -10,12 +10,11 @@
 /test/tmp/
 /test/version_tmp/
 /tmp/
-
 Gemfile.lock
 
 # Environment normalization:
-/.bundle/
-/vendor/bundle
+.bundle/
+vendor/
 /lib/bundler/man/
 
 # Logs

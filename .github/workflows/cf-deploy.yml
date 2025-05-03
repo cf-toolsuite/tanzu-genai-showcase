@@ -1,0 +1,98 @@
+name: Cloud Foundry Application Deployment
+
+on:
+  workflow_call:
+    inputs:
+      project_path:
+        required: true
+        type: string
+        description: 'Path to the project directory'
+      env_vars:
+        required: false
+        type: string
+        description: 'JSON string of environment variables to set'
+      random_route:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to use a random route for the application'
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download environment variables artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: env-vars
+          path: ./
+        continue-on-error: true
+      - name: Push Application to Cloud Foundry
+        working-directory: ${{ inputs.project_path }}
+        run: |
+          # Determine app name from manifest or project name
+          APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+          if [ -z "$APP_NAME" ]; then
+            APP_NAME=$(basename "${{ inputs.project_path }}") # Fallback to directory name
+          fi
+          echo "Deploying application: $APP_NAME from project: ${{ inputs.project_path }}"
+
+          # Push the application without starting it
+          if [ "${{ inputs.random_route }}" == "true" ]; then
+            echo "Pushing with random route..."
+            cf push "$APP_NAME" -f manifest.yml --no-start --random-route || echo "cf push failed, check logs."
+          else
+            echo "Pushing with route from manifest..."
+            cf push "$APP_NAME" -f manifest.yml --no-start || echo "cf push failed, check logs."
+          fi
+
+      - name: Set Input Environment Variables
+        working-directory: ${{ inputs.project_path }}
+        if: inputs.env_vars != ''
+        run: |
+          APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+          if [ -z "$APP_NAME" ]; then
+            APP_NAME=$(basename "${{ inputs.project_path }}")
+          fi
+
+          echo "Setting input environment variables..."
+          ENV_VARS_JSON='${{ inputs.env_vars }}'
+          for key in $(echo "$ENV_VARS_JSON" | jq -r 'keys[]'); do
+            value=$(echo "$ENV_VARS_JSON" | jq -r --arg key "$key" '.[$key]')
+            echo "Setting $key from inputs"
+            cf set-env "$APP_NAME" "$key" "$value"
+          done
+
+      - name: Set Environment Variables from Artifact
+        working-directory: ${{ inputs.project_path }}
+        run: |
+          if [ -f "../env_vars.json" ]; then
+            APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+            if [ -z "$APP_NAME" ]; then
+              APP_NAME=$(basename "${{ inputs.project_path }}")
+            fi
+
+            echo "Setting environment variables from artifact..."
+            ENV_VARS_JSON=$(cat ../env_vars.json)
+            for key in $(echo "$ENV_VARS_JSON" | jq -r 'keys[]'); do
+              value=$(echo "$ENV_VARS_JSON" | jq -r --arg key "$key" '.[$key]')
+              echo "Setting $key from artifact"
+              cf set-env "$APP_NAME" "$key" "$value"
+            done
+          else
+            echo "No environment variables artifact found, skipping this step"
+          fi
+
+      - name: Start Application
+        working-directory: ${{ inputs.project_path }}
+        run: |
+          APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+          if [ -z "$APP_NAME" ]; then
+            APP_NAME=$(basename "${{ inputs.project_path }}")
+          fi
+
+          echo "Starting application..."
+          cf start "$APP_NAME"
+        env:
+          CF_STAGING_TIMEOUT: 15
+          CF_STARTUP_TIMEOUT: 5

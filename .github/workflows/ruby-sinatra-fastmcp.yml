@@ -1,6 +1,7 @@
 name: ruby-sinatra-fastmcp CI
 
 on:
+  workflow_call:
   push:
     paths:
       - 'ruby-sinatra-fastmcp/**'
@@ -23,7 +24,7 @@ jobs:
     - name: Set up Ruby
       uses: ruby/setup-ruby@v1
       with:
-        ruby-version: '3.2.5'
+        ruby-version: '3.3.6'
         bundler-cache: true
 
     - name: Install dependencies

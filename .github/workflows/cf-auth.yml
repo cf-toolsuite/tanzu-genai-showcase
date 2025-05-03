@@ -1,0 +1,52 @@
+name: Cloud Foundry Authentication
+
+on:
+  workflow_call:
+    inputs:
+      cf_api:
+        required: true
+        type: string
+        description: 'Cloud Foundry API Endpoint'
+      cf_username:
+        required: false
+        type: string
+        description: 'Cloud Foundry Username (not required if using SSO)'
+      use_sso:
+        required: false
+        type: boolean
+        default: false
+        description: 'Whether to use SSO authentication instead of username/password'
+    secrets:
+      CF_PASSWORD:
+        required: false
+        description: 'Cloud Foundry Password (not required if using SSO)'
+      CF_SSO_REFRESH_TOKEN:
+        required: false
+        description: 'Cloud Foundry SSO Refresh Token (not required if using username/password)'
+
+jobs:
+  authenticate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Install CF CLI v8
+        run: |
+          wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | sudo apt-key add -
+          echo "deb https://packages.cloudfoundry.org/debian stable main" | sudo tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+          sudo apt-get update
+          sudo apt-get install cf8-cli
+
+      - name: Authenticate to Cloud Foundry
+        run: |
+          cf api "${{ inputs.cf_api }}"
+
+          # Determine authentication method
+          if [[ "${{ inputs.use_sso }}" == "true" ]]; then
+            echo "Using SSO authentication with refresh token"
+            cf auth --sso-passcode "${{ secrets.CF_SSO_REFRESH_TOKEN }}"
+          else
+            echo "Using username/password authentication"
+            cf auth "${{ inputs.cf_username }}" "${{ secrets.CF_PASSWORD }}"
+          fi
+
+          # Verify authentication was successful
+          cf target || { echo "Authentication failed"; exit 1; }

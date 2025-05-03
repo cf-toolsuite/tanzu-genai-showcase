@@ -40,23 +40,23 @@
     // Initialize Feather icons
     document.addEventListener('DOMContentLoaded', () => {
       feather.replace();
-      
+
       // Theme toggle functionality
       const body = document.body;
       const themeToggleBtn = document.getElementById('theme-toggle-btn');
       const darkIcon = document.getElementById('dark-icon');
       const lightIcon = document.getElementById('light-icon');
-      
+
       // Check for saved theme preference or use the system preference
       const savedTheme = localStorage.getItem('theme');
       const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      
+
       if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
         body.classList.replace('light-theme', 'dark-theme');
         darkIcon.style.display = 'none';
         lightIcon.style.display = 'block';
       }
-      
+
       // Toggle theme
       themeToggleBtn.addEventListener('click', () => {
         if (body.classList.contains('light-theme')) {

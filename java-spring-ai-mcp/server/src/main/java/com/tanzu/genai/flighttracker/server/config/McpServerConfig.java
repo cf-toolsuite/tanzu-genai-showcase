@@ -24,7 +24,7 @@ public class McpServerConfig {
     @Bean
     public ServerInfo serverInfo() {
         return new ServerInfo(
-            "Flight Tracker", 
+            "Flight Tracker",
             "MCP server for the AviationStack API",
             "1.0.0"
         );
@@ -45,7 +45,7 @@ public class McpServerConfig {
             "and provide a concise summary of the flight details including airline, " +
             "departure, arrival, status, and any delays."
         );
-        
+
         PromptTemplate airportInfoPrompt = new PromptTemplate(
             "airport-info",
             "Get information about an airport",
@@ -53,7 +53,7 @@ public class McpServerConfig {
             "Use the available tools to retrieve information about {airport_code} " +
             "and provide a concise summary of the airport details."
         );
-        
+
         PromptTemplate airlineInfoPrompt = new PromptTemplate(
             "airline-info",
             "Get information about an airline",
@@ -61,7 +61,7 @@ public class McpServerConfig {
             "Use the available tools to retrieve information about {airline_name} " +
             "and provide a concise summary of the airline details."
         );
-        
+
         PromptTemplate routeInfoPrompt = new PromptTemplate(
             "route-info",
             "Get information about routes between airports",
@@ -69,7 +69,7 @@ public class McpServerConfig {
             "Use the available tools to retrieve routes from {departure_airport} " +
             "to {arrival_airport} and provide a concise summary of the available routes."
         );
-        
+
         return List.of(
             flightInfoPrompt,
             airportInfoPrompt,

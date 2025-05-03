@@ -1,0 +1,966 @@
+/* Chat messages container and time */
+.message-container {
+  clear: both;
+  margin-bottom: 1rem;
+  max-width: 80%;
+}
+
+.message-container.user {
+  float: right;
+}
+
+.message-container.bot {
+  float: left;
+}
+
+.message-time {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--red-carpet-light-gray);
+  margin-top: 0.25rem;
+  margin-bottom: 0.75rem;
+}
+
+.message-time.text-end {
+  text-align: right;
+}
+
+.message-time.text-start {
+  text-align: left;
+}
+
+/* CSS Variables */
+:root {
+  --red-carpet-red: #E50914;
+  --red-carpet-dark: #141414;
+  --red-carpet-black: #000000;
+  --red-carpet-gray: #303030;
+  --red-carpet-light-gray: #606060;
+  --red-carpet-text: #FFFFFF;
+  --red-carpet-highlight: #F5F5F1;
+}
+
+/* Apply border-box to all elements */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+/* Form element consistency */
+:root {
+  /* Add form element variables */
+  --form-element-height: 38px;
+  --form-element-font-size: 0.875rem;
+  --form-element-padding: 0.5rem 1rem;
+  --form-element-border-radius: 4px;
+}
+
+/* Common button hover effects */
+.btn:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.3);
+}
+
+.btn:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+/* Apply consistent styling to all form elements */
+/* Note: The base styles are defined here, but some components override specific properties */
+
+/* Make sure input groups maintain consistent height */
+.input-group {
+  height: var(--form-element-height);
+}
+
+/* Special case for buttons with icons */
+.btn .bi {
+  font-size: 1rem;
+  vertical-align: -0.125em;
+}
+
+/* Bottom row layout with sample inquiries and location */
+.bottom-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 0.75rem;
+}
+
+.sample-inquiries-container {
+  flex: 1;
+  max-width: 75%;
+}
+
+.location-display-container {
+  margin-left: 1rem;
+}
+
+/* Location input styling */
+.location-input-group {
+  width: 350px;
+  margin-bottom: 0;
+  height: var(--form-element-height);
+}
+
+.location-input-group .input-group-text {
+  background-color: rgba(20, 20, 20, 0.5);
+  border: 1px solid var(--red-carpet-gray);
+  color: var(--red-carpet-light-gray);
+}
+
+.location-input-group .form-control {
+  background-color: rgba(20, 20, 20, 0.5);
+  border: 1px solid var(--red-carpet-gray);
+  color: var(--red-carpet-text);
+  font-size: 0.8rem;
+}
+
+/* Sample inquiries styling */
+.sample-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+.btn-sample {
+  height: var(--form-element-height);
+  font-size: var(--form-element-font-size);
+  padding: var(--form-element-padding);
+  border-radius: var(--form-element-border-radius);
+  margin-right: 0.5rem;
+  margin-bottom: 0.5rem;
+  background-color: var(--red-carpet-gray);
+  border: 1px solid var(--red-carpet-light-gray);
+  color: var(--red-carpet-text);
+  transition: all 0.2s ease;
+}
+
+.btn-sample:hover {
+  background-color: var(--red-carpet-red);
+  border-color: var(--red-carpet-red);
+  color: white;
+  /* Transform and shadow now come from common button styles */
+}
+
+/* Global styles */
+body {
+  background-color: var(--red-carpet-black);
+  color: var(--red-carpet-text);
+  font-family: 'Netflix Sans', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+}
+
+/* Header styling */
+.header {
+  background-color: var(--red-carpet-black);
+  padding: 1rem 0;
+  margin-bottom: 2rem;
+  border-bottom: 1px solid var(--red-carpet-gray);
+}
+
+.header .container {
+  padding-left: 0;
+  max-width: 1400px;
+}
+
+.red-carpet-logo {
+  color: var(--red-carpet-red);
+  font-weight: bold;
+  font-size: 1.8rem;
+  letter-spacing: -1px;
+}
+
+/* Main layout */
+.main-container {
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 1rem;
+}
+
+/* Navigation tabs styling */
+.nav-tabs {
+  border-bottom: 1px solid var(--red-carpet-gray);
+  margin-bottom: 2rem;
+}
+
+.nav-tabs .nav-link {
+  color: var(--red-carpet-light-gray);
+  background-color: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  border-radius: 0;
+  padding: 0.75rem 1.5rem;
+  font-weight: bold;
+  transition: all 0.3s ease;
+}
+
+/* When any tab is being hovered, make the active tab less prominent */
+.nav-tabs:hover .nav-link.active {
+  color: var(--red-carpet-light-gray);
+  background-color: transparent;
+  border-bottom-color: var(--red-carpet-light-gray);
+  text-shadow: none;
+}
+
+/* But when hovering the active tab itself, keep it prominent */
+.nav-tabs .nav-link.active:hover {
+  color: var(--red-carpet-red);
+  background-color: rgba(229, 9, 20, 0.08);
+  border-bottom-color: var(--red-carpet-red);
+  text-shadow: 0 0 8px rgba(229, 9, 20, 0.3);
+}
+
+/* Enhance the hover state of non-active tabs */
+.nav-tabs .nav-link:hover {
+  color: var(--red-carpet-red);
+  border-bottom-color: var(--red-carpet-red);
+  text-shadow: 0 0 10px rgba(229, 9, 20, 0.4);
+}
+
+/* Default active tab style when not hovering anything */
+.nav-tabs .nav-link.active {
+  color: var(--red-carpet-red);
+  background-color: rgba(229, 9, 20, 0.08);
+  border-bottom-color: var(--red-carpet-red);
+  text-shadow: 0 0 8px rgba(229, 9, 20, 0.3);
+}
+
+/* Content wrapper */
+.content-wrapper {
+  display: flex;
+  flex-direction: column;
+  padding: 0 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Input group styling */
+.input-group .form-control {
+  height: var(--form-element-height);
+  font-size: var(--form-element-font-size);
+  padding: var(--form-element-padding);
+  border-radius: var(--form-element-border-radius);
+  background-color: var(--red-carpet-gray);
+  border: 1px solid var(--red-carpet-light-gray);
+  color: var(--red-carpet-text);
+}
+
+.input-group .form-control::placeholder {
+  color: var(--red-carpet-light-gray);
+}
+
+.input-group .input-group-text {
+  height: var(--form-element-height);
+  font-size: var(--form-element-font-size);
+  padding: var(--form-element-padding);
+  border-radius: var(--form-element-border-radius);
+  background-color: var(--red-carpet-gray);
+  border: 1px solid var(--red-carpet-light-gray);
+  color: var(--red-carpet-light-gray);
+}
+
+/* Section headers */
+.section-header {
+  font-size: 1.25rem;
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+  color: var(--red-carpet-text);
+  padding: 0;
+}
+
+/* Ensure all h4 headers have consistent styling */
+h4.section-header,
+.section-header h4 {
+  font-size: 1.25rem;
+  font-weight: 500;
+  margin-bottom: 0.75rem;
+  color: var(--red-carpet-text);
+  padding: 0;
+}
+
+/* Section placeholder text */
+.text-muted {
+  color: var(--red-carpet-light-gray) !important;
+}
+
+.text-center.text-muted {
+  padding: 0;
+}
+
+/* Chat interface */
+.chat-container {
+  height: 50vh;
+  overflow-y: auto;
+  border: 1px solid var(--red-carpet-gray);
+  border-radius: 0.5rem;
+  background-color: var(--red-carpet-dark);
+  padding: 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: var(--red-carpet-light-gray) var(--red-carpet-dark);
+  margin-bottom: 1rem;
+}
+
+.chat-container::-webkit-scrollbar {
+  width: 8px;
+}
+
+.chat-container::-webkit-scrollbar-track {
+  background: var(--red-carpet-dark);
+}
+
+.chat-container::-webkit-scrollbar-thumb {
+  background-color: var(--red-carpet-light-gray);
+  border-radius: 20px;
+}
+
+/* Chat messages */
+.message {
+  width: 100%;
+  margin-bottom: 0;
+}
+
+.message.user {
+  background-color: var(--red-carpet-red);
+  color: white;
+  border-radius: 1rem 1rem 0 1rem;
+  padding: 0.75rem 1rem;
+}
+
+.message.bot {
+  background-color: var(--red-carpet-gray);
+  color: var(--red-carpet-text);
+  border-radius: 1rem 1rem 1rem 0;
+  padding: 0.75rem 1rem;
+  white-space: pre-line;
+}
+
+/* Processing message styling */
+.message.processing {
+  background-color: rgba(48, 48, 48, 0.7);
+  border: 1px solid var(--red-carpet-light-gray);
+}
+
+.processing-indicator {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.processing-indicator .dot {
+  width: 8px;
+  height: 8px;
+  background-color: var(--red-carpet-red);
+  border-radius: 50%;
+  margin: 0 4px;
+  opacity: 0.6;
+  animation: pulse 1.5s infinite ease-in-out;
+}
+
+.processing-indicator .dot:nth-child(2) {
+  animation-delay: 0.5s;
+}
+
+.processing-indicator .dot:nth-child(3) {
+  animation-delay: 1s;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(0.8);
+    opacity: 0.6;
+  }
+  50% {
+    transform: scale(1.2);
+    opacity: 1;
+  }
+}
+
+/* Movie grid */
+.movie-grid {
+  display: flex;
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  gap: 1.5rem;
+  margin-top: 0.5rem;
+  padding: 0 0 1rem 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(220, 53, 69, 0.5) rgba(52, 58, 64, 0.3);
+}
+
+.movie-grid::-webkit-scrollbar {
+  height: 4px;
+}
+
+.movie-grid::-webkit-scrollbar-track {
+  background: rgba(52, 58, 64, 0.3);
+  border-radius: 2px;
+}
+
+.movie-grid::-webkit-scrollbar-thumb {
+  background-color: rgba(220, 53, 69, 0.5);
+  border-radius: 2px;
+}
+
+/* Movie grid container and scroll arrows */
+.movie-grid-container {
+  position: relative;
+  width: 100%;
+  margin-top: 1rem;
+}
+
+.scroll-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: rgba(0, 0, 0, 0.7);
+  border: 1px solid var(--red-carpet-gray);
+  color: var(--red-carpet-text);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  cursor: pointer;
+  z-index: 5;
+  transition: all 0.2s ease;
+}
+
+.scroll-arrow:hover {
+  background-color: var(--red-carpet-red);
+  border-color: var(--red-carpet-red);
+  transform: translateY(-50%) scale(1.1);
+}
+
+.scroll-left {
+  left: 5px;
+}
+
+.scroll-right {
+  right: 5px;
+}
+
+.scroll-arrow i {
+  font-size: 1.25rem;
+}
+
+.movie-card {
+  background-color: rgba(52, 58, 64, 0.3);
+  border-radius: 8px;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  min-width: 160px;
+  width: 180px;
+  flex-shrink: 0;
+  height: 260px;
+  transition: all 0.3s ease;
+}
+
+.movie-card:hover {
+  border-color: rgba(220, 53, 69, 0.5);
+  transform: scale(1.05);
+  z-index: 10;
+}
+
+.movie-poster {
+  width: 100%;
+  aspect-ratio: 2/3;
+  object-fit: cover;
+  object-position: center top;
+  display: block;
+}
+
+.movie-info {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.95) 0%, rgba(0, 0, 0, 0.7) 70%, transparent 100%);
+  padding: 1.5rem 1rem 1rem;
+  transform: translateY(100%);
+  transition: transform 0.3s ease;
+}
+
+.movie-card:hover .movie-info {
+  transform: translateY(0);
+}
+
+.movie-title {
+  font-size: 1rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  color: var(--red-carpet-text);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.movie-overview {
+  font-size: 0.875rem;
+  line-height: 1.4;
+  margin-top: 0.75rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  color: #e0e0e0;
+}
+
+.movie-rating {
+  font-size: 0.875rem;
+  letter-spacing: 0.05em;
+}
+
+.current-release-badge {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  z-index: 1;
+}
+
+.movie-card.selected {
+  border: 2px solid var(--red-carpet-red);
+  box-shadow: 0 0 15px rgba(220, 53, 69, 0.3);
+  transform: scale(1.05);
+  z-index: 15;
+}
+
+/* Theater section */
+.theaters-outer-wrapper {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1rem;
+  overflow: hidden;
+  padding: 0;
+}
+
+.theater-section {
+  margin-top: 0.5rem;
+}
+
+/* Date selector improvements */
+.date-selector-container {
+  margin-bottom: 1.5rem;
+  position: relative;
+}
+
+.date-selector {
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  padding: 0.25rem 0 1rem 0;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(220, 53, 69, 0.5) rgba(52, 58, 64, 0.3);
+}
+
+.date-selector::-webkit-scrollbar {
+  height: 4px;
+}
+
+.date-selector::-webkit-scrollbar-track {
+  background: rgba(52, 58, 64, 0.3);
+  border-radius: 2px;
+}
+
+.date-selector::-webkit-scrollbar-thumb {
+  background-color: rgba(220, 53, 69, 0.5);
+  border-radius: 2px;
+}
+
+.date-button {
+  background-color: rgba(52, 58, 64, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--red-carpet-text);
+  padding: 0.75rem;
+  border-radius: 8px;
+  min-width: 110px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.date-button:hover {
+  border-color: rgba(220, 53, 69, 0.5);
+  transform: translateY(-1px);
+  background-color: rgba(52, 58, 64, 0.4);
+}
+
+.date-button.active {
+  background-color: rgba(220, 53, 69, 0.1);
+  border-color: var(--red-carpet-red);
+  box-shadow: 0 0 0 1px rgba(220, 53, 69, 0.2);
+}
+
+.date-button-content {
+  text-align: center;
+}
+
+.date-button .day-name {
+  font-size: 0.875rem;
+  color: var(--red-carpet-light-gray);
+  margin-bottom: 0.25rem;
+}
+
+.date-button .date-str {
+  font-weight: 500;
+  font-size: 1rem;
+}
+
+.date-button.active .day-name {
+  color: var(--red-carpet-red);
+}
+
+.selected-indicator {
+  position: absolute;
+  top: -0.5rem;
+  right: -0.5rem;
+  background-color: var(--red-carpet-red);
+  color: var(--red-carpet-text);
+  width: 1.25rem;
+  height: 1.25rem;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  border: 2px solid var(--red-carpet-black);
+}
+
+/* Theater list improvements */
+.theater-list {
+  overflow: hidden;
+}
+
+.theater-item {
+  padding: 1rem 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.theater-item:last-child {
+  border-bottom: none;
+}
+
+.theater-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 1.25rem;
+}
+
+.theater-name {
+  font-size: 1.1rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.distance-badge {
+  font-size: 0.875rem;
+  color: var(--red-carpet-light-gray);
+  font-weight: normal;
+}
+
+.theater-address {
+  color: var(--red-carpet-light-gray);
+  font-size: 0.9rem;
+}
+
+.theater-amenities {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.amenity-badge {
+  font-size: 0.75rem;
+  padding: 0.25rem 0.5rem;
+  background-color: rgba(52, 58, 64, 0.5);
+  border-radius: 4px;
+  color: var(--red-carpet-light-gray);
+}
+
+.theater-showtimes {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.showtime-format {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.format-label {
+  font-size: 0.875rem;
+  color: var(--red-carpet-light-gray);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.format-label i {
+  font-size: 1rem;
+}
+
+.showtime-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* Format-specific styles */
+.btn-outline-light.imax {
+  color: #00c6ff;
+  border-color: #00c6ff;
+  font-weight: 500;
+  background-color: rgba(0, 198, 255, 0.1);
+}
+
+.btn-outline-light.imax:hover {
+  background-color: rgba(0, 198, 255, 0.2);
+  color: #00c6ff;
+  /* Transform and shadow now come from common button styles */
+}
+
+.btn-outline-light.threed {
+  color: #7cb342;
+  border-color: #7cb342;
+  font-weight: 500;
+  background-color: rgba(124, 179, 66, 0.1);
+}
+
+.btn-outline-light.threed:hover {
+  background-color: rgba(124, 179, 66, 0.2);
+  color: #7cb342;
+  /* Transform and shadow now come from common button styles */
+}
+
+/* Standard showtime button improvements */
+.btn-outline-light {
+  height: var(--form-element-height);
+  font-size: var(--form-element-font-size);
+  padding: var(--form-element-padding);
+  border-radius: var(--form-element-border-radius);
+  transition: all 0.2s ease;
+  min-width: 80px;
+  background-color: rgba(52, 58, 64, 0.3);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.btn-outline-light:hover {
+  background-color: var(--red-carpet-red);
+  border-color: var(--red-carpet-red);
+  color: white;
+  /* Transform and shadow now come from common button styles */
+}
+
+/* Red carpet theme button */
+.btn-red-carpet {
+  height: var(--form-element-height);
+  font-size: var(--form-element-font-size);
+  padding: var(--form-element-padding);
+  border-radius: var(--form-element-border-radius);
+  background-color: var(--red-carpet-red);
+  border-color: var(--red-carpet-red);
+  color: white;
+  transition: all 0.2s ease;
+}
+
+.btn-red-carpet:hover {
+  background-color: #ff0a17; /* Brighter red */
+  border-color: #ff0a17;
+  color: white;
+  /* Transform and shadow now come from common button styles */
+}
+
+.btn-red-carpet:disabled {
+  background-color: #6c757d;
+  border-color: #6c757d;
+}
+
+/* Skeleton loading animation */
+@keyframes shimmer {
+  0% {
+    background-position: -1000px 0;
+  }
+  100% {
+    background-position: 1000px 0;
+  }
+}
+
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background-color: rgba(52, 58, 64, 0.3);
+}
+
+.skeleton-animation {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.0) 0%,
+    rgba(255, 255, 255, 0.06) 50%,
+    rgba(255, 255, 255, 0.0) 100%
+  );
+  background-size: 1000px 100%;
+  animation: shimmer 2s infinite linear;
+}
+
+.skeleton-poster {
+  width: 100%;
+  aspect-ratio: 2/3;
+  background-color: rgba(26, 26, 26, 0.5);
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.skeleton-title {
+  height: 24px;
+  margin: 8px 0;
+  background-color: rgba(26, 26, 26, 0.5);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.skeleton-rating {
+  height: 16px;
+  width: 80px;
+  background-color: rgba(26, 26, 26, 0.5);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 8px;
+}
+
+/* Genre selector improvements */
+.genre-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  padding: 0;
+}
+
+.genre-button {
+  background-color: rgba(52, 58, 64, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: var(--red-carpet-text);
+  padding: 0.5rem 1rem;
+  border-radius: 4px;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.genre-button:hover {
+  background-color: rgba(52, 58, 64, 0.4);
+  border-color: rgba(220, 53, 69, 0.5);
+  /* Transform and shadow now come from common button styles */
+}
+
+.genre-button:active {
+  background-color: rgba(52, 58, 64, 0.5);
+  /* Transform now comes from common button styles */
+}
+
+/* Header button */
+.header .btn-outline-light {
+  height: var(--form-element-height);
+  font-size: var(--form-element-font-size);
+  padding: var(--form-element-padding);
+  border-radius: var(--form-element-border-radius);
+  transition: all 0.2s ease;
+}
+
+.header .btn-outline-light:hover {
+  background-color: var(--red-carpet-red);
+  border-color: var(--red-carpet-red);
+  color: white;
+  /* Transform and shadow now come from common button styles */
+}
+
+/* Location icon active state */
+.location-icon-active {
+  color: var(--red-carpet-red) !important;
+}
+
+/* Location icon clickable state */
+.location-icon-clickable:hover {
+  color: var(--red-carpet-red) !important;
+  background-color: rgba(52, 58, 64, 0.5) !important;
+  transform: scale(1.1);
+  box-shadow: 0 0 6px rgba(229, 9, 20, 0.4);
+}
+
+/* Progress indicator styling */
+.processing-container {
+  background-color: rgba(32, 32, 32, 0.9);
+  border: 1px solid var(--red-carpet-gray);
+  border-radius: 0.5rem;
+  padding: 1.5rem;
+  margin-bottom: 1rem;
+  animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.progress {
+  height: 8px;
+  background-color: rgba(52, 58, 64, 0.5);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.progress-bar {
+  background-color: var(--red-carpet-red);
+}
+
+.progress-bar-striped {
+  background-image: linear-gradient(
+    45deg,
+    rgba(255, 255, 255, 0.15) 25%,
+    transparent 25%,
+    transparent 50%,
+    rgba(255, 255, 255, 0.15) 50%,
+    rgba(255, 255, 255, 0.15) 75%,
+    transparent 75%,
+    transparent
+  );
+  background-size: 16px 16px;
+}
+
+.progress-bar-animated {
+  animation: progress-bar-stripes 1s linear infinite;
+}
+
+@keyframes progress-bar-stripes {
+  from { background-position: 16px 0; }
+  to { background-position: 0 0; }
+}
+
+/* Spinner animation */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.spin {
+  animation: spin 1.5s linear infinite;
+  display: inline-block;
+}
+
+/* Location loading container */
+.location-loading-container {
+  width: 100%;
+  position: absolute;
+  top: -80px;
+  left: 0;
+  right: 0;
+  z-index: 10;
+}

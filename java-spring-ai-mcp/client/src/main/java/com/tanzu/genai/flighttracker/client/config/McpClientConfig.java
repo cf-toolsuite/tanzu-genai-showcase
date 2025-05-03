@@ -32,7 +32,7 @@ public class McpClientConfig {
             ChatModel chatModel,
             FunctionCallbackContext functionCallbackContext,
             ApplicationEventPublisher applicationEventPublisher) {
-        
+
         return new LLMChatClient(chatModel, functionCallbackContext, applicationEventPublisher);
     }
 }

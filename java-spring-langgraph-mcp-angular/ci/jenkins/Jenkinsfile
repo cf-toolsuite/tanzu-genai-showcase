@@ -1,0 +1,166 @@
+// Jenkins Pipeline for java-spring-langgraph-mcp-angular
+// Equivalent to GitHub Actions workflow: java-spring-langgraph-mcp-angular.yml
+
+pipeline {
+    agent any
+
+    tools {
+        jdk 'jdk21'
+        maven 'maven3'
+        nodejs 'node18'
+    }
+
+    options {
+        // Only keep the 10 most recent builds
+        buildDiscarder(logRotator(numToKeepStr: '10'))
+    }
+
+    // Only run on changes to project files or CI configuration
+    triggers {
+        pollSCM('H/5 * * * *')
+    }
+
+    stages {
+        stage('Build Backend') {
+            when {
+                anyOf {
+                    changeset 'java-spring-langgraph-mcp-angular/**'
+                    changeset 'java-spring-langgraph-mcp-angular/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('java-spring-langgraph-mcp-angular/backend') {
+                    // Cache Maven dependencies
+                    cache(path: '${HOME}/.m2/repository', key: "${env.JOB_NAME}-backend") {
+                        sh 'mvn -B package --file pom.xml'
+                    }
+
+                    // Archive backend artifacts if on main branch
+                    script {
+                        if (env.BRANCH_NAME == 'main') {
+                            archiveArtifacts artifacts: 'target/*.jar', fingerprint: true
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Build Frontend') {
+            when {
+                anyOf {
+                    changeset 'java-spring-langgraph-mcp-angular/**'
+                    changeset 'java-spring-langgraph-mcp-angular/ci/jenkins/Jenkinsfile'
+                }
+            }
+            steps {
+                dir('java-spring-langgraph-mcp-angular/frontend') {
+                    // Cache npm dependencies
+                    cache(path: '${HOME}/.npm', key: "${env.JOB_NAME}-frontend") {
+                        sh 'npm install'
+                    }
+
+                    sh 'npm run build -- --configuration production'
+
+                    // Archive frontend artifacts if on main branch
+                    script {
+                        if (env.BRANCH_NAME == 'main') {
+                            archiveArtifacts artifacts: 'dist/**', fingerprint: true
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Deploy to Cloud Foundry') {
+            when {
+                allOf {
+                    branch 'main'
+                    anyOf {
+                        changeset 'java-spring-langgraph-mcp-angular/**'
+                        changeset 'java-spring-langgraph-mcp-angular/ci/jenkins/Jenkinsfile'
+                    }
+                }
+            }
+            // This stage requires manual triggering
+            input {
+                message "Deploy to Cloud Foundry?"
+                ok "Yes, deploy it!"
+                parameters {
+                    string(name: 'CF_API', defaultValue: '', description: 'Cloud Foundry API Endpoint')
+                    string(name: 'CF_USERNAME', defaultValue: '', description: 'Cloud Foundry Username')
+                    password(name: 'CF_PASSWORD', defaultValue: '', description: 'Cloud Foundry Password')
+                    string(name: 'CF_ORG', defaultValue: '', description: 'Cloud Foundry Organization')
+                    string(name: 'CF_SPACE', defaultValue: '', description: 'Cloud Foundry Space')
+                    booleanParam(name: 'RANDOM_ROUTE', defaultValue: false, description: 'Use random route for the application')
+                    password(name: 'TICKETMASTER_API_KEY', defaultValue: '', description: 'Ticketmaster API Key')
+                    password(name: 'CITIES_API_KEY', defaultValue: '', description: 'Cities API Key')
+                    password(name: 'OPENAI_API_KEY', defaultValue: '', description: 'OpenAI API Key')
+                }
+            }
+            steps {
+                dir('java-spring-langgraph-mcp-angular') {
+                    // Install CF CLI
+                    sh '''
+                        wget -q -O - https://packages.cloudfoundry.org/debian/cli.cloudfoundry.org.key | sudo apt-key add -
+                        echo "deb https://packages.cloudfoundry.org/debian stable main" | sudo tee /etc/apt/sources.list.d/cloudfoundry-cli.list
+                        sudo apt-get update
+                        sudo apt-get install -y cf8-cli
+                    '''
+
+                    // Deploy to Cloud Foundry
+                    sh '''
+                        echo "Deploying to Cloud Foundry..."
+                        cf api "${CF_API}"
+                        cf auth "${CF_USERNAME}" "${CF_PASSWORD}"
+                        cf target -o "${CF_ORG}" -s "${CF_SPACE}"
+
+                        # Create GenAI service if it doesn't exist
+                        if ! cf service genai-llm-service > /dev/null 2>&1; then
+                            echo "Creating GenAI service..."
+                            cf create-service genai standard genai-llm-service || echo "Service creation failed, it might already exist or plan is not available"
+                        else
+                            echo "GenAI service already exists"
+                        fi
+
+                        # Set environment variables
+                        APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+                        if [ -z "$APP_NAME" ]; then
+                            APP_NAME=$(basename $(pwd)) # Fallback to directory name
+                        fi
+
+                        # Push the application without starting it
+                        if [ "${RANDOM_ROUTE}" = "true" ]; then
+                            echo "Pushing with random route..."
+                            cf push "$APP_NAME" -f manifest.yml --no-start --random-route
+                        else
+                            echo "Pushing with route from manifest..."
+                            cf push "$APP_NAME" -f manifest.yml --no-start
+                        fi
+
+                        # Set environment variables
+                        if [ -n "${TICKETMASTER_API_KEY}" ]; then
+                            cf set-env "$APP_NAME" "TICKETMASTER_API_KEY" "${TICKETMASTER_API_KEY}"
+                        fi
+
+                        if [ -n "${CITIES_API_KEY}" ]; then
+                            cf set-env "$APP_NAME" "CITIES_API_KEY" "${CITIES_API_KEY}"
+                        fi
+
+                        if [ -n "${OPENAI_API_KEY}" ]; then
+                            cf set-env "$APP_NAME" "SPRING_AI_OPENAI_API_KEY" "${OPENAI_API_KEY}"
+                        fi
+
+                        # Start the application
+                        cf start "$APP_NAME"
+                    '''
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            cleanWs()
+        }
+    }
+}

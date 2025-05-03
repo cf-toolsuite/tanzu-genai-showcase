@@ -19,13 +19,13 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @Service
 public class ChatService {
-    
+
     private final Map<String, ChatSession> chatSessions = new ConcurrentHashMap<>();
     private final ChatModel chatModel;
     private final CitiesApiClient citiesApiClient;
     private final SyncMcpToolCallbackProvider toolCallbackProvider;
     private final StatefulGraph<ChatbotState> chatbotGraph;
-    
+
     @Autowired
     public ChatService(
             ChatModel chatModel,
@@ -37,13 +37,13 @@ public class ChatService {
         this.toolCallbackProvider = toolCallbackProvider;
         this.chatbotGraph = chatbotGraph;
     }
-    
+
     public ChatSession createSession() {
         ChatSession session = ChatSession.builder()
                 .createdAt(LocalDateTime.now())
                 .lastUpdatedAt(LocalDateTime.now())
                 .build();
-        
+
         // Add initial welcome message
         ChatMessage welcomeMessage = ChatMessage.builder()
                 .id(UUID.randomUUID().toString())
@@ -51,24 +51,24 @@ public class ChatService {
                 .content("Welcome! I can help you find events and activities. Ask me about events in any city, or tell me what kind of events you're interested in.")
                 .timestamp(LocalDateTime.now())
                 .build();
-        
+
         session.addMessage(welcomeMessage);
         chatSessions.put(session.getId(), session);
-        
+
         return session;
     }
-    
+
     public ChatSession getSession(String sessionId) {
         return chatSessions.get(sessionId);
     }
-    
+
     public Mono<ChatResponse> processMessage(String sessionId, String messageText) {
         ChatSession session = chatSessions.get(sessionId);
-        
+
         if (session == null) {
             session = createSession();
         }
-        
+
         // Create user message
         ChatMessage userMessage = ChatMessage.builder()
                 .id(UUID.randomUUID().toString())
@@ -76,9 +76,9 @@ public class ChatService {
                 .content(messageText)
                 .timestamp(LocalDateTime.now())
                 .build();
-        
+
         session.addMessage(userMessage);
-        
+
         // Initialize chatbot state
         Map<String, Object> initData = new HashMap<>();
         initData.put("messages", session.getMessages());
@@ -86,16 +86,16 @@ public class ChatService {
         if (session.getCurrentCity() != null) {
             initData.put("city", session.getCurrentCity());
         }
-        
+
         ChatbotState initialState = new ChatbotState(initData);
-        
+
         // Here you would process through your LangGraph workflow
         // This is a placeholder for actual graph processing
-        
+
         // For now, create a simple response
         return createSimpleResponse(session, messageText);
     }
-    
+
     private Mono<ChatResponse> createSimpleResponse(ChatSession session, String userMessage) {
         // Check if message contains city name (very basic implementation)
         if (userMessage.toLowerCase().contains("events in ")) {
@@ -104,18 +104,18 @@ public class ChatService {
                 return citiesApiClient.getCityByName(cityName)
                         .flatMap(cityInfoList -> {
                             if (cityInfoList.isEmpty()) {
-                                return createTextResponse(session, 
+                                return createTextResponse(session,
                                         "I couldn't find information about " + cityName + ". Could you provide more details or try another city?");
                             }
-                            
+
                             CityInfo cityInfo = cityInfoList.get(0);
                             session.setCurrentCity(cityInfo);
-                            
+
                             // Here you would normally call Ticketmaster MCP server
                             // For now, create some mock event data
                             List<EventInfo> mockEvents = createMockEvents(cityInfo);
                             session.setRecommendedEvents(mockEvents);
-                            
+
                             ChatMessage assistantMessage = ChatMessage.builder()
                                     .id(UUID.randomUUID().toString())
                                     .role("assistant")
@@ -123,9 +123,9 @@ public class ChatService {
                                     .timestamp(LocalDateTime.now())
                                     .type(ChatMessage.MessageType.EVENT_RECOMMENDATION)
                                     .build();
-                            
+
                             session.addMessage(assistantMessage);
-                            
+
                             return Mono.just(ChatResponse.builder()
                                     .sessionId(session.getId())
                                     .message(assistantMessage)
@@ -135,12 +135,12 @@ public class ChatService {
                         });
             }
         }
-        
+
         // Default text response
-        return createTextResponse(session, 
+        return createTextResponse(session,
                 "I'm your event recommendation assistant. Ask me about events in a specific city, like 'Show me events in New York'.");
     }
-    
+
     private Mono<ChatResponse> createTextResponse(ChatSession session, String content) {
         ChatMessage assistantMessage = ChatMessage.builder()
                 .id(UUID.randomUUID().toString())
@@ -148,15 +148,15 @@ public class ChatService {
                 .content(content)
                 .timestamp(LocalDateTime.now())
                 .build();
-        
+
         session.addMessage(assistantMessage);
-        
+
         return Mono.just(ChatResponse.builder()
                 .sessionId(session.getId())
                 .message(assistantMessage)
                 .build());
     }
-    
+
     private String extractCityName(String message) {
         message = message.toLowerCase();
         int index = message.indexOf("events in ");
@@ -165,11 +165,11 @@ public class ChatService {
         }
         return null;
     }
-    
+
     private List<EventInfo> createMockEvents(CityInfo cityInfo) {
         // Create some mock events for demo purposes
         List<EventInfo> events = new ArrayList<>();
-        
+
         events.add(EventInfo.builder()
                 .id("e1")
                 .name("Summer Music Festival")
@@ -184,7 +184,7 @@ public class ChatService {
                 .subGenre("Festival")
                 .familyFriendly(true)
                 .build());
-                
+
         events.add(EventInfo.builder()
                 .id("e2")
                 .name("International Film Showcase")
@@ -199,7 +199,7 @@ public class ChatService {
                 .subGenre("Festival")
                 .familyFriendly(true)
                 .build());
-                
+
         events.add(EventInfo.builder()
                 .id("e3")
                 .name("Tech Conference 2025")
@@ -214,7 +214,7 @@ public class ChatService {
                 .subGenre("Conference")
                 .familyFriendly(false)
                 .build());
-                
+
         return events;
     }
 }

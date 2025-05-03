@@ -1,0 +1,205 @@
+# GitLab CI/CD for py-django-crewai
+# Equivalent to GitHub Actions workflow: py-django-crewai.yml
+
+image: python:3.12
+
+# Define stages in the pipeline
+stages:
+  - install
+  - test
+  - build
+  - package
+  - deploy
+
+# Cache dependencies between pipeline jobs
+cache:
+  key: ${CI_COMMIT_REF_SLUG}
+  paths:
+    - .pip/
+    - venv/
+    - py-django-crewai/frontend/node_modules/
+
+# Run CI only when changes in the project files or CI configuration
+workflow:
+  rules:
+    - if: $CI_PIPELINE_SOURCE == "push" && $CI_COMMIT_BRANCH
+      changes:
+        - py-django-crewai/**/*
+        - py-django-crewai/ci/gitlab/.gitlab-ci.yml
+    - if: $CI_PIPELINE_SOURCE == "merge_request_event"
+      changes:
+        - py-django-crewai/**/*
+        - py-django-crewai/ci/gitlab/.gitlab-ci.yml
+
+# Set up Python environment and install dependencies
+install:
+  stage: install
+  script:
+    - cd py-django-crewai
+    - python -m pip install --upgrade pip
+    - python -m venv venv
+    - source venv/bin/activate
+    - pip install -r requirements.txt
+  artifacts:
+    paths:
+      - py-django-crewai/venv/
+
+# Run backend tests
+backend-test:
+  stage: test
+  script:
+    - cd py-django-crewai
+    - source venv/bin/activate
+    - python manage.py test || echo "No tests run"
+  needs:
+    - install
+
+# Build frontend
+frontend-build:
+  stage: build
+  image: node:18
+  script:
+    - cd py-django-crewai
+    - cd frontend
+    - npm ci
+    - npm run build
+  artifacts:
+    paths:
+      - py-django-crewai/frontend/dist/
+  needs:
+    - install
+
+# Collect static files and prepare for deployment
+collect-static:
+  stage: build
+  script:
+    - cd py-django-crewai
+    - source venv/bin/activate
+    - python manage.py collectstatic --noinput || echo "Static collection skipped"
+  artifacts:
+    paths:
+      - py-django-crewai/static/
+  needs:
+    - frontend-build
+
+# Create package
+package:
+  stage: package
+  script:
+    - cd py-django-crewai
+    - source venv/bin/activate
+    - mkdir -p dist
+    - zip -r dist/py-django-crewai.zip . -x "*.git*" "*.env*" "*.pyc" "__pycache__/*" "*.github/*" "dist/*" "venv/*" "frontend/node_modules/*"
+  artifacts:
+    paths:
+      - py-django-crewai/dist/
+    expire_in: 1 week
+  needs:
+    - backend-test
+    - collect-static
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+
+# Upload artifacts - only on main branch
+upload:
+  stage: package
+  script:
+    - echo "Uploading artifacts to GitLab Package Registry"
+    - |
+      if [ -f "py-django-crewai/dist/py-django-crewai.zip" ]; then
+        # Upload the archive to GitLab Package Registry using the API
+        cd py-django-crewai
+        curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+             --upload-file dist/py-django-crewai.zip \
+             "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/py-django-crewai/${CI_COMMIT_TAG:-latest}/py-django-crewai.zip"
+      else
+        echo "Package file not found"
+        exit 1
+      fi
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"
+  needs:
+    - package
+
+# Deploy to Cloud Foundry
+deploy:
+  stage: deploy
+  image: governmentpaas/cf-cli:latest
+  variables:
+    CF_API: ""
+    CF_USERNAME: ""
+    CF_PASSWORD: ""
+    CF_ORG: ""
+    CF_SPACE: ""
+    RANDOM_ROUTE: "false"
+    OPENAI_API_KEY: ""
+    TMDB_API_KEY: ""
+    SERPAPI_API_KEY: ""
+    DJANGO_SECRET_KEY: ""
+  script:
+    - cd py-django-crewai
+    - echo "Deploying to Cloud Foundry..."
+    - cf api "$CF_API"
+    - cf auth "$CF_USERNAME" "$CF_PASSWORD"
+    - cf target -o "$CF_ORG" -s "$CF_SPACE"
+
+    # Create GenAI service if it doesn't exist
+    - |
+      if ! cf service movie-chatbot-llm > /dev/null 2>&1; then
+        echo "Creating GenAI service..."
+        cf create-service genai standard movie-chatbot-llm || echo "Service creation failed, it might already exist or plan is not available"
+      else
+        echo "GenAI service already exists"
+      fi
+
+    # Create database service if it doesn't exist
+    - |
+      if ! cf service movie-chatbot-db > /dev/null 2>&1; then
+        echo "Creating database service..."
+        cf create-service postgresql small movie-chatbot-db || echo "Service creation failed, it might already exist or plan is not available"
+      else
+        echo "Database service already exists"
+      fi
+
+    # Set environment variables
+    - |
+      APP_NAME=$(grep 'name:' manifest.yml | head -n 1 | awk '{print $2}')
+      if [ -z "$APP_NAME" ]; then
+        APP_NAME=$(basename $(pwd)) # Fallback to directory name
+      fi
+
+      # Push the application without starting it
+      if [ "$RANDOM_ROUTE" = "true" ]; then
+        echo "Pushing with random route..."
+        cf push "$APP_NAME" -f manifest.yml --no-start --random-route
+      else
+        echo "Pushing with route from manifest..."
+        cf push "$APP_NAME" -f manifest.yml --no-start
+      fi
+
+      # Set environment variables
+      if [ -n "$DJANGO_SECRET_KEY" ]; then
+        cf set-env "$APP_NAME" "DJANGO_SECRET_KEY" "$DJANGO_SECRET_KEY"
+      fi
+
+      if [ -n "$OPENAI_API_KEY" ]; then
+        cf set-env "$APP_NAME" "OPENAI_API_KEY" "$OPENAI_API_KEY"
+      fi
+
+      if [ -n "$TMDB_API_KEY" ]; then
+        cf set-env "$APP_NAME" "TMDB_API_KEY" "$TMDB_API_KEY"
+      fi
+
+      if [ -n "$SERPAPI_API_KEY" ]; then
+        cf set-env "$APP_NAME" "SERPAPI_API_KEY" "$SERPAPI_API_KEY"
+      fi
+
+      # Start the application
+      cf start "$APP_NAME"
+  environment:
+    name: production
+  when: manual
+  needs:
+    - package
+  rules:
+    - if: $CI_COMMIT_BRANCH == "main"

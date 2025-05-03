@@ -1,6 +1,7 @@
 name: dotnet-extensions-ai CI
 
 on:
+  workflow_call:
   push:
     paths:
       - 'dotnet-extensions-ai/**'

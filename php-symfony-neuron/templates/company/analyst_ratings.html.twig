@@ -8,86 +8,86 @@
         .rating-card {
             transition: transform 0.2s;
         }
-        
+
         .rating-card:hover {
             transform: translateY(-5px);
         }
-        
+
         .consensus-badge {
             font-size: 0.9rem;
             padding: 0.5rem 1rem;
             border-radius: 50px;
         }
-        
+
         .consensus-strong-buy {
             background-color: #28a745;
             color: white;
         }
-        
+
         .consensus-buy {
             background-color: #5cb85c;
             color: white;
         }
-        
+
         .consensus-hold {
             background-color: #f0ad4e;
             color: white;
         }
-        
+
         .consensus-sell {
             background-color: #d9534f;
             color: white;
         }
-        
+
         .consensus-strong-sell {
             background-color: #c9302c;
             color: white;
         }
-        
+
         .price-target {
             font-size: 2rem;
             font-weight: bold;
         }
-        
+
         .upside-positive {
             color: #28a745;
         }
-        
+
         .upside-negative {
             color: #dc3545;
         }
-        
+
         .rating-distribution {
             height: 2rem;
             border-radius: 4px;
             overflow: hidden;
         }
-        
+
         .rating-firm-card {
             margin-bottom: 1rem;
             transition: transform 0.2s;
         }
-        
+
         .rating-firm-card:hover {
             transform: translateY(-3px);
         }
-        
+
         .rating-badge {
             font-size: 0.8rem;
             padding: 0.3rem 0.6rem;
             border-radius: 50px;
         }
-        
+
         .rating-buy {
             background-color: #5cb85c;
             color: white;
         }
-        
+
         .rating-hold {
             background-color: #f0ad4e;
             color: white;
         }
-        
+
         .rating-sell {
             background-color: #d9534f;
             color: white;
@@ -104,7 +104,7 @@
             <li class="breadcrumb-item active" aria-current="page">Analyst Ratings</li>
         </ol>
     </nav>
-    
+
     <div class="row mb-4">
         <div class="col-md-8">
             <h1 class="mb-4">{{ company.name }} Analyst Ratings</h1>
@@ -115,7 +115,7 @@
             </a>
         </div>
     </div>
-    
+
     {% if ratings is empty %}
         <div class="alert alert-info">
             <p>No analyst ratings are available for {{ company.name }} at this time.</p>
@@ -141,26 +141,26 @@
                         {% elseif consensus.consensus == 'Strong Sell' %}
                             {% set consensusClass = 'consensus-strong-sell' %}
                         {% endif %}
-                        
+
                         <span class="d-inline-block consensus-badge {{ consensusClass }} mb-3">
                             {{ consensus.consensus }}
                         </span>
-                        
+
                         <p class="text-muted">Based on {{ consensus.ratings_count }} analyst ratings</p>
-                        
+
                         <!-- Rating Distribution -->
                         <div class="rating-distribution mb-3">
                             {% set buyWidth = (consensus.ratings.buy / consensus.ratings_count) * 100 %}
                             {% set holdWidth = (consensus.ratings.hold / consensus.ratings_count) * 100 %}
                             {% set sellWidth = (consensus.ratings.sell / consensus.ratings_count) * 100 %}
-                            
+
                             <div class="d-flex" style="height: 100%;">
                                 <div class="bg-success" style="width: {{ buyWidth }}%;"></div>
                                 <div class="bg-warning" style="width: {{ holdWidth }}%;"></div>
                                 <div class="bg-danger" style="width: {{ sellWidth }}%;"></div>
                             </div>
                         </div>
-                        
+
                         <div class="d-flex justify-content-between mb-4">
                             <div>
                                 <strong>{{ consensus.ratings.buy }}</strong>
@@ -177,14 +177,14 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <div class="card shadow-sm mb-4">
                     <div class="card-header">
                         <h5 class="mb-0">Price Target</h5>
                     </div>
                     <div class="card-body text-center">
                         <div class="price-target mb-3">${{ consensus.averagePriceTarget|number_format(2) }}</div>
-                        
+
                         {% if consensus.upside != 0 %}
                             <div class="mb-3 {% if consensus.upside > 0 %}upside-positive{% else %}upside-negative{% endif %}">
                                 {% if consensus.upside > 0 %}
@@ -195,7 +195,7 @@
                                 {{ consensus.upside|abs|number_format(2) }}% from current price
                             </div>
                         {% endif %}
-                        
+
                         <div class="d-flex justify-content-between mt-4">
                             <div>
                                 <div class="text-muted">Low</div>
@@ -213,7 +213,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Analyst Ratings List -->
             <div class="col-md-8">
                 <div class="card shadow-sm">
@@ -233,13 +233,13 @@
                                             {% elseif rating.rating == 'Sell' or rating.rating == 'Underweight' %}
                                                 {% set ratingClass = 'rating-sell' %}
                                             {% endif %}
-                                            
+
                                             <span class="rating-badge {{ ratingClass }}">{{ rating.rating }}</span>
                                         </div>
                                     </div>
-                                    
+
                                     <p class="text-muted mb-2">{{ rating.analyst }}</p>
-                                    
+
                                     <div class="row mt-3">
                                         <div class="col-md-6">
                                             <div class="d-flex justify-content-between">
@@ -260,7 +260,7 @@
                                             </div>
                                         </div>
                                     </div>
-                                    
+
                                     <div class="text-muted mt-3">
                                         <small>{{ rating.date|date('M d, Y') }}</small>
                                     </div>
@@ -272,7 +272,7 @@
             </div>
         </div>
     {% endif %}
-    
+
     <!-- Related Links -->
     <div class="row mt-4">
         <div class="col-md-12">

@@ -12,7 +12,7 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"github.com/gofiber/fiber/v2/middleware/cors"
-	"github.com/gofiber/fiber/v2/middleware/logger"
+	fiberLogger "github.com/gofiber/fiber/v2/middleware/logger"
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/gofiber/template/html/v2"
 
@@ -21,6 +21,7 @@ import (
 	"github.com/cf-toolsuite/tanzu-genai-showcase/go-fiber-langchaingo/internal/handler"
 	"github.com/cf-toolsuite/tanzu-genai-showcase/go-fiber-langchaingo/internal/service"
 	"github.com/cf-toolsuite/tanzu-genai-showcase/go-fiber-langchaingo/pkg/llm"
+	"github.com/cf-toolsuite/tanzu-genai-showcase/go-fiber-langchaingo/pkg/logger"
 )
 
 func main() {
@@ -34,7 +35,7 @@ func main() {
 	congressClient := api.NewCongressClient(cfg.CongressAPIKey)
 
 	// Create LLM client
-	llmClient, err := llm.NewLLMClient(cfg.LLMAPIKey, cfg.LLMAPIURL)
+	llmClient, err := llm.NewLLMClient(cfg.LLMAPIKey, cfg.LLMAPIURL, cfg.LLMModel)
 	if err != nil {
 		log.Fatalf("Failed to create LLM client: %v", err)
 	}
@@ -98,15 +99,24 @@ func main() {
                 </div>
             </div>
 
-            <div class="flex space-x-2">
-                <input type="text" id="user-input" placeholder="Type your message here..."
-                    class="flex-grow p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
-                <button id="send-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
-                    Send
-                </button>
-                <button id="clear-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
-                    Clear
-                </button>
+            <div class="flex flex-col space-y-2">
+                <div class="flex space-x-2">
+                    <input type="text" id="user-input" placeholder="Type your message here..."
+                        class="flex-grow p-2 border border-gray-300 rounded focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button id="send-button" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">
+                        Send
+                    </button>
+                    <button id="clear-button" class="bg-gray-500 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded">
+                        Clear
+                    </button>
+                </div>
+                <div class="flex items-center">
+                    <label class="inline-flex items-center cursor-pointer">
+                        <input type="checkbox" id="use-tools-toggle" class="sr-only peer">
+                        <div class="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                        <span class="ml-3 text-sm font-medium text-gray-900">Use API Tools</span>
+                    </label>
+                </div>
             </div>
         </div>
 
@@ -131,10 +141,25 @@ func main() {
                 chatContainer.scrollTop = chatContainer.scrollHeight;
             }
 
+            // Get the tools toggle
+            const useToolsToggle = document.getElementById('use-tools-toggle');
+
             // Function to send a message to the API
             async function sendMessage(message) {
                 try {
-                    const response = await fetch('/api/chat', {
+                    // Check if tools should be used
+                    const useTools = useToolsToggle.checked;
+
+                    // Add query parameter if tools should be used
+                    const url = useTools ? '/api/chat?useTools=true' : '/api/chat';
+
+                    // Add loading indicator
+                    const loadingId = 'loading-' + Date.now();
+                    addMessage('Thinking...', false);
+                    const loadingElement = chatContainer.lastChild;
+                    loadingElement.id = loadingId;
+
+                    const response = await fetch(url, {
                         method: 'POST',
                         headers: {
                             'Content-Type': 'application/json',
@@ -147,6 +172,14 @@ func main() {
                     }
 
                     const data = await response.json();
+
+                    // Remove loading indicator
+                    const loadingMessage = document.getElementById(loadingId);
+                    if (loadingMessage) {
+                        chatContainer.removeChild(loadingMessage);
+                    }
+
+                    // Add the actual response
                     addMessage(data.response, false);
                 } catch (error) {
                     console.error('Error sending message:', error);
@@ -262,8 +295,23 @@ func main() {
 		log.Fatalf("Failed to create log file: %v", err)
 	}
 
+	// Initialize our custom logger
+	if err := logger.Init(); err != nil {
+		log.Fatalf("Failed to initialize logger: %v", err)
+	}
+
+	// Log startup information
+	logger.LogStartup(map[string]string{
+		"port":             fmt.Sprintf("%d", cfg.Port),
+		"environment":      cfg.Environment,
+		"llm_model":        cfg.LLMModel,
+		"llm_api_url":      cfg.LLMAPIURL,
+		"llm_api_key":      cfg.LLMAPIKey,
+		"congress_api_key": cfg.CongressAPIKey,
+	})
+
 	// Enhanced logger configuration with more details
-	app.Use(logger.New(logger.Config{
+	app.Use(fiberLogger.New(fiberLogger.Config{
 		// Log format with extended details
 		Format:     "${time} | ${status} | ${latency} | ${method} ${path} | ${ip} | ${reqHeader:Content-Type} | ${reqHeader:User-Agent} | ${resBody} | ${error}\n",
 		TimeFormat: "2006-01-02 15:04:05",
