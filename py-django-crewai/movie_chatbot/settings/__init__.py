@@ -44,6 +44,7 @@ try:
     from .external_apis import * # noqa
     from .app_config import * # noqa
     from .llm import * # noqa
+    from .feature_flags import * # noqa
 except ImportError as e:
     logger.error(f"Error importing settings module: {e}", exc_info=True)
     raise

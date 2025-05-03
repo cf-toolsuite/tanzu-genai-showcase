@@ -1,5 +1,6 @@
 import React, { createContext, useState, useContext, useCallback, useEffect } from 'react';
 import { chatApi } from '../services/api';
+import { getConfig } from '../config';
 
 // Create the context
 const AppContext = createContext(null);
@@ -208,11 +209,21 @@ export function AppProvider({ children }) {
     return tab === 'casual-viewing' ? 'casual' : 'first_run';
   }, []);
 
-  // Effect to initialize state
+  // Effect to initialize state based on feature flags
   useEffect(() => {
-    // Initialize with first-run tab
-    setActiveTab('first-run');
-    console.log('AppContext initialized with first-run tab');
+    // Check if First Run mode is enabled
+    const config = getConfig();
+    const isFirstRunEnabled = config.features?.enableFirstRunMode !== false;
+
+    if (isFirstRunEnabled) {
+      // If First Run Mode is enabled, initialize with first-run tab
+      setActiveTab('first-run');
+      console.log('AppContext initialized with first-run tab');
+    } else {
+      // If First Run Mode is disabled, initialize with casual-viewing tab
+      setActiveTab('casual-viewing');
+      console.log('First Run Mode disabled, AppContext initialized with casual-viewing tab');
+    }
   }, []);
 
   // Effect to fetch theaters when movie is selected

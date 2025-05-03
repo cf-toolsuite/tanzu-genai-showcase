@@ -1,123 +1,192 @@
 """
-Custom event listener for CrewAI events.
+Custom event listener for CrewAI events with optimized logging.
+Performance improvements:
+1. Reduced logging verbosity for production
+2. Better filtering of events
+3. Optimized log format for easier debugging
+4. Memory efficient event processing
 """
+
 import logging
 from typing import Optional, Dict, Any
+import time
 
-# Get the logger
+# Configure logger
 logger = logging.getLogger('chatbot.movie_crew')
 
-from crewai.utilities.events.base_event_listener import BaseEventListener
+# Handle different versions of CrewAI library
+try:
+    # Try to import from the expected path (newer versions)
+    from crewai.utilities.events.event_listener import EventListener
+    from crewai.utilities.events.event_names import EventNames
+    logger.info("Using newer CrewAI events API")
+except ImportError:
+    try:
+        # Try to import from alternate path (older versions)
+        from crewai.utilities import EventListener
+        # Create an EventNames equivalent for older versions
+        class EventNames:
+            AGENT_STARTED = "agent_started"
+            AGENT_FINISHED = "agent_finished"
+            TASK_STARTED = "task_started"
+            TASK_FINISHED = "task_finished"
+            TOOL_STARTED = "tool_started"
+            TOOL_FINISHED = "tool_finished"
+            CREW_STARTED = "crew_started"
+            CREW_FINISHED = "crew_finished"
+        logger.info("Using older CrewAI events API")
+    except ImportError:
+        # Fallback for versions without event listener support
+        logger.warning("CrewAI event listener not found. Using fallback implementation.")
+        # Create minimal implementations for compatibility
+        class EventListener:
+            def on_event(self, event_name: str, data: Optional[Dict[str, Any]] = None) -> None:
+                logger.debug(f"Event: {event_name}")
 
-class CustomEventListener(BaseEventListener):
+        class EventNames:
+            AGENT_STARTED = "agent_started"
+            AGENT_FINISHED = "agent_finished"
+            TASK_STARTED = "task_started"
+            TASK_FINISHED = "task_finished"
+            TOOL_STARTED = "tool_started"
+            TOOL_FINISHED = "tool_finished"
+            CREW_STARTED = "crew_started"
+            CREW_FINISHED = "crew_finished"
+
+class CustomEventListener(EventListener):
     """
-    Custom event listener for CrewAI events that works with CrewAI 0.114.0+.
-    This class handles events from the CrewAI execution and provides
-    proper error handling for tool usage events.
+    Custom event listener for CrewAI events with optimized logging.
+    Handles different CrewAI versions and provides performance metrics.
+    This class reduces the verbosity of CrewAI logs while still providing
+    useful information for debugging.
     """
 
     def __init__(self):
-        """Initialize the event listener."""
+        """Initialize the custom event listener with optimized settings."""
         super().__init__()
+        self.start_times = {}
         self.tool_usage_counts = {}
-        self.errors = []
+        self.agent_task_mapping = {}
+        self.task_durations = {}
 
-        # Pre-register known tool names to avoid KeyError
-        self.tool_names = [
-            "search_movies_tool",
-            "analyze_preferences_tool",
-            "find_theaters_tool"
-        ]
-
-        for tool_name in self.tool_names:
-            self.tool_usage_counts[tool_name] = 0
-
-    def setup_listeners(self, crewai_event_bus):
+    def on_event(self, event_name: str, data: Optional[Dict[str, Any]] = None) -> None:
         """
-        Set up the event listeners for the CrewAI event bus.
+        Handle CrewAI events with optimized logging.
 
         Args:
-            crewai_event_bus: The CrewAI event bus
+            event_name: Name of the event
+            data: Event data
         """
-        from crewai.utilities.events import (
-            ToolUsageStartedEvent,
-            ToolUsageFinishedEvent,
-            ToolUsageErrorEvent,
-            CrewKickoffStartedEvent,
-            CrewKickoffCompletedEvent,
-            TaskStartedEvent,
-            TaskCompletedEvent
-        )
+        # Skip if no data
+        if not data:
+            return
 
-        @crewai_event_bus.on(ToolUsageStartedEvent)
-        def on_tool_usage_started(source, event: ToolUsageStartedEvent):
-            """Handle tool usage started event."""
-            tool_name = getattr(event, 'tool_name', 'unknown_tool')
+        # Process based on event type
+        if event_name == EventNames.AGENT_STARTED:
+            self._handle_agent_started(data)
+        elif event_name == EventNames.AGENT_FINISHED:
+            self._handle_agent_finished(data)
+        elif event_name == EventNames.TASK_STARTED:
+            self._handle_task_started(data)
+        elif event_name == EventNames.TASK_FINISHED:
+            self._handle_task_finished(data)
+        elif event_name == EventNames.TOOL_STARTED:
+            self._handle_tool_started(data)
+        elif event_name == EventNames.TOOL_FINISHED:
+            self._handle_tool_finished(data)
+        elif event_name == EventNames.CREW_STARTED:
+            self._handle_crew_started(data)
+        elif event_name == EventNames.CREW_FINISHED:
+            self._handle_crew_finished(data)
 
-            logger.info(f"Tool usage started: {tool_name}")
+    def _handle_agent_started(self, data: Dict[str, Any]) -> None:
+        """Handle agent started event."""
+        agent_name = data.get('agent_name', 'Unknown Agent')
+        logger.info(f"Agent started: {agent_name}")
 
-            # Ensure tool is registered in counts
-            if tool_name not in self.tool_usage_counts:
-                self.tool_usage_counts[tool_name] = 0
-                logger.info(f"Added new tool {tool_name} to tracking")
+    def _handle_agent_finished(self, data: Dict[str, Any]) -> None:
+        """Handle agent finished event."""
+        agent_name = data.get('agent_name', 'Unknown Agent')
+        logger.info(f"Agent finished: {agent_name}")
 
-        @crewai_event_bus.on(ToolUsageFinishedEvent)
-        def on_tool_usage_finished(source, event: ToolUsageFinishedEvent):
-            """Handle tool usage finished event."""
-            tool_name = getattr(event, 'tool_name', 'unknown_tool')
+    def _handle_task_started(self, data: Dict[str, Any]) -> None:
+        """Handle task started event."""
+        task_id = data.get('task_id', 'unknown_task')
+        task_description = data.get('task_description', 'Unknown Task')
+        agent_name = data.get('agent_name', 'Unknown Agent')
 
-            # Increment tool usage counter safely
-            if tool_name not in self.tool_usage_counts:
-                self.tool_usage_counts[tool_name] = 0
+        # Store task start time for duration calculation
+        import time
+        self.start_times[task_id] = time.time()
 
-            self.tool_usage_counts[tool_name] += 1
-            logger.info(f"Tool usage completed: {tool_name}, count: {self.tool_usage_counts[tool_name]}")
+        # Store agent-task mapping
+        self.agent_task_mapping[task_id] = agent_name
 
-        @crewai_event_bus.on(ToolUsageErrorEvent)
-        def on_tool_usage_error(source, event: ToolUsageErrorEvent):
-            """Handle tool usage error event."""
-            tool_name = getattr(event, 'tool_name', 'unknown_tool')
-            error = getattr(event, 'error', 'Unknown error')
+        # Log task start with minimal info
+        logger.info(f"Task started: '{task_description}' (Agent: {agent_name})")
 
-            logger.error(f"Tool usage error: {tool_name}, error: {error}")
-            self.errors.append({
-                'tool_name': tool_name,
-                'error': str(error)
-            })
+    def _handle_task_finished(self, data: Dict[str, Any]) -> None:
+        """Handle task finished event."""
+        task_id = data.get('task_id', 'unknown_task')
+        task_description = data.get('task_description', 'Unknown Task')
 
-        @crewai_event_bus.on(CrewKickoffStartedEvent)
-        def on_crew_kickoff_started(source, event: CrewKickoffStartedEvent):
-            """Handle crew kickoff started event."""
-            crew_id = getattr(event, 'id', 'unknown_crew')
-            logger.info(f"Crew kickoff started: {crew_id}")
+        # Calculate task duration
+        import time
+        if task_id in self.start_times:
+            duration = time.time() - self.start_times[task_id]
+            self.task_durations[task_id] = duration
 
-        @crewai_event_bus.on(CrewKickoffCompletedEvent)
-        def on_crew_kickoff_completed(source, event: CrewKickoffCompletedEvent):
-            """Handle crew kickoff completed event."""
-            crew_id = getattr(event, 'id', 'unknown_crew')
-            logger.info(f"Crew kickoff completed: {crew_id}")
+            # Log task completion with duration
+            logger.info(f"Task finished: '{task_description}' in {duration:.2f}s")
 
-            # Log tool usage statistics
-            logger.info(f"Tool usage counts: {self.tool_usage_counts}")
+            # Clean up
+            del self.start_times[task_id]
+        else:
+            logger.info(f"Task finished: '{task_description}'")
 
-            # Log any errors that occurred
-            if self.errors:
-                logger.warning(f"Errors during crew execution: {len(self.errors)}")
-                for i, error in enumerate(self.errors):
-                    logger.warning(f"Error {i+1}: Tool {error['tool_name']}: {error['error']}")
-            else:
-                logger.info("No errors during crew execution")
+    def _handle_tool_started(self, data: Dict[str, Any]) -> None:
+        """Handle tool started event."""
+        tool_name = data.get('tool_name', 'Unknown Tool')
 
-        @crewai_event_bus.on(TaskStartedEvent)
-        def on_task_started(source, event: TaskStartedEvent):
-            """Handle task started event."""
-            task_id = getattr(event, 'id', 'unknown_task')
-            task_name = getattr(source, 'name', 'unknown_task_name') if source else 'unknown_task_name'
-            logger.info(f"Task started: {task_name} ({task_id})")
+        # Count tool usage
+        if tool_name not in self.tool_usage_counts:
+            self.tool_usage_counts[tool_name] = 0
+        self.tool_usage_counts[tool_name] += 1
 
-        @crewai_event_bus.on(TaskCompletedEvent)
-        def on_task_completed(source, event: TaskCompletedEvent):
-            """Handle task completed event."""
-            task_id = getattr(event, 'id', 'unknown_task')
-            task_name = getattr(source, 'name', 'unknown_task_name') if source else 'unknown_task_name'
-            logger.info(f"Task completed: {task_name} ({task_id})")
+        # Only log at debug level to reduce verbosity
+        logger.debug(f"Tool started: {tool_name}")
+
+    def _handle_tool_finished(self, data: Dict[str, Any]) -> None:
+        """Handle tool finished event."""
+        tool_name = data.get('tool_name', 'Unknown Tool')
+
+        # Only log at debug level to reduce verbosity
+        logger.debug(f"Tool finished: {tool_name}")
+
+    def _handle_crew_started(self, data: Dict[str, Any]) -> None:
+        """Handle crew started event."""
+        logger.info("CrewAI workflow started")
+
+    def _handle_crew_finished(self, data: Dict[str, Any]) -> None:
+        """Handle crew finished event with performance summary."""
+        # Log performance summary
+        logger.info("CrewAI workflow completed")
+
+        # Log task durations
+        if self.task_durations:
+            logger.info("Task performance summary:")
+            for task_id, duration in self.task_durations.items():
+                agent_name = self.agent_task_mapping.get(task_id, 'Unknown Agent')
+                logger.info(f"  - Task {task_id}: {duration:.2f}s (Agent: {agent_name})")
+
+        # Log tool usage
+        if self.tool_usage_counts:
+            logger.info("Tool usage summary:")
+            for tool_name, count in self.tool_usage_counts.items():
+                logger.info(f"  - {tool_name}: {count} calls")
+
+        # Reset counters for next run
+        self.start_times = {}
+        self.tool_usage_counts = {}
+        self.agent_task_mapping = {}
+        self.task_durations = {}

@@ -1,5 +1,6 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useAppContext } from '../context/AppContext';
+import { getConfig } from '../config';
 
 export function useLocation() {
   const { setLocation, setIsLoadingLocation } = useAppContext();
@@ -7,6 +8,18 @@ export function useLocation() {
 
   // Function to gather location data from ipapi.co
   const detectLocation = useCallback(() => {
+    // Check if First Run mode is enabled
+    const config = getConfig();
+    const isFirstRunEnabled = config.features?.enableFirstRunMode !== false;
+
+    if (!isFirstRunEnabled) {
+      console.log("First Run mode is disabled, skipping location detection");
+      setLocation('Seattle, Washington, United States');
+      setIsLoadingLocation(false);
+      setInitialized(true);
+      return;
+    }
+
     // Set loading state
     setIsLoadingLocation(true);
 

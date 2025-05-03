@@ -5,9 +5,13 @@ from django.conf import settings
 from django.utils import timezone
 from .models import Conversation, Message, MovieRecommendation, Theater, Showtime
 from .services.movie_crew import MovieCrewManager
+from .services.movie_crew_optimized import MovieCrewManagerOptimized
+from django.conf import settings
+from .performance_settings import THEATER_SEARCH_TIMEOUT, THEATER_FALLBACK_ENABLED
 import json
 import logging
 import traceback
+import time
 from datetime import datetime as dt
 from datetime import datetime
 
@@ -143,6 +147,14 @@ def get_movies_theaters_and_showtimes(request):
             'message': 'This endpoint only accepts POST requests'
         }, status=405)
 
+    # Check if First Run mode is enabled
+    if not settings.FEATURES.get('ENABLE_FIRST_RUN_MODE', True):
+        logger.warning("First Run mode is disabled but endpoint was accessed")
+        return JsonResponse({
+            'status': 'error',
+            'message': 'First Run mode is currently disabled. Please use Casual Viewing mode instead.'
+        }, status=403)
+
     try:
         logger.info("=== Processing First Run mode request for movies, theaters, and showtimes ===")
         data = _parse_request_data(request)
@@ -255,6 +267,9 @@ def poll_movie_recommendations(request):
             'message': 'This endpoint only accepts GET requests'
         }, status=405)
 
+    timeout_seconds = getattr(settings, "THEATER_SEARCH_TIMEOUT", 60)
+    start_time = time.time()
+
     try:
         # Get the conversation
         conversation = _get_or_create_conversation(request, 'casual')
@@ -320,15 +335,31 @@ def poll_movie_recommendations(request):
 
         # If we don't have recommendations yet, process the query
         # Initialize movie crew manager
-        movie_crew_manager = MovieCrewManager(
-            api_key=settings.LLM_CONFIG['api_key'],
-            base_url=settings.LLM_CONFIG.get('base_url'),
-            model=settings.LLM_CONFIG.get('model', 'gpt-4o-mini'),
-            tmdb_api_key=settings.TMDB_API_KEY,
-            user_location='',  # No location needed for casual mode
-            user_ip=get_client_ip(request),
-            timezone='UTC'  # Default timezone for casual mode
-        )
+        # Use optimized manager if optimization is enabled in settings
+        use_optimized = getattr(settings, "USE_OPTIMIZED_COMPONENTS", True)
+
+        if use_optimized:
+            # Note: The optimized manager doesn't support timeout and fallback parameters yet
+            movie_crew_manager = MovieCrewManagerOptimized(
+                api_key=settings.LLM_CONFIG['api_key'],
+                base_url=settings.LLM_CONFIG.get('base_url'),
+                model=settings.LLM_CONFIG.get('model', 'gpt-4o-mini'),
+                tmdb_api_key=settings.TMDB_API_KEY,
+                user_location='',  # No location needed for casual mode
+                user_ip=get_client_ip(request),
+                timezone='UTC'  # Default timezone for casual mode
+                # timeout and fallback parameters removed as they're not supported
+            )
+        else:
+            movie_crew_manager = MovieCrewManager(
+                api_key=settings.LLM_CONFIG['api_key'],
+                base_url=settings.LLM_CONFIG.get('base_url'),
+                model=settings.LLM_CONFIG.get('model', 'gpt-4o-mini'),
+                tmdb_api_key=settings.TMDB_API_KEY,
+                user_location='',  # No location needed for casual mode
+                user_ip=get_client_ip(request),
+                timezone='UTC'  # Default timezone for casual mode
+            )
 
         # Process query with casual mode
         conversation_history = [{
@@ -359,7 +390,8 @@ def poll_movie_recommendations(request):
             conversation.save()
 
         try:
-            # Process the query with explicit casual mode (first_run_mode=False)
+            # Add timeout handling for the process_query call
+            # Use the timeout parameter if the manager supports it
             response_data = movie_crew_manager.process_query(
                 query=user_message_text,
                 conversation_history=conversation_history,
@@ -432,6 +464,27 @@ def poll_movie_recommendations(request):
         })
 
     except Exception as e:
+        # Check if it's a timeout issue
+        elapsed = time.time() - start_time if 'start_time' in locals() else float('inf')
+        if elapsed >= timeout_seconds:
+            logger.warning(f"Timeout occurred while processing theater data after {elapsed:.1f} seconds")
+            # Return partial results with empty theaters on timeout
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Your movie recommendations are ready, but we couldn\'t find theater information within the time limit.',
+                'recommendations': [
+                    {
+                        'id': movie.id,
+                        'title': movie.title,
+                        'overview': movie.overview,
+                        'poster_url': movie.poster_url,
+                        'release_date': movie.release_date.isoformat() if movie.release_date and hasattr(movie.release_date, 'isoformat') else None,
+                        'rating': float(movie.rating) if movie.rating else None,
+                        'theaters': []
+                    } for movie in conversation.recommendations.all().order_by('-created_at')[:5]
+                ]
+            })
+
         logger.error(f"Error processing movie recommendation poll: {str(e)}")
         logger.error(traceback.format_exc())
         return JsonResponse({
@@ -633,6 +686,17 @@ def poll_first_run_recommendations(request):
             'message': 'This endpoint only accepts GET requests'
         }, status=405)
 
+    # Check if First Run mode is enabled
+    if not settings.FEATURES.get('ENABLE_FIRST_RUN_MODE', True):
+        logger.warning("First Run mode is disabled but poll endpoint was accessed")
+        return JsonResponse({
+            'status': 'error',
+            'message': 'First Run mode is currently disabled. Please use Casual Viewing mode instead.'
+        }, status=403)
+
+    timeout_seconds = getattr(settings, "THEATER_SEARCH_TIMEOUT", 60)
+    start_time = time.time()
+
     try:
         # Get the conversation
         conversation = _get_or_create_conversation(request, 'first_run')
@@ -729,15 +793,31 @@ def poll_first_run_recommendations(request):
 
         # If we don't have recommendations yet, process the query
         # Initialize movie crew manager
-        movie_crew_manager = MovieCrewManager(
-            api_key=settings.LLM_CONFIG['api_key'],
-            base_url=settings.LLM_CONFIG.get('base_url'),
-            model=settings.LLM_CONFIG.get('model', 'gpt-4o-mini'),
-            tmdb_api_key=settings.TMDB_API_KEY,
-            user_location=user_location,
-            user_ip=get_client_ip(request),
-            timezone=request.session.get('user_timezone', 'America/Los_Angeles')
-        )
+        # Use optimized manager if optimization is enabled in settings
+        use_optimized = getattr(settings, "USE_OPTIMIZED_COMPONENTS", True)
+
+        if use_optimized:
+            # Note: The optimized manager doesn't support timeout and fallback parameters yet
+            movie_crew_manager = MovieCrewManagerOptimized(
+                api_key=settings.LLM_CONFIG['api_key'],
+                base_url=settings.LLM_CONFIG.get('base_url'),
+                model=settings.LLM_CONFIG.get('model', 'gpt-4o-mini'),
+                tmdb_api_key=settings.TMDB_API_KEY,
+                user_location=user_location,
+                user_ip=get_client_ip(request),
+                timezone=request.session.get('user_timezone', 'America/Los_Angeles')
+                # timeout and fallback parameters removed as they're not supported
+            )
+        else:
+            movie_crew_manager = MovieCrewManager(
+                api_key=settings.LLM_CONFIG['api_key'],
+                base_url=settings.LLM_CONFIG.get('base_url'),
+                model=settings.LLM_CONFIG.get('model', 'gpt-4o-mini'),
+                tmdb_api_key=settings.TMDB_API_KEY,
+                user_location=user_location,
+                user_ip=get_client_ip(request),
+                timezone=request.session.get('user_timezone', 'America/Los_Angeles')
+            )
 
         # Process query with first run mode
         conversation_history = [{
@@ -757,7 +837,8 @@ def poll_first_run_recommendations(request):
         setattr(request, '_processing_first_run_query', True)
 
         try:
-            # Process the query with explicit first run mode
+            # Add timeout handling for the process_query call
+            # Use the timeout parameter if the manager supports it
             response_data = movie_crew_manager.process_query(
                 query=user_message_text,
                 conversation_history=conversation_history,
@@ -874,6 +955,27 @@ def poll_first_run_recommendations(request):
         })
 
     except Exception as e:
+        # Check if it's a timeout issue
+        elapsed = time.time() - start_time if 'start_time' in locals() else float('inf')
+        if elapsed >= timeout_seconds:
+            logger.warning(f"Timeout occurred while processing theater data after {elapsed:.1f} seconds")
+            # Return partial results with empty theaters on timeout
+            return JsonResponse({
+                'status': 'success',
+                'message': 'Your movie recommendations are ready, but we couldn\'t find theater information within the time limit.',
+                'recommendations': [
+                    {
+                        'id': movie.id,
+                        'title': movie.title,
+                        'overview': movie.overview,
+                        'poster_url': movie.poster_url,
+                        'release_date': movie.release_date.isoformat() if movie.release_date and hasattr(movie.release_date, 'isoformat') else None,
+                        'rating': float(movie.rating) if movie.rating else None,
+                        'theaters': []
+                    } for movie in conversation.recommendations.all().order_by('-created_at')[:5]
+                ]
+            })
+
         logger.error(f"Error processing first run movie recommendation poll: {str(e)}")
         logger.error(traceback.format_exc())
         return JsonResponse({
@@ -893,11 +995,14 @@ def get_api_config(request):
     try:
         from movie_chatbot.settings import app_config
 
-        # Return non-sensitive configuration settings
+        # Return non-sensitive configuration settings including feature flags
         return JsonResponse({
             'api_timeout_seconds': app_config.API_REQUEST_TIMEOUT,
             'api_max_retries': app_config.API_MAX_RETRIES,
-            'api_retry_backoff_factor': app_config.API_RETRY_BACKOFF_FACTOR
+            'api_retry_backoff_factor': app_config.API_RETRY_BACKOFF_FACTOR,
+            'features': {
+                'enable_first_run_mode': settings.FEATURES.get('ENABLE_FIRST_RUN_MODE', True)
+            }
         })
     except Exception as e:
         logger.error(f"Error getting API configuration: {str(e)}")

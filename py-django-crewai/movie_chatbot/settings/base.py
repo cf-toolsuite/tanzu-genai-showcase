@@ -26,6 +26,10 @@ WSGI_APPLICATION = 'movie_chatbot.wsgi.application'
 # Default primary key field type
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
+# --- Feature Flags ---
+# Import feature flags from the dedicated module
+from .feature_flags import FEATURES
+
 
 # --- Internationalization ---
 # https://docs.djangoproject.com/en/4.2/topics/i18n/

@@ -124,7 +124,7 @@ export const chatApi = {
     try {
       console.log(`[First Run Mode] Getting movies, theaters, and showtimes for: "${message}" (Location: ${location})`);
 
-      const response = await api.post('/get-movies-theaters-and-showtimes/', {
+      const response = await api.post('/api/movies-theaters-showtimes/', {
         message: message,
         location,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
@@ -187,7 +187,7 @@ export const chatApi = {
     try {
       console.log(`[Casual Mode] Getting movie recommendations for: "${message}"`);
 
-      const response = await api.post('/get-movie-recommendations/', {
+      const response = await api.post('/api/movie-recommendations/', {
         message: message,
         timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
         mode: 'casual' // Explicitly set mode to casual
@@ -218,7 +218,7 @@ export const chatApi = {
   pollMovieRecommendations: async () => {
     try {
       console.log('Polling for movie recommendations...');
-      const response = await api.get('/poll-movie-recommendations/');
+      const response = await api.get('/api/poll-movie-recommendations/');
 
       // If the processing is complete, return the results
       if (response.data.status === 'success' && response.data.recommendations) {
@@ -245,7 +245,7 @@ export const chatApi = {
   pollFirstRunRecommendations: async () => {
     try {
       console.log('Polling for first run movie recommendations...');
-      const response = await api.get('/poll-first-run-recommendations/');
+      const response = await api.get('/api/poll-first-run-recommendations/');
 
       // If the processing is complete, return the results
       if (response.data.status === 'success' && response.data.recommendations) {
@@ -280,7 +280,7 @@ export const chatApi = {
       }
 
       // If not in cache, make initial request to fetch or start processing
-      const response = await api.get(`/get-theaters/${movieId}/`);
+      const response = await api.get(`/api/theaters/${movieId}/`);
 
       // If response contains a status of "processing", start polling
       if (response.data.status === 'processing') {
@@ -306,7 +306,7 @@ export const chatApi = {
   // Method for polling theater status
   pollTheaterStatus: async (movieId) => {
     try {
-      const response = await api.get(`/theater-status/${movieId}/`);
+      const response = await api.get(`/api/theater-status/${movieId}/`);
 
       // If the processing is complete, cache the results
       if (response.data.status === 'success' && response.data.theaters) {
@@ -327,7 +327,7 @@ export const chatApi = {
       // Clear cache when resetting conversation
       cache.clear();
 
-      await api.get('/reset/');
+      await api.get('/api/reset/');
       return { status: 'success' };
     } catch (error) {
       console.error('Error resetting conversation:', error);
