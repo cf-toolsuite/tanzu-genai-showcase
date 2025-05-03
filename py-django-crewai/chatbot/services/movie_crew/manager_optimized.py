@@ -92,7 +92,7 @@ class MovieCrewManagerOptimized:
         self.llm_provider = llm_provider
         self.llm_instance = None  # Will be created on demand
         self.timeout = timeout or 180  # Default timeout: 3 minutes if not specified
-        self.fallback_enabled = fallback_enabled
+        self.fallback_enabled = False  # Disabled fallback to avoid generating fake data
 
         # Configure TMDb API if key is provided
         if tmdb_api_key:

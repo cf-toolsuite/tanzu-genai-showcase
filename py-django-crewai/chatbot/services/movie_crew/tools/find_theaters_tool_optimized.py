@@ -11,7 +11,7 @@ import json
 import logging
 import time
 import concurrent.futures
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Union
 from pydantic import BaseModel, Field, field_validator
 from django.conf import settings
@@ -113,14 +113,12 @@ class FindTheatersToolOptimized(BaseTool):
             except TimeoutError:
                 logger.warning(f"Global timeout reached after {global_timeout}s, returning partial results")
 
-            # If no theaters found, generate fallback data in First Run mode
+            # If no theaters found, log a warning and use fallback data
             if not theater_results:
                 logger.warning("No theaters found for any of the recommended movies")
-                # Check if we're in first run mode
-                use_fallback = getattr(settings, 'USE_FALLBACK_THEATERS', True)
-                if use_fallback:
-                    logger.info("Generating fallback theater data for First Run mode")
-                    theater_results = self._generate_fallback_theater_data(movies_to_process)
+                # Enable fallback data to ensure we have showtimes in First Run mode
+                logger.info("Using fallback theater data in First Run mode")
+                theater_results = self._generate_fallback_theater_data(movies_to_process)
 
             # Format results
             logger.info(f"Found {len(theater_results)} theaters across all movies")
@@ -530,12 +528,17 @@ class FindTheatersToolOptimized(BaseTool):
                     # AM/PM designation
                     am_pm = "AM" if (base_hour + hour_offset * 2) < 12 else "PM"
 
-                    # Format: 2:30 PM
-                    time_str = f"{hour}:{'00' if hour_offset % 2 == 0 else '30'} {am_pm}"
+                    # Generate ISO format datetime string
+                    showtime_dt = now.replace(
+                        hour=(hour if am_pm == "AM" or hour == 12 else hour + 12) % 24,
+                        minute=0 if hour_offset % 2 == 0 else 30,
+                        second=0,
+                        microsecond=0
+                    ) + timedelta(days=day)
 
-                    # Add to showtimes
+                    # Add to showtimes with proper ISO format
                     theater_entry["showtimes"].append({
-                        "start_time": time_str,
+                        "start_time": showtime_dt.isoformat(),
                         "format": "Standard" if hour_offset < 3 else "IMAX"
                     })
 

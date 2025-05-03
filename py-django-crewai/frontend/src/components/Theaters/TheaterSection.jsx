@@ -152,8 +152,12 @@ function TheaterSection() {
     // Skip if no movie is selected
     if (!selectedMovieId) return;
 
-    // Skip if movie already has theaters
-    if (selectedMovie?.theaters?.length > 0) return;
+    // Skip if movie theaters array is already defined (even if empty)
+    // This is the key change - we check if theaters is defined at all, not just if it has items
+    if (selectedMovie?.theaters !== undefined) {
+      console.log(`Movie ${selectedMovieId} already has theaters defined (${selectedMovie.theaters.length} theaters), skipping poll`);
+      return;
+    }
 
     // Skip if already loading or error state
     if (isLoadingTheaters || theaterError) return;
@@ -184,7 +188,7 @@ function TheaterSection() {
       // Set up recurring polling
       pollingIntervalRef.current = setInterval(pollTheaterStatus, pollingDelayRef.current);
 
-      // Set a timeout to stop polling after 30 seconds to prevent excessive polling
+      // Set a timeout to stop polling after 15 seconds to prevent excessive polling
       pollingTimeoutRef.current = setTimeout(() => {
         if (pollingIntervalRef.current) {
           clearInterval(pollingIntervalRef.current);
@@ -203,7 +207,7 @@ function TheaterSection() {
             )
           );
         }
-      }, 30 * 1000); // 30 seconds max polling (reduced from 2 minutes)
+      }, 15 * 1000); // 15 seconds max polling (reduced from 30 seconds)
     }, 500);
 
     // Cleanup function

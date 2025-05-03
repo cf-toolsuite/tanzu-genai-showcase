@@ -115,7 +115,12 @@ def poll_movie_recommendations(request):
                 # Format recommendations
                 recommendations_data = []
                 # Convert ISO format string to datetime object
-                query_dt = datetime.fromisoformat(query_timestamp)
+                try:
+                    query_dt = datetime.fromisoformat(query_timestamp)
+                except ValueError:
+                    # Handle invalid format
+                    logger.warning(f"Invalid timestamp format: {query_timestamp}")
+                    query_dt = timezone.now() - timezone.timedelta(hours=24)  # Use 24 hours ago as fallback
 
                 # If the query_dt is naive (no timezone), make it timezone-aware
                 if query_dt.tzinfo is None:
@@ -292,7 +297,12 @@ def poll_first_run_recommendations(request):
                 # Format recommendations
                 recommendations_data = []
                 # Convert ISO format string to datetime object
-                query_dt = datetime.fromisoformat(query_timestamp)
+                try:
+                    query_dt = datetime.fromisoformat(query_timestamp)
+                except ValueError:
+                    # Handle invalid format
+                    logger.warning(f"Invalid timestamp format: {query_timestamp}")
+                    query_dt = timezone.now() - timezone.timedelta(hours=24)  # Use 24 hours ago as fallback
 
                 # If the query_dt is naive (no timezone), make it timezone-aware
                 if query_dt.tzinfo is None:
@@ -439,32 +449,37 @@ def poll_first_run_recommendations(request):
                         for showtime_data in theater_data.get('showtimes', []):
                             # Process the showtime data
                             try:
-                                # Check for non-ISO format times (e.g., "8:00 PM")
-                                time_str = showtime_data['start_time']
+                                try:
+                                    # Check for non-ISO format times (e.g., "8:00 PM")
+                                    time_str = showtime_data['start_time']
 
-                                if ":" in time_str and ("AM" in time_str.upper() or "PM" in time_str.upper()):
-                                    # Parse time like "8:00 PM"
-                                    import pytz
+                                    if ":" in time_str and ("AM" in time_str.upper() or "PM" in time_str.upper()):
+                                        # Parse time like "8:00 PM"
+                                        import pytz
 
-                                    # Get the base date (today)
-                                    today = datetime.now().date()
+                                        # Get the base date (today)
+                                        today = datetime.now().date()
 
-                                    # Parse the time
-                                    time_format = "%I:%M %p"  # Format for "8:00 PM"
-                                    time_obj = datetime.strptime(time_str, time_format).time()
+                                        # Parse the time
+                                        time_format = "%I:%M %p"  # Format for "8:00 PM"
+                                        time_obj = datetime.strptime(time_str, time_format).time()
 
-                                    # Combine date and time
-                                    start_time = datetime.combine(today, time_obj)
+                                        # Combine date and time
+                                        start_time = datetime.combine(today, time_obj)
 
-                                    # Make it timezone aware
-                                    tz = pytz.timezone(user_timezone)
-                                    start_time = tz.localize(start_time)
-                                else:
-                                    # Standard ISO format parsing
-                                    start_time = datetime.fromisoformat(time_str)
-                                    if start_time.tzinfo is None:
-                                        # Make timezone-aware if needed
-                                        start_time = timezone.make_aware(start_time)
+                                        # Make it timezone aware
+                                        tz = pytz.timezone(user_timezone)
+                                        start_time = tz.localize(start_time)
+                                    else:
+                                        # Standard ISO format parsing
+                                        start_time = datetime.fromisoformat(time_str)
+                                        if start_time.tzinfo is None:
+                                            # Make timezone-aware if needed
+                                            start_time = timezone.make_aware(start_time)
+                                except ValueError as e:
+                                    # Handle invalid datetime format by skipping this showtime
+                                    logger.warning(f"Invalid datetime format in showtime: {time_str} - {str(e)}")
+                                    continue
 
                                 # Create the showtime
                                 showtime = Showtime.objects.create(
