@@ -418,9 +418,11 @@ To enable debug logging:
 * [ipapi.co Documentation](https://ipapi.co/api/)
 
 * [Architecture Guide](./docs/ARCHITECTURE.md)
+* [Configuration Guide](./docs/CONFIGURATION.md)
 * [Developer Guide](./docs/DEVELOPMENT.md)
 * [Troubleshooting Guide](./docs/TROUBLESHOOTING.md)
 * [Deployment Guide](DEPLOY.md)
+   * [Cloud Foundry Deployment Guide](./docs/CLOUD_FOUNDRY.md)
    * [Scenarios Guide](./docs/DEPLOYMENT_SCENARIOS.md)
 * [API Documentation](./docs/API.md)
 * [Testing Guide](./docs/TESTING.md)

@@ -26,9 +26,11 @@ db.sqlite3
 db.sqlite3-journal
 media
 
-# Development/deployment files
+# Sensitive config
 .env
 .env.example
+
+# Development/deployment files
 .git
 .gitignore
 .idea
