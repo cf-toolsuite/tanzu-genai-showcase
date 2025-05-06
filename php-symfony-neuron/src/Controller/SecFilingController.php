@@ -122,7 +122,7 @@ class SecFilingController extends AbstractController
         // If we don't have the content yet, download it
         if (!$secFiling->getContent() && $secFiling->getTextUrl()) {
             try {
-                // Use the EdgarApiClient through the SecFilingService to download content
+                // Use the Kaleidoscope API client through the SecFilingService to download content
                 $content = $secFilingService->processSecFiling($secFiling);
 
                 if (!$content) {
@@ -177,16 +177,16 @@ class SecFilingController extends AbstractController
 
         try {
             // Generate summary
-            $summary = $neuronAiService->generateText(
+            $summary = $neuronAiService->generateCompletion(
                 "Summarize the following section from a 10-K report for {$secFiling->getCompany()->getName()}: {$sectionTitle}\n\n{$truncatedContent}",
-                1000
+                ['max_tokens' => 1000]
             );
 
             // Update key findings
             $keyFindings = $secFiling->getKeyFindings() ?? [];
-            $keyFindings[$sectionKey] = $neuronAiService->generateText(
+            $keyFindings[$sectionKey] = $neuronAiService->generateCompletion(
                 "Extract 3-5 key findings from the following section of a 10-K report for {$secFiling->getCompany()->getName()}: {$sectionTitle}\n\n{$truncatedContent}",
-                500
+                ['max_tokens' => 500]
             );
 
             $secFiling->setKeyFindings($keyFindings);

@@ -276,8 +276,8 @@ Various projects require API keys for external services:
 - **Stock API Key**: Required for php-symfony-neuron
   - Various providers available (Alpha Vantage, Finnhub, etc.)
 
-- **Edgar API Key**: Required for php-symfony-neuron
-  - SEC EDGAR database access
+- **Kaleidoscope API Key**: Required for php-symfony-neuron
+  - SEC filings database access
 
 - **LinkedIn API Credentials**: Required for php-symfony-neuron
   - **Sign up**: [https://www.linkedin.com/developers/](https://www.linkedin.com/developers/)

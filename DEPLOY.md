@@ -42,10 +42,10 @@ You **must** configure the following secrets in your repository for the applicat
 | `OPENAI_API_KEY`            | `java-spring-ai-mcp/client`, `java-spring-langgraph-mcp-angular`, `php-symfony-neuron`, `py-django-crewai` | `SPRING_AI_OPENAI_API_KEY` (Java), `OPENAI_API_KEY` (PHP/Python) |
 | `TICKETMASTER_API_KEY`      | `java-spring-langgraph-mcp-angular`     | `TICKETMASTER_API_KEY`       |
 | `CITIES_API_KEY`            | `java-spring-langgraph-mcp-angular`     | `CITIES_API_KEY`             |
-| `NEWS_API_KEY`              | `js-langchain-react`, `php-symfony-neuron` | `NEWS_API_KEY`               |
+| `NEWS_API_KEY`              | `js-langchain-react`, `php-symfony-neuron` | `NEWS_API_KEY`            |
 | `LLM_API_KEY`               | `js-langchain-react`                    | `API_KEY`                    |
 | `STOCK_API_KEY`             | `php-symfony-neuron`                    | `STOCK_API_KEY`              |
-| `EDGAR_API_KEY`             | `php-symfony-neuron`                    | `EDGAR_API_KEY`              |
+| `KALEIDOSCOPE_API_KEY`      | `php-symfony-neuron`                    | `KALEIDOSCOPE_API_KEY`       |
 | `LINKEDIN_CLIENT_ID`        | `php-symfony-neuron`                    | `LINKEDIN_CLIENT_ID`         |
 | `LINKEDIN_CLIENT_SECRET`    | `php-symfony-neuron`                    | `LINKEDIN_CLIENT_SECRET`     |
 | `DJANGO_SECRET_KEY`         | `py-django-crewai`                      | `DJANGO_SECRET_KEY`          |

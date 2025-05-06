@@ -149,7 +149,7 @@ pipeline {
                     booleanParam(name: 'RANDOM_ROUTE', defaultValue: false, description: 'Use random route for the application')
                     password(name: 'STOCK_API_KEY', defaultValue: '', description: 'Stock API Key')
                     password(name: 'NEWS_API_KEY', defaultValue: '', description: 'News API Key')
-                    password(name: 'EDGAR_API_KEY', defaultValue: '', description: 'Edgar API Key')
+                    password(name: 'KALEIDOSCOPE_API_KEY', defaultValue: '', description: 'Kaleidoscope API Key')
                     password(name: 'OPENAI_API_KEY', defaultValue: '', description: 'OpenAI API Key')
                     password(name: 'LINKEDIN_CLIENT_ID', defaultValue: '', description: 'LinkedIn Client ID')
                     password(name: 'LINKEDIN_CLIENT_SECRET', defaultValue: '', description: 'LinkedIn Client Secret')
@@ -214,8 +214,8 @@ pipeline {
                             cf set-env "$APP_NAME" "NEWS_API_KEY" "${NEWS_API_KEY}"
                         fi
 
-                        if [ -n "${EDGAR_API_KEY}" ]; then
-                            cf set-env "$APP_NAME" "EDGAR_API_KEY" "${EDGAR_API_KEY}"
+                        if [ -n "${KALEIDOSCOPE_API_KEY}" ]; then
+                            cf set-env "$APP_NAME" "KALEIDOSCOPE_API_KEY" "${KALEIDOSCOPE_API_KEY}"
                         fi
 
                         if [ -n "${OPENAI_API_KEY}" ]; then

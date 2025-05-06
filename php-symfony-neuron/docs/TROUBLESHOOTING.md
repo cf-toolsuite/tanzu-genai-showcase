@@ -29,19 +29,19 @@ If you encounter issues with HTTP client services not being found or properly co
    php bin/console cache:clear
    ```
 
-### SEC EDGAR API Integration
+### Kaleidoscope API Integration
 
-The SEC EDGAR API doesn't require an API key, but it does require a proper User-Agent header:
+The Kaleidoscope API requires an API key for SEC filings access:
 
-1. Set the `SEC_EDGAR_USER_AGENT` environment variable in your `.env` file:
+1. Set the `KALEIDOSCOPE_API_KEY` environment variable in your `.env` file:
    ```
-   SEC_EDGAR_USER_AGENT="YourAppName your_email@example.com"
+   KALEIDOSCOPE_API_KEY="your_kaleidoscope_api_key"
    ```
 
-2. Make sure the `edgar_api.user_agent` parameter is properly configured in `services.yaml`:
+2. Make sure the `kaleidoscope_api.key` parameter is properly configured in `services.yaml`:
    ```yaml
    parameters:
-       edgar_api.user_agent: '%env(SEC_EDGAR_USER_AGENT)%'
+       kaleidoscope_api.key: '%env(KALEIDOSCOPE_API_KEY)%'
    ```
 
 ### Symfony Version Compatibility

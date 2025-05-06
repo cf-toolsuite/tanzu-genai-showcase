@@ -6,16 +6,17 @@ namespace App\Service;
 use App\Entity\Company;
 use App\Entity\SecFiling;
 use App\Repository\SecFilingRepository;
-use App\Service\ApiClient\EdgarClientFactory; // Import the factory
-use App\Service\ApiClient\ApiClientInterface; // Keep interface hint
-use App\Service\ApiClient\EdgarApiClient; // Import concrete type for checking
+use App\Service\ApiClient\SecApiClientFactory;
+use App\Service\ApiClient\ApiClientInterface;
+use App\Service\ApiClient\KaleidoscopeApiClient;
+use App\Service\ApiClient\MockKaleidoscopeApiClient;
 use App\Service\NeuronAiService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
 
 class SecFilingService
 {
-    private ApiClientInterface $edgarApiClient; // Keep interface hint
+    private ApiClientInterface $secApiClient; // SEC API client
     private NeuronAiService $neuronAiService;
     private EntityManagerInterface $entityManager;
     private SecFilingRepository $secFilingRepository;
@@ -25,14 +26,14 @@ class SecFilingService
      * Constructor
      */
     public function __construct(
-        EdgarClientFactory $edgarClientFactory, // Inject the factory
+        SecApiClientFactory $secApiClientFactory, // Inject the unified factory
         NeuronAiService $neuronAiService,
         EntityManagerInterface $entityManager,
         SecFilingRepository $secFilingRepository,
         LoggerInterface $logger
     ) {
-        // Get client from factory
-        $this->edgarApiClient = $edgarClientFactory->createClient();
+        // Get client from factory - will be Kaleidoscope based on settings
+        $this->secApiClient = $secApiClientFactory->createClient();
 
         // Assign other dependencies
         $this->neuronAiService = $neuronAiService;
@@ -52,13 +53,14 @@ class SecFilingService
             $this->logger->warning('Cannot import 10-K reports: company has no ticker symbol');
             return [];
         }
-        // Ensure we have the correct client type for EDGAR specific methods
-        if (!$this->edgarApiClient instanceof EdgarApiClient && !$this->edgarApiClient instanceof MockEdgarApiClient) {
-             $this->logger->error('Cannot import 10-K reports: Invalid EdgarApiClient type.');
+        // Ensure we have the correct client type for SEC API specific methods
+        if (!($this->secApiClient instanceof KaleidoscopeApiClient ||
+              $this->secApiClient instanceof MockKaleidoscopeApiClient)) {
+             $this->logger->error('Cannot import 10-K reports: Invalid SEC API client type.');
              return [];
         }
 
-        $reports = $this->edgarApiClient->get10KReports($company->getTickerSymbol(), $limit);
+        $reports = $this->secApiClient->get10KReports($company->getTickerSymbol(), $limit);
 
         if (empty($reports)) {
             $this->logger->warning('No 10-K reports found for ' . $company->getTickerSymbol());
@@ -94,7 +96,7 @@ class SecFilingService
             if ($downloadContent && !empty($report['textUrl'])) {
                 $this->logger->info('Downloading content for 10-K', ['accession' => $report['accessionNumber']]);
                 try {
-                    $content = $this->edgarApiClient->downloadReport($report['textUrl'], 'text');
+                    $content = $this->secApiClient->downloadReport($report['textUrl'], 'text');
                     $filing->setContent($content);
                 } catch (\Exception $e) {
                     $this->logger->error('Error downloading 10-K content', ['error' => $e->getMessage()]);
@@ -112,15 +114,17 @@ class SecFilingService
      */
     public function processSecFiling(SecFiling $filing): bool
     {
-        if (!$this->edgarApiClient instanceof EdgarApiClient && !$this->edgarApiClient instanceof MockEdgarApiClient) {
-             $this->logger->error('Cannot process filing: Invalid EdgarApiClient type.');
+        // Ensure we have the correct client type for SEC API specific methods
+        if (!($this->secApiClient instanceof KaleidoscopeApiClient ||
+              $this->secApiClient instanceof MockKaleidoscopeApiClient)) {
+             $this->logger->error('Cannot process filing: Invalid SEC API client type.');
              return false;
         }
 
         if (!$filing->getContent()) {
             if ($filing->getTextUrl()) {
                 try {
-                    $content = $this->edgarApiClient->downloadReport($filing->getTextUrl(), 'text');
+                    $content = $this->secApiClient->downloadReport($filing->getTextUrl(), 'text');
                     $filing->setContent($content);
                 } catch (\Exception $e) {
                     $this->logger->error('Error downloading content for processing', ['error' => $e->getMessage()]);
@@ -132,7 +136,7 @@ class SecFilingService
             }
         }
 
-        $sections = $this->edgarApiClient->extractReportSections($filing->getContent());
+        $sections = $this->secApiClient->extractReportSections($filing->getContent());
         if (empty($sections)) {
             $this->logger->warning('No sections extracted from filing', ['id' => $filing->getId()]);
             // Don't mark as processed if sections fail
@@ -151,11 +155,24 @@ class SecFilingService
             };
             $truncatedContent = substr($content, 0, 8000);
             try {
-                // $summary = $this->neuronAiService->generateText("Summarize the following section from a 10-K report for {$filing->getCompany()->getName()}: {$sectionTitle}\n\n{$truncatedContent}", 1000);
-                // $findings = $this->neuronAiService->generateText("Extract 3-5 key findings from the following section of a 10-K report for {$filing->getCompany()->getName()}: {$sectionTitle}\n\n{$truncatedContent}", 500);
-                // Mock summaries for now to avoid actual API calls during debugging
-                $summary = "Mock summary for {$sectionTitle}.";
-                $findings = "1. Mock finding one.\n2. Mock finding two.\n3. Mock finding three.";
+                try {
+                    $summary = $this->neuronAiService->generateCompletion(
+                        "Summarize the following section from a 10-K report for {$filing->getCompany()->getName()}: {$sectionTitle}\n\n{$truncatedContent}",
+                        ['max_tokens' => 1000]
+                    );
+
+                    $findings = $this->neuronAiService->generateCompletion(
+                        "Extract 3-5 key findings from the following section of a 10-K report for {$filing->getCompany()->getName()}: {$sectionTitle}\n\n{$truncatedContent}",
+                        ['max_tokens' => 500]
+                    );
+                } catch (\Exception $e) {
+                    $this->logger->error('Error generating AI content for section', [
+                        'section' => $sectionTitle,
+                        'error' => $e->getMessage()
+                    ]);
+                    $summary = "Unable to generate summary for {$sectionTitle}.";
+                    $findings = "Unable to extract key findings.";
+                }
 
                 $summaries[$key] = $summary;
                 $keyFindings[$key] = $findings;
@@ -167,10 +184,21 @@ class SecFilingService
         $overallSummary = '';
         try {
             $combinedSummaries = implode("\n\n", $summaries);
-            // $overallSummary = $this->neuronAiService->generateText("Create a concise executive summary of the following 10-K report highlights for {$filing->getCompany()->getName()} ({$filing->getFiscalYear()}):\n\n{$combinedSummaries}", 1500);
-            $overallSummary = "Mock overall summary based on section summaries."; // Mock
+            try {
+                $overallSummary = $this->neuronAiService->generateCompletion(
+                    "Create a concise executive summary of the following 10-K report highlights for {$filing->getCompany()->getName()} ({$filing->getFiscalYear()}):\n\n{$combinedSummaries}",
+                    ['max_tokens' => 1500]
+                );
+            } catch (\Exception $e) {
+                $this->logger->error('Error generating overall summary', [
+                    'company' => $filing->getCompany()->getName(),
+                    'error' => $e->getMessage()
+                ]);
+                $overallSummary = "Unable to generate executive summary for this report.";
+            }
         } catch (\Exception $e) {
-            $this->logger->error('Error generating overall summary', ['error' => $e->getMessage()]);
+            $this->logger->error('Error preparing summaries for executive summary', ['error' => $e->getMessage()]);
+            $overallSummary = "Unable to process report for executive summary.";
         }
 
         $filing->setSummary($overallSummary);

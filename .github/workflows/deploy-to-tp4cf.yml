@@ -181,7 +181,7 @@ jobs:
       CF_SSO_REFRESH_TOKEN: ${{ secrets.CF_SSO_REFRESH_TOKEN }}
       STOCK_API_KEY: ${{ secrets.STOCK_API_KEY }}
       NEWS_API_KEY: ${{ secrets.NEWS_API_KEY }}
-      EDGAR_API_KEY: ${{ secrets.EDGAR_API_KEY }}
+      KALEIDOSCOPE_API_KEY: ${{ secrets.KALEIDOSCOPE_API_KEY }}
       OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
       LINKEDIN_CLIENT_ID: ${{ secrets.LINKEDIN_CLIENT_ID }}
       LINKEDIN_CLIENT_SECRET: ${{ secrets.LINKEDIN_CLIENT_SECRET }}

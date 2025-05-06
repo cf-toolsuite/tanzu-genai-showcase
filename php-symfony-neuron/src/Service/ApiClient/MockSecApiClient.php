@@ -3,14 +3,14 @@
 namespace App\Service\ApiClient;
 
 /**
- * Mock SEC API client that extends MockEdgarApiClient for compatibility with StockClientsFactory
+ * Mock SEC API client that extends MockKaleidoscopeApiClient for compatibility with StockClientsFactory
  *
  * This class exists to maintain compatibility with the StockClientsFactory
  * which expects a MockSecApiClient service, while our actual mock implementation
- * is named MockEdgarApiClient.
+ * is now MockKaleidoscopeApiClient.
  */
-class MockSecApiClient extends MockEdgarApiClient
+class MockSecApiClient extends MockKaleidoscopeApiClient
 {
-    // No additional implementation needed - this class simply extends MockEdgarApiClient
+    // No additional implementation needed - this class simply extends MockKaleidoscopeApiClient
     // to maintain compatibility with the StockClientsFactory
 }

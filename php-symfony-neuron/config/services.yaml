@@ -5,9 +5,9 @@ parameters:
     llm.api_key: '%env(GENAI_API_KEY)%'
     llm.base_url: '%env(GENAI_BASE_URL)%'
     llm.model: '%env(GENAI_MODEL)%'
-    env(USE_MOCK_DATA): '%env(bool:USE_MOCK_DATA)%'
+    use_mock_data: '%env(bool:USE_MOCK_DATA)%'
     alpha_vantage.api_key: '%env(ALPHA_VANTAGE_API_KEY)%'
-    edgar_api.user_agent: '%env(SEC_EDGAR_USER_AGENT)%' # User-Agent for SEC EDGAR API from environment
+    kaleidoscope_api.key: '%env(KALEIDOSCOPE_API_KEY)%' # API key for Kaleidoscope API
 
 services:
     # Default configuration for services in *this* file
@@ -22,14 +22,22 @@ services:
     App\:
         resource: '../src/'
         exclude:
-            - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
-            # Removed exclusion of API client implementations AND factories to enable autowiring
-            # - '../src/Service/ApiClient/'
+
+    # Configure LLM services explicitly
+    App\Service\LlmClientFactory:
+        arguments:
+            $apiKey: '%llm.api_key%'
+            $baseUrl: '%llm.base_url%'
+            $model: '%llm.model%'
+
+    # Configure NeuronAiService explicitly with the LlmClientFactory dependency
+    App\Service\NeuronAiService:
+        arguments:
+            $clientFactory: '@App\Service\LlmClientFactory'
 
     # --- Define ALL Concrete Implementations (Real & Mock) ---
-    # These need to be defined with proper arguments for the factories to locate them
     # Alpha Vantage
     App\Service\ApiClient\AlphaVantageClient:
         public: true
@@ -52,7 +60,7 @@ services:
     App\Service\ApiClient\MockYahooFinanceClient:
         public: true
 
-    # SEC API (Edgar)
+    # SEC API (Kaleidoscope)
     App\Service\ApiClient\SecApiClient:
         public: true
         arguments:
@@ -74,15 +82,15 @@ services:
     App\Service\ApiClient\MockNewsApiClient:
         public: true
 
-    # Edgar API
-    App\Service\ApiClient\EdgarApiClient:
+    # Kaleidoscope API (Now the only SEC filings provider)
+    App\Service\ApiClient\KaleidoscopeApiClient:
         public: true
         arguments:
             $httpClient: '@http_client'
             $params: '@parameter_bag'
             $logger: '@logger'
 
-    App\Service\ApiClient\MockEdgarApiClient:
+    App\Service\ApiClient\MockKaleidoscopeApiClient:
         public: true
 
     # LinkedIn API
@@ -96,26 +104,7 @@ services:
     App\Service\ApiClient\MockLinkedInApiClient:
         public: true
 
-    # --- Define the Factories ---
-    # We use a service locator for the factories to avoid circular dependencies
-    # and allow the factories to access the correct client service.
-    # Define explicit service locators for factories to avoid YAML !service_locator tag issues
-    App\Service\ApiClient\EdgarClientFactory.locator:
-        public: true
-        class: Symfony\Component\DependencyInjection\ServiceLocator
-        tags: ['container.service_locator']
-        arguments:
-            -
-                App\Service\ApiClient\EdgarApiClient: '@App\Service\ApiClient\EdgarApiClient'
-                App\Service\ApiClient\MockEdgarApiClient: '@App\Service\ApiClient\MockEdgarApiClient'
-
-    App\Service\ApiClient\EdgarClientFactory:
-        public: true
-        arguments:
-            $locator: '@App\Service\ApiClient\EdgarClientFactory.locator'
-            $useMockData: '%env(bool:USE_MOCK_DATA)%'
-        tags: ['container.service_subscriber']
-
+    # LinkedIn Client Factory
     App\Service\ApiClient\LinkedInClientFactory.locator:
         public: true
         class: Symfony\Component\DependencyInjection\ServiceLocator
@@ -132,76 +121,23 @@ services:
             $useMockData: '%env(bool:USE_MOCK_DATA)%'
         tags: ['container.service_subscriber']
 
-    App\Service\ApiClient\StockClientsFactory.locator:
+    # SEC API Client Factory (Kaleidoscope only)
+    App\Service\ApiClient\SecApiClientFactory.locator:
         public: true
         class: Symfony\Component\DependencyInjection\ServiceLocator
         tags: ['container.service_locator']
         arguments:
             -
-                App\Service\ApiClient\AlphaVantageClient: '@App\Service\ApiClient\AlphaVantageClient'
-                App\Service\ApiClient\MockAlphaVantageClient: '@App\Service\ApiClient\MockAlphaVantageClient'
-                App\Service\ApiClient\YahooFinanceClient: '@App\Service\ApiClient\YahooFinanceClient'
-                App\Service\ApiClient\MockYahooFinanceClient: '@App\Service\ApiClient\MockYahooFinanceClient'
-                App\Service\ApiClient\NewsApiClient: '@App\Service\ApiClient\NewsApiClient'
-                App\Service\ApiClient\MockNewsApiClient: '@App\Service\ApiClient\MockNewsApiClient'
-                App\Service\ApiClient\SecApiClient: '@App\Service\ApiClient\SecApiClient'
-                App\Service\ApiClient\MockSecApiClient: '@App\Service\ApiClient\MockSecApiClient'
+                App\Service\ApiClient\KaleidoscopeApiClient: '@App\Service\ApiClient\KaleidoscopeApiClient'
+                App\Service\ApiClient\MockKaleidoscopeApiClient: '@App\Service\ApiClient\MockKaleidoscopeApiClient'
 
-    App\Service\ApiClient\StockClientsFactory:
+    App\Service\ApiClient\SecApiClientFactory:
         public: true
         arguments:
-            $locator: '@App\Service\ApiClient\StockClientsFactory.locator'
+            $locator: '@App\Service\ApiClient\SecApiClientFactory.locator'
             $useMockData: '%env(bool:USE_MOCK_DATA)%'
+            $logger: '@logger'
         tags: ['container.service_subscriber']
-
-    # --- Service Definitions that USE the API Clients ---
-    # Inject the FACTORIES now, not the clients directly.
-
-    App\Service\StockDataService:
-        arguments:
-            # Inject the factory
-            $stockClientsFactory: '@App\Service\ApiClient\StockClientsFactory'
-            # Other dependencies (autowired or explicit)
-            $entityManager: '@doctrine.orm.entity_manager'
-            $cache: '@stock_data.cache' # Ensure stock_data.cache is defined (e.g., in stock_api.yaml)
-            $logger: '@logger'
-        # No longer injecting individual clients here
-
-    App\Service\SecFilingService:
-        arguments:
-            # Inject the factory
-            $edgarClientFactory: '@App\Service\ApiClient\EdgarClientFactory'
-            # Other dependencies... (autowired or explicit)
-            $neuronAiService: '@App\Service\NeuronAiService'
-            $entityManager: '@doctrine.orm.entity_manager'
-            $secFilingRepository: '@App\Repository\SecFilingRepository'
-            $logger: '@logger'
-        # No longer injecting $edgarApiClient here
-
-    App\Service\LinkedInService:
-        arguments:
-            # Inject the factory
-            $linkedInClientFactory: '@App\Service\ApiClient\LinkedInClientFactory'
-            # Other dependencies... (autowired or explicit)
-            $entityManager: '@doctrine.orm.entity_manager'
-            $logger: '@logger'
-            $requestStack: '@request_stack'
-        # No longer injecting $linkedInApiClient here
-
-    # --- Other Services ---
-    App\Service\LlmClientFactory:
-        arguments:
-            $apiKey: '%llm.api_key%'
-            $baseUrl: '%llm.base_url%'
-            $model: '%llm.model%'
-
-    App\Service\NeuronAiService:
-        arguments:
-            $clientFactory: '@App\Service\LlmClientFactory'
-
-    App\Service\ReportExportService:
-        arguments:
-            $projectDir: '%kernel.project_dir%'
 
     # Define the stock data cache service
     stock_data.cache:

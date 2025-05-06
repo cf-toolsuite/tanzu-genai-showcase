@@ -425,5 +425,4 @@ The application uses the following deployment strategy:
 ### API References
 
 - [Neuron AI Documentation](https://github.com/neuron-ai/docs)
-- [Financial Data API Documentation](https://example.com/financial-api-docs)
-- [SEC EDGAR API Documentation](https://www.sec.gov/edgar/sec-api-documentation)
+- [Kaleidoscope API Documentation](https://www.kscope.io/docs/api)

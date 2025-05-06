@@ -140,8 +140,8 @@ pipelines:
                 cf set-env "$APP_NAME" "NEWS_API_KEY" "$NEWS_API_KEY"
               fi
 
-              if [ -n "$EDGAR_API_KEY" ]; then
-                cf set-env "$APP_NAME" "EDGAR_API_KEY" "$EDGAR_API_KEY"
+              if [ -n "$KALEIDOSCOPE_API_KEY" ]; then
+                cf set-env "$APP_NAME" "KALEIDOSCOPE_API_KEY" "$KALEIDOSCOPE_API_KEY"
               fi
 
               if [ -n "$OPENAI_API_KEY" ]; then
@@ -175,7 +175,7 @@ options:
 # RANDOM_ROUTE: Whether to use a random route (true/false)
 # STOCK_API_KEY: Stock API key
 # NEWS_API_KEY: News API key
-# EDGAR_API_KEY: Edgar API key
+# KALEIDOSCOPE_API_KEY: Kaleidoscope API key
 # OPENAI_API_KEY: OpenAI API key
 # LINKEDIN_CLIENT_ID: LinkedIn Client ID
 # LINKEDIN_CLIENT_SECRET: LinkedIn Client Secret
