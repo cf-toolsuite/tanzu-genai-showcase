@@ -22,6 +22,12 @@ class ResearchReport
     private ?string $title = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $summary = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
+    private ?string $content = null;
+
+    #[ORM\Column(type: Types::TEXT, nullable: true)]
     private ?string $executiveSummary = null;
 
     #[ORM\Column(type: Types::TEXT, nullable: true)]
@@ -60,6 +66,18 @@ class ResearchReport
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $generatedBy = null;
 
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $publicationDate = null;
+
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $analyst = null;
+
+    #[ORM\Column(length: 50, nullable: true)]
+    private ?string $recommendation = null;
+
+    #[ORM\Column(type: Types::DECIMAL, precision: 10, scale: 2, nullable: true)]
+    private ?string $priceTarget = null;
+
     public function __construct()
     {
         $this->createdAt = new \DateTimeImmutable();
@@ -90,6 +108,30 @@ class ResearchReport
     public function setTitle(string $title): static
     {
         $this->title = $title;
+
+        return $this;
+    }
+
+    public function getSummary(): ?string
+    {
+        return $this->summary;
+    }
+
+    public function setSummary(?string $summary): static
+    {
+        $this->summary = $summary;
+
+        return $this;
+    }
+
+    public function getContent(): ?string
+    {
+        return $this->content;
+    }
+
+    public function setContent(?string $content): static
+    {
+        $this->content = $content;
 
         return $this;
     }
@@ -246,6 +288,54 @@ class ResearchReport
     public function setGeneratedBy(?string $generatedBy): static
     {
         $this->generatedBy = $generatedBy;
+
+        return $this;
+    }
+
+    public function getPublicationDate(): ?\DateTimeImmutable
+    {
+        return $this->publicationDate;
+    }
+
+    public function setPublicationDate(?\DateTimeImmutable $publicationDate): static
+    {
+        $this->publicationDate = $publicationDate;
+
+        return $this;
+    }
+
+    public function getAnalyst(): ?string
+    {
+        return $this->analyst;
+    }
+
+    public function setAnalyst(?string $analyst): static
+    {
+        $this->analyst = $analyst;
+
+        return $this;
+    }
+
+    public function getRecommendation(): ?string
+    {
+        return $this->recommendation;
+    }
+
+    public function setRecommendation(?string $recommendation): static
+    {
+        $this->recommendation = $recommendation;
+
+        return $this;
+    }
+
+    public function getPriceTarget(): ?string
+    {
+        return $this->priceTarget;
+    }
+
+    public function setPriceTarget(?string $priceTarget): static
+    {
+        $this->priceTarget = $priceTarget;
 
         return $this;
     }

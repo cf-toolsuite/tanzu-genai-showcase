@@ -30,9 +30,11 @@ class StockClientsFactory implements ServiceSubscriberInterface
      */
     public function getAlphaVantageClient(): ApiClientInterface
     {
-        return $this->useMockData
-            ? $this->locator->get(MockAlphaVantageClient::class)
-            : $this->locator->get(AlphaVantageClient::class);
+        $serviceId = $this->useMockData
+            ? 'App\Service\ApiClient\MockAlphaVantageClient'
+            : 'App\Service\ApiClient\AlphaVantageClient';
+
+        return $this->locator->get($serviceId);
     }
 
     /**
@@ -42,9 +44,11 @@ class StockClientsFactory implements ServiceSubscriberInterface
      */
     public function getYahooFinanceClient(): ApiClientInterface
     {
-         return $this->useMockData
-            ? $this->locator->get(MockYahooFinanceClient::class)
-            : $this->locator->get(YahooFinanceClient::class);
+         $serviceId = $this->useMockData
+            ? 'App\Service\ApiClient\MockYahooFinanceClient'
+            : 'App\Service\ApiClient\YahooFinanceClient';
+
+         return $this->locator->get($serviceId);
     }
 
     /**
@@ -54,9 +58,11 @@ class StockClientsFactory implements ServiceSubscriberInterface
      */
      public function getNewsApiClient(): ApiClientInterface
     {
-         return $this->useMockData
-            ? $this->locator->get(MockNewsApiClient::class)
-            : $this->locator->get(NewsApiClient::class);
+         $serviceId = $this->useMockData
+            ? 'App\Service\ApiClient\MockNewsApiClient'
+            : 'App\Service\ApiClient\NewsApiClient';
+
+         return $this->locator->get($serviceId);
     }
 
     /**
@@ -66,9 +72,11 @@ class StockClientsFactory implements ServiceSubscriberInterface
      */
      public function getSecApiClient(): ApiClientInterface
     {
-         return $this->useMockData
-            ? $this->locator->get(MockSecApiClient::class)
-            : $this->locator->get(SecApiClient::class);
+         $serviceId = $this->useMockData
+            ? 'App\Service\ApiClient\MockSecApiClient'
+            : 'App\Service\ApiClient\SecApiClient';
+
+         return $this->locator->get($serviceId);
     }
 
     /**
@@ -79,11 +87,15 @@ class StockClientsFactory implements ServiceSubscriberInterface
     public static function getSubscribedServices(): array
     {
         return [
-            // Define all real and mock services this factory might need
-            AlphaVantageClient::class, MockAlphaVantageClient::class,
-            YahooFinanceClient::class, MockYahooFinanceClient::class,
-            NewsApiClient::class, MockNewsApiClient::class,
-            SecApiClient::class, MockSecApiClient::class,
+            // Define all real and mock services this factory might need with fully qualified names
+            'App\Service\ApiClient\AlphaVantageClient',
+            'App\Service\ApiClient\MockAlphaVantageClient',
+            'App\Service\ApiClient\YahooFinanceClient',
+            'App\Service\ApiClient\MockYahooFinanceClient',
+            'App\Service\ApiClient\NewsApiClient',
+            'App\Service\ApiClient\MockNewsApiClient',
+            'App\Service\ApiClient\SecApiClient',
+            'App\Service\ApiClient\MockSecApiClient',
         ];
     }
 }

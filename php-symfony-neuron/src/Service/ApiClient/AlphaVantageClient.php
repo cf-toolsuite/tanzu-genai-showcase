@@ -20,6 +20,9 @@ class AlphaVantageClient extends AbstractApiClient
         $this->baseUrl = 'https://www.alphavantage.co'; // Base URL without /query
         // API Key is read from params via AbstractApiClient constructor
         $this->apiKey = $this->params->get('alpha_vantage.api_key', '');
+        
+        // Log API initialization
+        $this->logger->debug('AlphaVantageClient initialized with API Key: ' . ($this->apiKey ? 'Set' : 'Missing'));
     }
 
     /**

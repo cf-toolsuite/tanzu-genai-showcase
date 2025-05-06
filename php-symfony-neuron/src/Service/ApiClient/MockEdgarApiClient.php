@@ -3,138 +3,133 @@
 namespace App\Service\ApiClient;
 
 use Psr\Log\LoggerInterface;
+use Symfony\Contracts\HttpClient\HttpClientInterface;
+use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
 /**
- * Mock Implementation of SEC EDGAR API client
+ * Mock SEC EDGAR API client for development/testing
  */
-class MockEdgarApiClient implements ApiClientInterface
+class MockEdgarApiClient extends EdgarApiClient
 {
-    private LoggerInterface $logger;
-    private array $mockCikMapping = [
-        'AAPL' => ['cik' => '0000320193', 'name' => 'Apple Inc.'],
-        'MSFT' => ['cik' => '0000789019', 'name' => 'Microsoft Corporation'],
-        'AVGO' => ['cik' => '0001730168', 'name' => 'Broadcom Inc.'], // Corrected example CIK if known
-    ];
+    /**
+     * {@inheritdoc}
+     */
+    private ?string $userAgent = null;
 
-    public function __construct(LoggerInterface $logger)
+    protected function initialize(): void
     {
-        $this->logger = $logger;
-        $this->logger->info("MockEdgarApiClient instantiated.");
+        $this->baseUrl = 'mock://api.sec.gov';
+        $this->apiKey = '';
+        $this->userAgent = 'Mock EDGAR Client';
+        $this->logger->info('MockEdgarApiClient initialized');
     }
 
-    public function getCik(string $ticker): ?string
+    /**
+     * Override request to return mock data
+     */
+    protected function request(string $method, string $endpoint, array $params = [], array $options = []): array
     {
-        return $this->mockCikMapping[strtoupper($ticker)]['cik'] ?? null;
-    }
+        // Log mock request
+        $this->logger->info("Making MOCK API {$method} request to {$endpoint}", ['params' => $params]);
 
-    public function getCompanySubmissions(string $identifier): array
-    {
-        $this->logger->info("MockEdgarApiClient::getCompanySubmissions called", ['identifier' => $identifier]);
-        return $this->getMockSubmissionsData($identifier);
-    }
-
-    public function get10KReports(string $ticker, int $limit = 5): array
-    {
-        $this->logger->info("MockEdgarApiClient::get10KReports called", ['ticker' => $ticker, 'limit' => $limit]);
-        // Reuse the mock submissions data structure and filter/format
-        $submissions = $this->getMockSubmissionsData($ticker);
-        $filings = [];
-        $recent = $submissions['filings']['recent'];
-        $count = 0;
-        $cik = $submissions['cik'];
-        for ($i = 0; $i < count($recent['accessionNumber']); $i++) {
-            if ($recent['form'][$i] === '10-K') {
-                $a = $recent['accessionNumber'][$i];
-                $ac = str_replace('-', '', $a);
-                $p = $recent['primaryDocument'][$i] ?? "{$ac}-index.htm";
-                $fd = $recent['filingDate'][$i] ?? '';
-                $rd = $recent['reportDate'][$i] ?? '';
-                $filings[] = ['id' => $a, 'cik' => $cik, 'companyName' => $submissions['name'], 'formType' => '10-K', 'filingDate' => $fd, 'reportDate' => $rd, 'accessionNumber' => $a, 'fileNumber' => $recent['fileNumber'][$i] ?? '', 'documentUrl' => "...", 'htmlUrl' => "...", 'textUrl' => "...", 'description' => $recent['primaryDocDescription'][$i] ?? 'Annual report', 'fiscalYear' => $rd ? date('Y', strtotime($rd)) : ($fd ? date('Y', strtotime($fd)) : 'N/A')];
-                $count++;
-                if ($count >= $limit) break;
-            }
+        // Use a simplified pattern matching approach to return different mock data based on endpoint
+        if (strpos($endpoint, '/submissions') !== false) {
+            return $this->getMockSubmissions($endpoint, $params);
         }
-        return $filings;
+
+        // Default to empty response if no matching endpoint
+        return [];
     }
 
-    public function downloadReport(string $url, string $format = 'text'): string
+    /**
+     * Get mock submissions data
+     */
+    private function getMockSubmissions(string $endpoint, array $params): array
     {
-        $this->logger->info("MockEdgarApiClient::downloadReport called", ['url' => $url]);
-        return "Mock 10-K Content \n\nItem 1. Business\nMock business description.\n\nItem 1A. Risk Factors\nMock risks.";
-    }
+        // Extract CIK from endpoint if present
+        $cik = '';
+        if (preg_match('/CIK(\d+)\.json/', $endpoint, $matches)) {
+            $cik = $matches[1];
+        }
 
-    public function extractReportSections(string $content): array
-    {
-        $this->logger->info("MockEdgarApiClient::extractReportSections called");
+        // Return mock data structure that matches EDGAR API response format
         return [
-            'item1' => "Mock Business section extracted.",
-            'item1a' => "Mock Risk Factors section extracted.",
-            'item7' => "Mock MD&A section extracted.",
-            'item8' => "Mock Financial Statements section extracted.",
+            'cik' => $cik,
+            'name' => 'MOCK COMPANY ' . ($cik ? substr($cik, -4) : 'INC'),
+            'filings' => [
+                'recent' => [
+                    'accessionNumber' => ['0000000000-22-000001', '0000000000-21-000001', '0000000000-20-000001'],
+                    'filingDate' => ['2022-04-01', '2021-04-01', '2020-04-01'],
+                    'reportDate' => ['2022-03-31', '2021-03-31', '2020-03-31'],
+                    'form' => ['10-K', '10-K', '10-K'],
+                    'primaryDocument' => ['form10k.htm', 'form10k.htm', 'form10k.htm'],
+                    'primaryDocDescription' => ['Annual Report', 'Annual Report', 'Annual Report'],
+                    'fileNumber' => ['000-00000', '000-00000', '000-00000'],
+                ]
+            ]
         ];
     }
 
-    // --- Stubs for other ApiClientInterface methods ---
-    public function searchCompanies(string $term): array
+    /**
+     * {@inheritdoc}
+     */
+    public function get10KReports(string $ticker, int $limit = 5): array
     {
-        return [];
-    }
-    public function getCompanyProfile(string $symbol): array
-    {
-        $submissions = $this->getMockSubmissionsData($symbol);
-        $cik = $submissions['cik'];
-        return ['symbol' => $symbol, 'name' => $submissions['name'] ?? $symbol, 'cik' => $cik, 'industry' => $submissions['sicDescription'] ?? '', 'exchange' => $submissions['exchanges'][0] ?? '', 'address' => '', 'description' => '', 'sector' => '', 'employees' => 0, 'marketCap' => 0, 'peRatio' => 0, 'dividendYield' => 0, 'eps' => 0, 'beta' => 0, 'officers' => []];
-    }
-    public function getQuote(string $symbol): array
-    {
-        return ['symbol' => $symbol, 'price' => 0];
-    }
-    public function getFinancials(string $symbol, string $period = 'quarterly'): array
-    {
-        return [];
-    }
-    public function getCompanyNews(string $symbol, int $limit = 5): array
-    {
-        return [];
-    }
-    public function getExecutives(string $symbol): array
-    {
-        return [];
-    }
-    public function getHistoricalPrices(string $symbol, string $interval = 'daily', string $outputSize = 'compact'): array
-    {
-        return [];
+        $mockReports = [];
+
+        // Create mock 10-K reports
+        for ($i = 0; $i < min($limit, 5); $i++) {
+            $year = date('Y') - $i;
+            $filing_date = $year . '-04-01';
+            $report_date = $year . '-03-31';
+            $accession = '0000000000-' . substr($year, -2) . '-00000' . ($i + 1);
+            $accession_no_dashes = str_replace('-', '', $accession);
+
+            $mockReports[] = [
+                'id' => $accession,
+                'cik' => '0000000000',
+                'companyName' => 'MOCK ' . strtoupper($ticker) . ' INC',
+                'formType' => '10-K',
+                'filingDate' => $filing_date,
+                'reportDate' => $report_date,
+                'accessionNumber' => $accession,
+                'fileNumber' => '000-00000',
+                'documentUrl' => "https://www.sec.gov/Archives/edgar/data/0000000000/{$accession_no_dashes}/{$accession}-index.htm",
+                'htmlUrl' => "https://www.sec.gov/Archives/edgar/data/0000000000/{$accession_no_dashes}/form10k.htm",
+                'textUrl' => "https://www.sec.gov/Archives/edgar/data/0000000000/{$accession_no_dashes}/{$accession_no_dashes}.txt",
+                'description' => 'Annual report',
+                'fiscalYear' => $year
+            ];
+        }
+
+        return $mockReports;
     }
 
-    // --- Mock Data Generation ---
-    private function getMockSubmissionsData(string $identifier): array
-    { /* same as before */
-        $ticker = $identifier;
-        $cik = $this->getCik($ticker);
-        if (!$cik) {
-            $ticker = 'AAPL';
-            $cik = $this->getCik($ticker);
-        }
-        $name = $this->mockCikMapping[strtoupper($ticker)]['name'] ?? 'Mock Company';
-        $accessionNumbers = [];
-        $forms = [];
-        $filingDates = [];
-        $reportDates = [];
-        $primaryDocs = [];
-        $fileNumbers = [];
-        $primaryDocDescs = [];
-        for ($i = 0; $i < 10; $i++) {
-            $form = (mt_rand(0, 1) === 0 && $i < 3) ? '10-K' : (mt_rand(0, 1) === 0 ? '10-Q' : '8-K');
-            $date = (new \DateTime())->modify('-' . ($i * 30 + mt_rand(0, 15)) . ' days');
-            $accNum = $date->format('Ymd') . '-' . mt_rand(10, 99) . '-' . mt_rand(100000, 999999);
-            $accessionNumbers[] = $accNum;
-            $forms[] = $form;
-            $filingDates[] = $date->format('Y-m-d');
-            $reportDates[] = ($form === '10-K' || $form === '10-Q') ? $date->modify('-1 day')->format('Y-m-d') : '';
-            $primaryDocs[] = $form . '.htm';
-            $fileNumbers[] = '001-' . mt_rand(10000, 99999);
-            $primaryDocDescs[] = $form === '10-K' ? 'Annual' : ($form === '10-Q' ? 'Quarterly' : 'Current');
-        }
-        return ['cik' => $cik, 'name' => $name, 'sicDescription' => 'Mock Industry', 'exchanges' => ['MOCK'], 'filings' => ['recent' => ['accessionNumber' => $accessionNumbers, 'filingDate' => $filingDates, 'reportDate' => $reportDates, 'form' => $forms, 'primaryDocument' => $primaryDocs, 'fileNumber' => $fileNumbers, 'primaryDocDescription' => $primaryDocDescs]]];
+    /**
+     * {@inheritdoc}
+     */
+    public function downloadReport(string $url, string $format = 'text'): string
+    {
+        // Return mock content - this could be enhanced to return more realistic mock data
+        return "MOCK 10-K REPORT CONTENT\n\n" .
+               "Item 1. BUSINESS\n\nThis is mock business description content.\n\n" .
+               "Item 1A. RISK FACTORS\n\nThis is mock risk factors content.\n\n" .
+               "Item 7. MANAGEMENT'S DISCUSSION AND ANALYSIS\n\nThis is mock MD&A content.\n\n" .
+               "Item 8. FINANCIAL STATEMENTS AND SUPPLEMENTARY DATA\n\nThis is mock financial statements content.\n\n" .
+               "Item 9. CHANGES IN AND DISAGREEMENTS WITH ACCOUNTANTS\n\nNone.";
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function extractReportSections(string $content): array
+    {
+        // Return mock sections
+        return [
+            'item1' => 'This is mock business description content.',
+            'item1a' => 'This is mock risk factors content.',
+            'item7' => 'This is mock MD&A content.',
+            'item8' => 'This is mock financial statements content.'
+        ];
     }
 }

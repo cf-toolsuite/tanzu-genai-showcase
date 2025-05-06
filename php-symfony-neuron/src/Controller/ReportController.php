@@ -33,8 +33,24 @@ class ReportController extends AbstractController
     }
 
     #[Route('/{id}', name: 'report_show', methods: ['GET'])]
-    public function show(ResearchReport $report): Response
+    public function show(Request $request, ResearchReport $report): Response
     {
+        // Return JSON for AJAX requests
+        if ($request->isXmlHttpRequest()) {
+            return $this->json([
+                'id' => $report->getId(),
+                'title' => $report->getTitle(),
+                'reportType' => $report->getReportType(),
+                'summary' => $report->getSummary(),
+                'content' => $report->getContent(),
+                'publicationDate' => $report->getPublicationDate()->format('M d, Y'),
+                'analyst' => $report->getAnalyst(),
+                'recommendation' => $report->getRecommendation(),
+                'priceTarget' => $report->getPriceTarget()
+            ]);
+        }
+
+        // Return HTML for regular requests
         return $this->render('report/show.html.twig', [
             'report' => $report,
         ]);

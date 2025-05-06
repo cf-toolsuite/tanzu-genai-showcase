@@ -6,6 +6,9 @@ namespace App\Service\ApiClient;
 use Psr\Container\ContainerInterface;
 use Symfony\Contracts\Service\ServiceSubscriberInterface;
 
+/**
+ * Factory for creating LinkedIn API clients
+ */
 class LinkedInClientFactory implements ServiceSubscriberInterface
 {
     private ContainerInterface $locator;
@@ -24,20 +27,17 @@ class LinkedInClientFactory implements ServiceSubscriberInterface
     }
 
     /**
-     * Creates and returns the appropriate LinkedIn API client instance.
-     * Note: Returns the concrete class type as LinkedInApiClient doesn't follow ApiClientInterface here.
+     * Creates the appropriate LinkedIn API client instance based on settings.
      *
-     * @return LinkedInApiClient The LinkedIn API client instance.
+     * @return ApiClientInterface The LinkedIn API client instance.
      */
-    public function createClient(): LinkedInApiClient
+    public function createClient(): ApiClientInterface
     {
-        if ($this->useMockData) {
-            // Get the mock client instance from the locator
-            return $this->locator->get(MockLinkedInApiClient::class);
-        } else {
-            // Get the real client instance from the locator
-            return $this->locator->get(LinkedInApiClient::class);
-        }
+        $serviceId = $this->useMockData
+            ? 'App\Service\ApiClient\MockLinkedInApiClient'
+            : 'App\Service\ApiClient\LinkedInApiClient';
+
+        return $this->locator->get($serviceId);
     }
 
     /**
@@ -48,9 +48,8 @@ class LinkedInClientFactory implements ServiceSubscriberInterface
     public static function getSubscribedServices(): array
     {
         return [
-            // Define the real and mock services this factory might need
-            LinkedInApiClient::class,
-            MockLinkedInApiClient::class,
+            'App\Service\ApiClient\LinkedInApiClient',
+            'App\Service\ApiClient\MockLinkedInApiClient'
         ];
     }
 }

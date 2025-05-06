@@ -38,6 +38,12 @@ class Company
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $description = null;
 
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $foundedYear = null;
+
+    #[ORM\Column(type: 'integer', nullable: true)]
+    private ?int $employees = null;
+
     #[ORM\Column(type: 'datetime_immutable')]
     private ?\DateTimeImmutable $createdAt = null;
 
@@ -158,6 +164,30 @@ class Company
     public function setDescription(?string $description): static
     {
         $this->description = $description;
+
+        return $this;
+    }
+
+    public function getFoundedYear(): ?int
+    {
+        return $this->foundedYear;
+    }
+
+    public function setFoundedYear(?int $foundedYear): static
+    {
+        $this->foundedYear = $foundedYear;
+
+        return $this;
+    }
+
+    public function getEmployees(): ?int
+    {
+        return $this->employees;
+    }
+
+    public function setEmployees(?int $employees): static
+    {
+        $this->employees = $employees;
 
         return $this;
     }

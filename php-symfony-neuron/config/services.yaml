@@ -6,6 +6,8 @@ parameters:
     llm.base_url: '%env(GENAI_BASE_URL)%'
     llm.model: '%env(GENAI_MODEL)%'
     env(USE_MOCK_DATA): '%env(bool:USE_MOCK_DATA)%'
+    alpha_vantage.api_key: '%env(ALPHA_VANTAGE_API_KEY)%'
+    edgar_api.user_agent: '%env(SEC_EDGAR_USER_AGENT)%' # User-Agent for SEC EDGAR API from environment
 
 services:
     # Default configuration for services in *this* file
@@ -23,60 +25,134 @@ services:
             - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
-            # Exclude API client implementations AND factories - we define them explicitly
-            - '../src/Service/ApiClient/'
+            # Removed exclusion of API client implementations AND factories to enable autowiring
+            # - '../src/Service/ApiClient/'
 
     # --- Define ALL Concrete Implementations (Real & Mock) ---
-    # These need to be defined so the factories can locate them.
-    App\Service\ApiClient\AlphaVantageClient: ~ # ~ uses _defaults
-    App\Service\ApiClient\YahooFinanceClient: ~
-    App\Service\ApiClient\SecApiClient: ~
-    App\Service\ApiClient\NewsApiClient: ~
-    App\Service\ApiClient\EdgarApiClient: ~
-    App\Service\ApiClient\LinkedInApiClient: ~
+    # These need to be defined with proper arguments for the factories to locate them
+    # Alpha Vantage
+    App\Service\ApiClient\AlphaVantageClient:
+        public: true
+        arguments:
+            $httpClient: '@http_client'
+            $params: '@parameter_bag'
+            $logger: '@logger'
 
-    App\Service\ApiClient\MockAlphaVantageClient: ~
-    App\Service\ApiClient\MockYahooFinanceClient: ~
-    App\Service\ApiClient\MockSecApiClient: ~
-    App\Service\ApiClient\MockNewsApiClient: ~
-    App\Service\ApiClient\MockEdgarApiClient: ~
-    App\Service\ApiClient\MockLinkedInApiClient: ~
+    App\Service\ApiClient\MockAlphaVantageClient:
+        public: true
+
+    # Yahoo Finance
+    App\Service\ApiClient\YahooFinanceClient:
+        public: true
+        arguments:
+            $httpClient: '@http_client'
+            $params: '@parameter_bag'
+            $logger: '@logger'
+
+    App\Service\ApiClient\MockYahooFinanceClient:
+        public: true
+
+    # SEC API (Edgar)
+    App\Service\ApiClient\SecApiClient:
+        public: true
+        arguments:
+            $httpClient: '@http_client'
+            $params: '@parameter_bag'
+            $logger: '@logger'
+
+    App\Service\ApiClient\MockSecApiClient:
+        public: true
+
+    # News API
+    App\Service\ApiClient\NewsApiClient:
+        public: true
+        arguments:
+            $httpClient: '@http_client'
+            $params: '@parameter_bag'
+            $logger: '@logger'
+
+    App\Service\ApiClient\MockNewsApiClient:
+        public: true
+
+    # Edgar API
+    App\Service\ApiClient\EdgarApiClient:
+        public: true
+        arguments:
+            $httpClient: '@http_client'
+            $params: '@parameter_bag'
+            $logger: '@logger'
+
+    App\Service\ApiClient\MockEdgarApiClient:
+        public: true
+
+    # LinkedIn API
+    App\Service\ApiClient\LinkedInApiClient:
+        public: true
+        arguments:
+            $params: '@parameter_bag'
+            $logger: '@logger'
+            $requestStack: '@request_stack'
+
+    App\Service\ApiClient\MockLinkedInApiClient:
+        public: true
 
     # --- Define the Factories ---
     # We use a service locator for the factories to avoid circular dependencies
     # and allow the factories to access the correct client service.
-    App\Service\ApiClient\EdgarClientFactory:
+    # Define explicit service locators for factories to avoid YAML !service_locator tag issues
+    App\Service\ApiClient\EdgarClientFactory.locator:
+        public: true
+        class: Symfony\Component\DependencyInjection\ServiceLocator
+        tags: ['container.service_locator']
         arguments:
-            $locator: !service_locator # Use a service locator
-                # List the services this factory needs access to
-                - App\Service\ApiClient\EdgarApiClient
-                - App\Service\ApiClient\MockEdgarApiClient
-            $useMockData: '%env(bool:USE_MOCK_DATA)%'
-        tags: ['container.service_subscriber'] # Tag for service locator
+            -
+                App\Service\ApiClient\EdgarApiClient: '@App\Service\ApiClient\EdgarApiClient'
+                App\Service\ApiClient\MockEdgarApiClient: '@App\Service\ApiClient\MockEdgarApiClient'
 
-    App\Service\ApiClient\LinkedInClientFactory:
+    App\Service\ApiClient\EdgarClientFactory:
+        public: true
         arguments:
-            $locator: !service_locator
-                # List the services this factory needs access to
-                - App\Service\ApiClient\LinkedInApiClient
-                - App\Service\ApiClient\MockLinkedInApiClient
+            $locator: '@App\Service\ApiClient\EdgarClientFactory.locator'
             $useMockData: '%env(bool:USE_MOCK_DATA)%'
         tags: ['container.service_subscriber']
 
-    App\Service\ApiClient\StockClientsFactory:
-         arguments:
-            $locator: !service_locator
-                # List the services this factory needs access to
-                - App\Service\ApiClient\AlphaVantageClient
-                - App\Service\ApiClient\MockAlphaVantageClient
-                - App\Service\ApiClient\YahooFinanceClient
-                - App\Service\ApiClient\MockYahooFinanceClient
-                - App\Service\ApiClient\NewsApiClient
-                - App\Service\ApiClient\MockNewsApiClient
-                - App\Service\ApiClient\SecApiClient
-                - App\Service\ApiClient\MockSecApiClient
+    App\Service\ApiClient\LinkedInClientFactory.locator:
+        public: true
+        class: Symfony\Component\DependencyInjection\ServiceLocator
+        tags: ['container.service_locator']
+        arguments:
+            -
+                App\Service\ApiClient\LinkedInApiClient: '@App\Service\ApiClient\LinkedInApiClient'
+                App\Service\ApiClient\MockLinkedInApiClient: '@App\Service\ApiClient\MockLinkedInApiClient'
+
+    App\Service\ApiClient\LinkedInClientFactory:
+        public: true
+        arguments:
+            $locator: '@App\Service\ApiClient\LinkedInClientFactory.locator'
             $useMockData: '%env(bool:USE_MOCK_DATA)%'
-         tags: ['container.service_subscriber']
+        tags: ['container.service_subscriber']
+
+    App\Service\ApiClient\StockClientsFactory.locator:
+        public: true
+        class: Symfony\Component\DependencyInjection\ServiceLocator
+        tags: ['container.service_locator']
+        arguments:
+            -
+                App\Service\ApiClient\AlphaVantageClient: '@App\Service\ApiClient\AlphaVantageClient'
+                App\Service\ApiClient\MockAlphaVantageClient: '@App\Service\ApiClient\MockAlphaVantageClient'
+                App\Service\ApiClient\YahooFinanceClient: '@App\Service\ApiClient\YahooFinanceClient'
+                App\Service\ApiClient\MockYahooFinanceClient: '@App\Service\ApiClient\MockYahooFinanceClient'
+                App\Service\ApiClient\NewsApiClient: '@App\Service\ApiClient\NewsApiClient'
+                App\Service\ApiClient\MockNewsApiClient: '@App\Service\ApiClient\MockNewsApiClient'
+                App\Service\ApiClient\SecApiClient: '@App\Service\ApiClient\SecApiClient'
+                App\Service\ApiClient\MockSecApiClient: '@App\Service\ApiClient\MockSecApiClient'
+
+    App\Service\ApiClient\StockClientsFactory:
+        public: true
+        arguments:
+            $locator: '@App\Service\ApiClient\StockClientsFactory.locator'
+            $useMockData: '%env(bool:USE_MOCK_DATA)%'
+        tags: ['container.service_subscriber']
 
     # --- Service Definitions that USE the API Clients ---
     # Inject the FACTORIES now, not the clients directly.
@@ -127,4 +203,10 @@ services:
         arguments:
             $projectDir: '%kernel.project_dir%'
 
-    # Cache definition should remain in stock_api.yaml or cache.yaml
+    # Define the stock data cache service
+    stock_data.cache:
+        class: Symfony\Component\Cache\Adapter\FilesystemAdapter
+        arguments:
+            $namespace: 'stock_data'
+            $defaultLifetime: 3600
+            $directory: '%kernel.cache_dir%/stock_data'

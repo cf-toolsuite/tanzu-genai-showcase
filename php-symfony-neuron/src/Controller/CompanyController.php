@@ -279,7 +279,8 @@ class CompanyController extends AbstractController
     public function stockPrices(
         Company $company,
         Request $request,
-        StockDataService $stockDataService
+        StockDataService $stockDataService,
+        \App\Repository\StockPriceRepository $stockPriceRepository
     ): Response {
         $interval = $request->query->get('interval', 'daily');
         $period = $request->query->get('period', '3m');
@@ -295,7 +296,7 @@ class CompanyController extends AbstractController
         };
 
         // Get repository for filtering and specialized queries
-        $repository = $this->getDoctrine()->getRepository(\App\Entity\StockPrice::class);
+        $repository = $stockPriceRepository;
 
         // Check if we need to import data
         $latestPrice = $repository->findMostRecent($company, $interval);
@@ -628,6 +629,167 @@ class CompanyController extends AbstractController
             'company' => $company,
             'competitorAnalyses' => $company->getCompetitorAnalyses(),
         ]);
+    }
+
+    #[Route('/{id}/reports', name: 'company_reports', methods: ['GET'])]
+    public function reports(Company $company): Response
+    {
+        return $this->render('company/reports.html.twig', [
+            'company' => $company,
+            'reports' => $company->getResearchReports(),
+        ]);
+    }
+
+    #[Route('/{id}/generate-reports', name: 'company_generate_reports', methods: ['POST'])]
+    public function generateReports(
+        Request $request,
+        Company $company,
+        NeuronAiService $neuronAiService,
+        EntityManagerInterface $entityManager
+    ): Response {
+        // Only allow XHR requests
+        if (!$request->isXmlHttpRequest()) {
+            return $this->json(['success' => false, 'message' => 'AJAX requests only'], 400);
+        }
+
+        try {
+            // Generate 3 research reports with different types
+            $reportTypes = ['Equity Research', 'Industry Analysis', 'Investment Recommendation'];
+
+            foreach ($reportTypes as $index => $reportType) {
+                // Create a new research report
+                $report = new ResearchReport();
+                $report->setCompany($company);
+                $report->setReportType($reportType);
+
+                // Generate title based on report type
+                $title = match($reportType) {
+                    'Equity Research' => $company->getName() . ' - Equity Analysis',
+                    'Industry Analysis' => 'Industry Overview: ' . $company->getIndustry(),
+                    'Investment Recommendation' => $company->getName() . ' - Investment Outlook',
+                    default => $company->getName() . ' Research Report'
+                };
+                $report->setTitle($title);
+
+                // Set publication date (recent dates with some variation)
+                $date = new \DateTimeImmutable('-' . mt_rand(1, 30) . ' days');
+                $report->setPublicationDate($date);
+
+                // Set analyst name
+                $analysts = ['Michael Chen', 'Sarah Johnson', 'David Williams', 'Emma Rodriguez'];
+                $report->setAnalyst($analysts[array_rand($analysts)]);
+
+                // Try to get AI-generated content
+                try {
+                    $aiData = $neuronAiService->generateResearchReport(
+                        $company->getName(),
+                        $company->getIndustry(),
+                        $reportType
+                    );
+
+                    if (!isset($aiData['error'])) {
+                        // Use AI-generated content
+                        $report->setSummary($aiData['summary'] ?? 'Summary of the research findings and key points.');
+                        $report->setContent($aiData['content'] ?? 'Detailed analysis would appear here.');
+
+                        // Set recommendation and price target
+                        $recommendations = ['Buy', 'Hold', 'Sell'];
+                        $weights = [70, 20, 10]; // 70% chance of Buy, 20% Hold, 10% Sell
+                        $report->setRecommendation($this->weightedRandom($recommendations, $weights));
+
+                        // Generate a reasonable price target based on recommendation
+                        $currentPrice = 100; // Placeholder price
+                        $multiplier = match($report->getRecommendation()) {
+                            'Buy' => mt_rand(110, 150) / 100,
+                            'Hold' => mt_rand(95, 105) / 100,
+                            'Sell' => mt_rand(70, 90) / 100,
+                            default => 1
+                        };
+                        $report->setPriceTarget(round($currentPrice * $multiplier, 2));
+                    } else {
+                        // Use fallback content
+                        $this->setFallbackReportContent($report, $company);
+                    }
+                } catch (\Exception $e) {
+                    // Use fallback content
+                    $this->setFallbackReportContent($report, $company);
+                }
+
+                // Persist to database
+                $entityManager->persist($report);
+            }
+
+            $entityManager->flush();
+
+            return $this->json(['success' => true]);
+        } catch (\Exception $e) {
+            return $this->json(['success' => false, 'message' => $e->getMessage()], 500);
+        }
+    }
+
+    /**
+     * Helper method to set fallback content for research reports
+     */
+    private function setFallbackReportContent(ResearchReport $report, Company $company): void
+    {
+        $report->setSummary('This research report provides an analysis of ' . $company->getName() .
+            ' within the ' . $company->getIndustry() . ' industry, examining financial performance, market position, and future outlook.');
+
+        $report->setContent('<p>The company has shown consistent performance in recent quarters, with notable strengths in its core business segments.</p>' .
+            '<p>Key findings:</p>' .
+            '<ul>' .
+            '<li>Strong market position in ' . $company->getIndustry() . '</li>' .
+            '<li>Diversified product portfolio</li>' .
+            '<li>Potential for growth in emerging markets</li>' .
+            '<li>Competitive advantages in technology and innovation</li>' .
+            '</ul>' .
+            '<p>Financial indicators suggest stable performance with opportunities for future growth.</p>');
+
+        // Set recommendation and price target
+        $recommendations = ['Buy', 'Hold', 'Sell'];
+        $weights = [70, 20, 10]; // 70% chance of Buy, 20% Hold, 10% Sell
+        $report->setRecommendation($this->weightedRandom($recommendations, $weights));
+
+        // Generate a reasonable price target
+        $basePrice = mt_rand(50, 200);
+        $multiplier = match($report->getRecommendation()) {
+            'Buy' => mt_rand(110, 150) / 100,
+            'Hold' => mt_rand(95, 105) / 100,
+            'Sell' => mt_rand(70, 90) / 100,
+            default => 1
+        };
+        $report->setPriceTarget(round($basePrice * $multiplier, 2));
+    }
+
+    /**
+     * Helper method for weighted random selection
+     */
+    private function weightedRandom(array $items, array $weights): mixed
+    {
+        $totalWeight = array_sum($weights);
+        $randomNumber = mt_rand(1, $totalWeight);
+
+        $currentWeight = 0;
+        foreach ($items as $index => $item) {
+            $currentWeight += $weights[$index];
+            if ($randomNumber <= $currentWeight) {
+                return $item;
+            }
+        }
+
+        return $items[0]; // Fallback
+    }
+
+    #[Route('/{id}', name: 'company_delete', methods: ['POST'])]
+    public function delete(Request $request, Company $company, EntityManagerInterface $entityManager): Response
+    {
+        if ($this->isCsrfTokenValid('delete'.$company->getId(), $request->request->get('_token'))) {
+            $entityManager->remove($company);
+            $entityManager->flush();
+            $this->addFlash('success', 'Company deleted successfully.');
+        }
+
+        return $this->redirectToRoute('company_index');
     }
 
     #[Route('/{id}/generate-competitors', name: 'company_generate_competitors', methods: ['POST'])]

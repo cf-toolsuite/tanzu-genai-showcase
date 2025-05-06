@@ -1,8 +1,8 @@
 parameters:
-    alpha_vantage.api_key: '%env(resolve:ALPHA_VANTAGE_API_KEY)%'
-    yahoo_finance.api_key: '%env(resolve:YAHOO_FINANCE_API_KEY)%'
-    news_api.api_key: '%env(resolve:NEWS_API_KEY)%'
-    sec_api.api_key: '%env(resolve:SEC_API_KEY)%'
+    alpha_vantage.api_key: '%env(default:STOCK_API_KEY:ALPHA_VANTAGE_API_KEY)%'
+    yahoo_finance.api_key: '%env(default::YAHOO_FINANCE_API_KEY)%'
+    news_api.api_key: '%env(NEWS_API_KEY)%'
+    sec_api.api_key: '%env(default::SEC_API_KEY)%'
 
 services:
     # Configure cache for the stock data service
@@ -13,42 +13,7 @@ services:
             $defaultLifetime: 3600
             $directory: '%kernel.cache_dir%/stock_data'
 
-    # API clients
-    App\Service\ApiClient\AlphaVantageClient:
-        arguments:
-            $params: '@parameter_bag'
-            $logger: '@logger'
-        calls:
-            - [initialize, []]
+    # API clients - removed explicit service definition since we're using factories now
 
-    App\Service\ApiClient\YahooFinanceClient:
-        arguments:
-            $params: '@parameter_bag'
-            $logger: '@logger'
-        calls:
-            - [initialize, []]
-
-    App\Service\ApiClient\NewsApiClient:
-        arguments:
-            $params: '@parameter_bag'
-            $logger: '@logger'
-        calls:
-            - [initialize, []]
-
-    App\Service\ApiClient\SecApiClient:
-        arguments:
-            $params: '@parameter_bag'
-            $logger: '@logger'
-        calls:
-            - [initialize, []]
-
-    # Stock data service
-    App\Service\StockDataService:
-        arguments:
-            $alphaVantageClient: '@App\Service\ApiClient\AlphaVantageClient'
-            $yahooFinanceClient: '@App\Service\ApiClient\YahooFinanceClient'
-            $newsApiClient: '@App\Service\ApiClient\NewsApiClient'
-            $secApiClient: '@App\Service\ApiClient\SecApiClient'
-            $entityManager: '@doctrine.orm.entity_manager'
-            $cache: '@stock_data.cache'
-            $logger: '@logger'
+    # Stock data cache definition only
+    # The StockDataService is now defined in services.yaml using the factory pattern

@@ -202,16 +202,22 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h1>{{ company.name }} ({{ company.tickerSymbol }})</h1>
 
-        {% if metrics is defined and metrics.latestPrice is defined %}
-            <div class="price-display">
-                <h2 class="mb-0">${{ metrics.latestPrice|number_format(2) }}</h2>
-                <div class="{% if metrics.latestChangePercent > 0 %}positive-change{% else %}negative-change{% endif %}">
+    {% if metrics is defined and metrics is not empty and metrics.latestPrice is defined %}
+        <div class="price-display">
+            <h2 class="mb-0">${{ metrics.latestPrice|number_format(2) }}</h2>
+            <div class="{% if metrics.latestChangePercent is defined and metrics.latestChangePercent > 0 %}positive-change{% else %}negative-change{% endif %}">
+                {% if metrics.latestChange is defined %}
                     {{ metrics.latestChange > 0 ? '+' : '' }}{{ metrics.latestChange|number_format(2) }}
+                {% endif %}
+                {% if metrics.latestChangePercent is defined %}
                     ({{ metrics.latestChangePercent > 0 ? '+' : '' }}{{ metrics.latestChangePercent|number_format(2) }}%)
-                </div>
-                <small class="text-muted">As of {{ metrics.latestDate }}</small>
+                {% endif %}
             </div>
-        {% endif %}
+            {% if metrics.latestDate is defined %}
+                <small class="text-muted">As of {{ metrics.latestDate }}</small>
+            {% endif %}
+        </div>
+    {% endif %}
     </div>
 
     <div class="chart-controls">
@@ -280,34 +286,47 @@
                     </div>
                     <div class="card-body">
                         <table class="table table-sm">
+                            {% if metrics.latestPrice is defined %}
                             <tr>
                                 <th>Latest Price</th>
                                 <td>${{ metrics.latestPrice|number_format(2) }}</td>
                             </tr>
+                            {% endif %}
+
+                            {% if metrics.periodHigh is defined %}
                             <tr>
                                 <th>Period High</th>
                                 <td>${{ metrics.periodHigh|number_format(2) }}</td>
                             </tr>
+                            {% endif %}
+
+                            {% if metrics.periodLow is defined %}
                             <tr>
                                 <th>Period Low</th>
                                 <td>${{ metrics.periodLow|number_format(2) }}</td>
                             </tr>
+                            {% endif %}
+
                             {% if metrics.ma50 is defined %}
-                                <tr>
-                                    <th>50-Day MA</th>
-                                    <td>${{ metrics.ma50|number_format(2) }}</td>
-                                </tr>
+                            <tr>
+                                <th>50-Day MA</th>
+                                <td>${{ metrics.ma50|number_format(2) }}</td>
+                            </tr>
                             {% endif %}
+
                             {% if metrics.ma200 is defined %}
-                                <tr>
-                                    <th>200-Day MA</th>
-                                    <td>${{ metrics.ma200|number_format(2) }}</td>
-                                </tr>
+                            <tr>
+                                <th>200-Day MA</th>
+                                <td>${{ metrics.ma200|number_format(2) }}</td>
+                            </tr>
                             {% endif %}
+
+                            {% if metrics.avgVolume is defined %}
                             <tr>
                                 <th>Avg. Volume</th>
                                 <td>{{ (metrics.avgVolume / 1000000)|number_format(2) }}M</td>
                             </tr>
+                            {% endif %}
                         </table>
                     </div>
                 </div>

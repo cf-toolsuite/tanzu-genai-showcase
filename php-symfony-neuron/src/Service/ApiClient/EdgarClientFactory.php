@@ -3,9 +3,12 @@
 // src/Service/ApiClient/EdgarClientFactory.php
 namespace App\Service\ApiClient;
 
-use Psr\Container\ContainerInterface; // Use PSR container for service location
+use Psr\Container\ContainerInterface;
 use Symfony\Contracts\Service\ServiceSubscriberInterface;
 
+/**
+ * Factory for creating EDGAR API clients
+ */
 class EdgarClientFactory implements ServiceSubscriberInterface
 {
     private ContainerInterface $locator;
@@ -24,19 +27,17 @@ class EdgarClientFactory implements ServiceSubscriberInterface
     }
 
     /**
-     * Creates and returns the appropriate Edgar API client instance.
+     * Creates the appropriate EDGAR API client instance based on settings.
      *
-     * @return ApiClientInterface The Edgar API client instance.
+     * @return ApiClientInterface The EDGAR API client instance.
      */
     public function createClient(): ApiClientInterface
     {
-        if ($this->useMockData) {
-            // Get the mock client instance from the locator
-            return $this->locator->get(MockEdgarApiClient::class);
-        } else {
-            // Get the real client instance from the locator
-            return $this->locator->get(EdgarApiClient::class);
-        }
+        $serviceId = $this->useMockData
+            ? 'App\Service\ApiClient\MockEdgarApiClient'
+            : 'App\Service\ApiClient\EdgarApiClient';
+
+        return $this->locator->get($serviceId);
     }
 
     /**
@@ -47,9 +48,8 @@ class EdgarClientFactory implements ServiceSubscriberInterface
     public static function getSubscribedServices(): array
     {
         return [
-            // Define the real and mock services this factory might need
-            EdgarApiClient::class,
-            MockEdgarApiClient::class,
+            'App\Service\ApiClient\EdgarApiClient',
+            'App\Service\ApiClient\MockEdgarApiClient'
         ];
     }
 }

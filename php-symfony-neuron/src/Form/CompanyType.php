@@ -7,6 +7,7 @@ use Symfony\Component\Form\AbstractType;
 use Symfony\Component\Form\Extension\Core\Type\TextType;
 use Symfony\Component\Form\Extension\Core\Type\TextareaType;
 use Symfony\Component\Form\Extension\Core\Type\UrlType;
+use Symfony\Component\Form\Extension\Core\Type\IntegerType;
 use Symfony\Component\Form\FormBuilderInterface;
 use Symfony\Component\OptionsResolver\OptionsResolver;
 
@@ -69,6 +70,22 @@ class CompanyType extends AbstractType
                     'placeholder' => 'Enter company description',
                     'class' => 'form-control',
                     'rows' => 5
+                ],
+            ])
+            ->add('foundedYear', IntegerType::class, [
+                'label' => 'Founded Year',
+                'required' => false,
+                'attr' => [
+                    'placeholder' => 'Enter founding year',
+                    'class' => 'form-control'
+                ],
+            ])
+            ->add('employees', IntegerType::class, [
+                'label' => 'Number of Employees',
+                'required' => false,
+                'attr' => [
+                    'placeholder' => 'Enter number of employees',
+                    'class' => 'form-control'
                 ],
             ]);
     }
