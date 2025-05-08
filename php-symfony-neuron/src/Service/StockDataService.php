@@ -424,11 +424,42 @@ class StockDataService
         return $this->cache->get($cacheKey, function (ItemInterface $item) use ($symbol) {
             $item->expiresAfter(21600); // Cache for 6 hours
             $this->logger->info('Cache miss for analyst ratings', ['symbol' => $symbol]);
+
+            // Try to get ratings from SEC API first
             try {
-                return $this->secApiClient->getAnalystRatings($symbol);
+                // Check if the secApiClient has the method
+                if (method_exists($this->secApiClient, 'getAnalystRatings')) {
+                    return $this->secApiClient->getAnalystRatings($symbol);
+                } else {
+                    $this->logger->info('SEC API client does not support analyst ratings, trying Yahoo Finance');
+                }
+            } catch (\BadMethodCallException $e) {
+                $this->logger->info('SEC API client does not support analyst ratings, trying Yahoo Finance');
             } catch (\Exception $e) {
-                $this->logger->error('Error getting analyst ratings: ' . $e->getMessage());
-                return [];
+                $this->logger->error('Error getting analyst ratings from SEC API: ' . $e->getMessage());
+            }
+
+            // Fallback to Yahoo Finance
+            try {
+                $ratings = $this->yahooFinanceClient->getAnalystRatings($symbol);
+                return $ratings;
+            } catch (\Exception $e) {
+                $this->logger->error('Error getting analyst ratings from Yahoo Finance: ' . $e->getMessage());
+
+                // Return empty but well-formed structure expected by the template
+                return [
+                    'ratings' => [],
+                    'consensus' => [
+                        'consensusRating' => 'N/A',
+                        'averagePriceTarget' => 0,
+                        'lowPriceTarget' => 0,
+                        'highPriceTarget' => 0,
+                        'buy' => 0,
+                        'hold' => 0,
+                        'sell' => 0,
+                        'upside' => 0
+                    ]
+                ];
             }
         });
     }
@@ -477,10 +508,34 @@ class StockDataService
         $ratingsData = $this->getAnalystRatings($symbol);
 
         if (empty($ratingsData) || empty($ratingsData['ratings'])) {
-            return ['symbol' => $symbol, 'consensus' => 'N/A', 'averagePriceTarget' => 0, 'lowPriceTarget' => 0, 'highPriceTarget' => 0, 'ratings' => ['buy' => 0, 'hold' => 0, 'sell' => 0], 'upside' => 0, 'ratings_count' => 0];
+            return [
+                'symbol' => $symbol,
+                'consensus' => 'N/A',
+                'averagePriceTarget' => 0,
+                'lowPriceTarget' => 0,
+                'highPriceTarget' => 0,
+                'ratings' => ['buy' => 0, 'hold' => 0, 'sell' => 0],
+                'upside' => 0,
+                'ratings_count' => 0,
+                'dataAvailable' => false
+            ];
         }
 
-        return ['symbol' => $symbol, 'consensus' => $ratingsData['consensus']['consensusRating'] ?? 'N/A', 'averagePriceTarget' => $ratingsData['consensus']['averagePriceTarget'] ?? 0, 'lowPriceTarget' => $ratingsData['consensus']['lowPriceTarget'] ?? 0, 'highPriceTarget' => $ratingsData['consensus']['highPriceTarget'] ?? 0, 'ratings' => ['buy' => $ratingsData['consensus']['buy'] ?? 0, 'hold' => $ratingsData['consensus']['hold'] ?? 0, 'sell' => $ratingsData['consensus']['sell'] ?? 0], 'upside' => $ratingsData['consensus']['upside'] ?? 0, 'ratings_count' => count($ratingsData['ratings'] ?? [])];
+        return [
+            'symbol' => $symbol,
+            'consensus' => $ratingsData['consensus']['consensusRating'] ?? 'N/A',
+            'averagePriceTarget' => $ratingsData['consensus']['averagePriceTarget'] ?? 0,
+            'lowPriceTarget' => $ratingsData['consensus']['lowPriceTarget'] ?? 0,
+            'highPriceTarget' => $ratingsData['consensus']['highPriceTarget'] ?? 0,
+            'ratings' => [
+                'buy' => $ratingsData['consensus']['buy'] ?? 0,
+                'hold' => $ratingsData['consensus']['hold'] ?? 0,
+                'sell' => $ratingsData['consensus']['sell'] ?? 0
+            ],
+            'upside' => $ratingsData['consensus']['upside'] ?? 0,
+            'ratings_count' => count($ratingsData['ratings'] ?? []),
+            'dataAvailable' => true
+        ];
     }
 
     /**

@@ -144,7 +144,7 @@
                                     </div>
 
                                     <div class="news-date mt-2">
-                                        <i class="far fa-calendar-alt fa-fw"></i> {{ article.publishedAt is instanceof('DateTime') ? article.publishedAt|date('M d, Y') : article.publishedAt|date('M d, Y') }}
+                                        <i class="far fa-calendar-alt fa-fw"></i> {{ article.publishedAt|date('M d, Y') }}
                                     </div>
 
                                     <a href="{{ article.url }}" target="_blank" class="btn btn-primary btn-sm mt-3">Read More</a>
@@ -174,7 +174,7 @@
                                     <h6 class="mb-1">{{ article.title }}</h6>
                                     <div class="d-flex justify-content-between align-items-center mt-2">
                                         <small class="text-muted">{{ article.source }}</small>
-                                        <small class="text-muted">{{ article.publishedAt is instanceof('DateTime') ? article.publishedAt|date('M d') : article.publishedAt|date('M d') }}</small>
+                                        <small class="text-muted">{{ article.publishedAt|date('M d') }}</small>
                                     </div>
                                     <div class="mt-2">
                                         <a href="{{ article.url }}" target="_blank" class="btn btn-outline-secondary btn-sm">Read</a>

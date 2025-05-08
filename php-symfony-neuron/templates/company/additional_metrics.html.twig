@@ -1,0 +1,515 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ company.name }} - Additional Metrics{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .metrics-card {
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .metrics-card .card-header {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            border-bottom: 1px solid #e9ecef;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .metrics-card .card-header .btn {
+            font-size: 0.875rem;
+        }
+        .esg-score {
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+        }
+        .esg-label {
+            font-size: 1rem;
+            color: #6c757d;
+            text-align: center;
+        }
+        .esg-component {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .esg-component-label {
+            width: 120px;
+            font-weight: 500;
+        }
+        .esg-component-bar {
+            flex-grow: 1;
+            height: 8px;
+            background-color: #e9ecef;
+            position: relative;
+            margin-right: 10px;
+            border-radius: 4px;
+        }
+        .esg-component-value {
+            position: absolute;
+            height: 8px;
+            background-color: #0d6efd;
+            border-radius: 4px;
+        }
+        .esg-component-score {
+            width: 40px;
+            text-align: right;
+            font-weight: 500;
+        }
+        .filing-type {
+            display: inline-block;
+            padding: 0.25rem 0.5rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            border-radius: 4px;
+            background-color: #e9ecef;
+            margin-right: 0.5rem;
+        }
+        .filing-type-10K {
+            background-color: #d1e7dd;
+            color: #0f5132;
+        }
+        .filing-type-10Q {
+            background-color: #cfe2ff;
+            color: #084298;
+        }
+        .filing-type-8K {
+            background-color: #f8d7da;
+            color: #842029;
+        }
+        .transaction-type-Purchase {
+            color: #198754;
+            font-weight: 500;
+        }
+        .transaction-type-Sale {
+            color: #dc3545;
+            font-weight: 500;
+        }
+        .transaction-type-Option {
+            color: #6c757d;
+            font-weight: 500;
+        }
+        .institution-name {
+            font-weight: 500;
+        }
+        .change-positive {
+            color: #198754;
+        }
+        .change-negative {
+            color: #dc3545;
+        }
+        .change-neutral {
+            color: #6c757d;
+        }
+        .rating-buy {
+            color: #198754;
+            font-weight: 500;
+        }
+        .rating-hold {
+            color: #fd7e14;
+            font-weight: 500;
+        }
+        .rating-sell {
+            color: #dc3545;
+            font-weight: 500;
+        }
+        .rating-neutral {
+            color: #6c757d;
+            font-weight: 500;
+        }
+        .metrics-nav {
+            margin-bottom: 1.5rem;
+        }
+        .metrics-nav .nav-link {
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            margin-right: 0.5rem;
+            font-weight: 500;
+            color: #495057;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            transition: all 0.2s ease-in-out;
+        }
+        .metrics-nav .nav-link:hover {
+            background-color: #e9ecef;
+            border-color: #dee2e6;
+        }
+        .metrics-nav .nav-link.active {
+            color: #fff;
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .metrics-nav .nav-link i {
+            margin-right: 0.5rem;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="container mt-4">
+        <h1>{{ company.name }} ({{ company.tickerSymbol }}) - Additional Metrics</h1>
+        
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ path('company_show', {'id': company.id}) }}">Company Profile</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Additional Metrics</li>
+            </ol>
+        </nav>
+        
+        <div class="metrics-nav">
+            <ul class="nav nav-pills">
+                <li class="nav-item">
+                    <a class="nav-link active" href="{{ path('company_additional_metrics', {'id': company.id}) }}">
+                        <i class="fas fa-chart-line"></i> Overview
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('company_esg_dashboard', {'id': company.id}) }}">
+                        <i class="fas fa-leaf"></i> ESG
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('company_sec_filings', {'id': company.id}) }}">
+                        <i class="fas fa-file-alt"></i> SEC Filings
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('company_insider_activity', {'id': company.id}) }}">
+                        <i class="fas fa-user-tie"></i> Insider Activity
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('company_institutional_ownership', {'id': company.id}) }}">
+                        <i class="fas fa-building"></i> Institutional Ownership
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('company_analyst_coverage', {'id': company.id}) }}">
+                        <i class="fas fa-chart-bar"></i> Analyst Coverage
+                    </a>
+                </li>
+            </ul>
+        </div>
+        
+        <div class="row">
+            <!-- ESG Data -->
+            <div class="col-md-6">
+                <div class="card metrics-card">
+                    <div class="card-header">
+                        <span>ESG Scores</span>
+                        <a href="{{ path('company_esg_dashboard', {'id': company.id}) }}" class="btn btn-sm btn-outline-primary">View Details</a>
+                    </div>
+                    <div class="card-body">
+                        {% if esgData %}
+                            <div class="esg-score">{{ esgData.totalScore|number_format(1) }}</div>
+                            <div class="esg-label">Overall ESG Score</div>
+                            
+                            <div class="mt-4">
+                                <div class="esg-component">
+                                    <span class="esg-component-label">Environmental</span>
+                                    <div class="esg-component-bar">
+                                        <div class="esg-component-value" style="width: {{ esgData.environmentScore * 10 }}%;"></div>
+                                    </div>
+                                    <span class="esg-component-score">{{ esgData.environmentScore|number_format(1) }}</span>
+                                </div>
+                                
+                                <div class="esg-component">
+                                    <span class="esg-component-label">Social</span>
+                                    <div class="esg-component-bar">
+                                        <div class="esg-component-value" style="width: {{ esgData.socialScore * 10 }}%;"></div>
+                                    </div>
+                                    <span class="esg-component-score">{{ esgData.socialScore|number_format(1) }}</span>
+                                </div>
+                                
+                                <div class="esg-component">
+                                    <span class="esg-component-label">Governance</span>
+                                    <div class="esg-component-bar">
+                                        <div class="esg-component-value" style="width: {{ esgData.governanceScore * 10 }}%;"></div>
+                                    </div>
+                                    <span class="esg-component-score">{{ esgData.governanceScore|number_format(1) }}</span>
+                                </div>
+                            </div>
+                            
+                            <div class="mt-3 text-center">
+                                <small class="text-muted">Last updated: {{ esgData.lastUpdated|date('M d, Y') }}</small>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info mb-0">
+                                <p class="mb-0">ESG data is not available for this company.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Analyst Ratings -->
+            <div class="col-md-6">
+                <div class="card metrics-card">
+                    <div class="card-header">
+                        <span>Analyst Ratings</span>
+                        <a href="{{ path('company_analyst_coverage', {'id': company.id}) }}" class="btn btn-sm btn-outline-primary">View Details</a>
+                    </div>
+                    <div class="card-body">
+                        {% if analystRatings is not empty %}
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="text-center mb-3">
+                                        <div class="h3">
+                                            {% if analystConsensus.buy > analystConsensus.hold and analystConsensus.buy > analystConsensus.sell %}
+                                                <span class="rating-buy">Buy</span>
+                                            {% elseif analystConsensus.sell > analystConsensus.buy and analystConsensus.sell > analystConsensus.hold %}
+                                                <span class="rating-sell">Sell</span>
+                                            {% else %}
+                                                <span class="rating-hold">Hold</span>
+                                            {% endif %}
+                                        </div>
+                                        <div class="text-muted">Consensus Rating</div>
+                                    </div>
+                                    
+                                    <div class="text-center">
+                                        <div class="h3">${{ analystConsensus.averagePriceTarget|number_format(2) }}</div>
+                                        <div class="text-muted">Average Price Target</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <h6>Rating Distribution</h6>
+                                    <div class="mb-2">
+                                        <div class="d-flex justify-content-between">
+                                            <span>Buy</span>
+                                            <span>{{ analystConsensus.buy }}</span>
+                                        </div>
+                                        <div class="progress" style="height: 6px;">
+                                            <div class="progress-bar bg-success" role="progressbar" 
+                                                 style="width: {{ (analystConsensus.buy / analystConsensus.total * 100)|number_format }}%" 
+                                                 aria-valuenow="{{ analystConsensus.buy }}" 
+                                                 aria-valuemin="0" 
+                                                 aria-valuemax="{{ analystConsensus.total }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-2">
+                                        <div class="d-flex justify-content-between">
+                                            <span>Hold</span>
+                                            <span>{{ analystConsensus.hold }}</span>
+                                        </div>
+                                        <div class="progress" style="height: 6px;">
+                                            <div class="progress-bar bg-warning" role="progressbar" 
+                                                 style="width: {{ (analystConsensus.hold / analystConsensus.total * 100)|number_format }}%" 
+                                                 aria-valuenow="{{ analystConsensus.hold }}" 
+                                                 aria-valuemin="0" 
+                                                 aria-valuemax="{{ analystConsensus.total }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="mb-2">
+                                        <div class="d-flex justify-content-between">
+                                            <span>Sell</span>
+                                            <span>{{ analystConsensus.sell }}</span>
+                                        </div>
+                                        <div class="progress" style="height: 6px;">
+                                            <div class="progress-bar bg-danger" role="progressbar" 
+                                                 style="width: {{ (analystConsensus.sell / analystConsensus.total * 100)|number_format }}%" 
+                                                 aria-valuenow="{{ analystConsensus.sell }}" 
+                                                 aria-valuemin="0" 
+                                                 aria-valuemax="{{ analystConsensus.total }}">
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info mb-0">
+                                <p class="mb-0">Analyst ratings are not available for this company.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="row">
+            <!-- SEC Filings -->
+            <div class="col-md-6">
+                <div class="card metrics-card">
+                    <div class="card-header">
+                        <span>Recent SEC Filings</span>
+                        <a href="{{ path('company_sec_filings', {'id': company.id}) }}" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
+                    <div class="card-body">
+                        {% if secFilings is not empty %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Type</th>
+                                            <th>Description</th>
+                                            <th>Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for filing in secFilings %}
+                                            <tr>
+                                                <td>
+                                                    <span class="filing-type {% if filing.type == '10-K' %}filing-type-10K{% elseif filing.type == '10-Q' %}filing-type-10Q{% elseif filing.type == '8-K' %}filing-type-8K{% endif %}">
+                                                        {{ filing.type }}
+                                                    </span>
+                                                </td>
+                                                <td>
+                                                    <a href="{{ filing.url }}" target="_blank">{{ filing.description }}</a>
+                                                </td>
+                                                <td>{{ filing.filingDate|date('M d, Y') }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info mb-0">
+                                <p class="mb-0">No SEC filings are available for this company.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Insider Transactions -->
+            <div class="col-md-6">
+                <div class="card metrics-card">
+                    <div class="card-header">
+                        <span>Recent Insider Transactions</span>
+                        <a href="{{ path('company_insider_activity', {'id': company.id}) }}" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
+                    <div class="card-body">
+                        {% if insiderTransactions is not empty %}
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Insider</th>
+                                            <th>Type</th>
+                                            <th>Shares</th>
+                                            <th>Value</th>
+                                            <th>Date</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for transaction in insiderTransactions %}
+                                            <tr>
+                                                <td>
+                                                    {{ transaction.insiderName }}<br>
+                                                    <small class="text-muted">{{ transaction.title }}</small>
+                                                </td>
+                                                <td>
+                                                    {% if transaction.transactionType matches '/purchase/i' %}
+                                                        <span class="transaction-type-Purchase">{{ transaction.transactionType }}</span>
+                                                    {% elseif transaction.transactionType matches '/sale/i' %}
+                                                        <span class="transaction-type-Sale">{{ transaction.transactionType }}</span>
+                                                    {% else %}
+                                                        <span class="transaction-type-Option">{{ transaction.transactionType }}</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>{{ transaction.shares|number_format }}</td>
+                                                <td>${{ transaction.value|number_format }}</td>
+                                                <td>{{ transaction.transactionDate|date('M d, Y') }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info mb-0">
+                                <p class="mb-0">No insider transactions are available for this company.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Institutional Ownership -->
+        <div class="row mt-4">
+            <div class="col-12">
+                <div class="card metrics-card">
+                    <div class="card-header">
+                        <span>Top Institutional Holders</span>
+                        <a href="{{ path('company_institutional_ownership', {'id': company.id}) }}" class="btn btn-sm btn-outline-primary">View All</a>
+                    </div>
+                    <div class="card-body">
+                        {% if institutionalOwners is not empty %}
+                            <div class="row mb-4">
+                                <div class="col-md-4">
+                                    <div class="text-center">
+                                        <div class="h2">{{ totalInstitutionalOwnership|number_format(2) }}%</div>
+                                        <div class="text-muted">Total Institutional Ownership</div>
+                                    </div>
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="progress" style="height: 24px;">
+                                        <div class="progress-bar bg-primary" role="progressbar" 
+                                             style="width: {{ totalInstitutionalOwnership }}%" 
+                                             aria-valuenow="{{ totalInstitutionalOwnership }}" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                            {{ totalInstitutionalOwnership|number_format(2) }}%
+                                        </div>
+                                        <div class="progress-bar bg-secondary" role="progressbar" 
+                                             style="width: {{ 100 - totalInstitutionalOwnership }}%" 
+                                             aria-valuenow="{{ 100 - totalInstitutionalOwnership }}" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                            {{ (100 - totalInstitutionalOwnership)|number_format(2) }}%
+                                        </div>
+                                    </div>
+                                    <div class="d-flex justify-content-between mt-1">
+                                        <small>Institutional</small>
+                                        <small>Retail & Other</small>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Institution</th>
+                                            <th>Shares</th>
+                                            <th>Value</th>
+                                            <th>% Owned</th>
+                                            <th>Change</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for owner in institutionalOwners %}
+                                            <tr>
+                                                <td class="institution-name">{{ owner.institutionName }}</td>
+                                                <td>{{ owner.shares|number_format }}</td>
+                                                <td>${{ owner.value|number_format }}</td>
+                                                <td>{{ owner.percentageOwned|number_format(2) }}%</td>
+                                                <td>
+                                                    {% if owner.percentageChange > 0 %}
+                                                        <span class="change-positive">+{{ owner.percentageChange|number_format(2) }}%</span>
+                                                    {% elseif owner.percentageChange < 0 %}
+                                                        <span class="change-negative">{{ owner.percentageChange|number_format(2) }}%</span>
+                                                    {% else %}
+                                                        <span class="change-neutral">{{ owner.percentageChange|number_format(2) }}%</span>
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        {% else %}
+                            <div class="alert alert-info mb-0">
+                                <p class="mb-0">No institutional ownership data is available for this company.</p>
+                            </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

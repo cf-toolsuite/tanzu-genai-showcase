@@ -1,0 +1,311 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ symbol }} - ESG Dashboard{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .metric-card {
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            margin-bottom: 20px;
+        }
+        .metric-card .card-header {
+            border-radius: 8px 8px 0 0;
+            font-weight: bold;
+        }
+        .esg-score {
+            display: inline-block;
+            width: 120px;
+            height: 120px;
+            line-height: 120px;
+            border-radius: 50%;
+            text-align: center;
+            font-weight: bold;
+            font-size: 36px;
+            color: white;
+            margin: 0 auto;
+        }
+        .score-high {
+            background-color: #28a745;
+        }
+        .score-medium {
+            background-color: #ffc107;
+        }
+        .score-low {
+            background-color: #dc3545;
+        }
+        .score-label {
+            font-size: 18px;
+            font-weight: bold;
+            margin-top: 10px;
+            text-align: center;
+        }
+        .score-description {
+            font-size: 14px;
+            color: #666;
+            text-align: center;
+            margin-top: 5px;
+        }
+        .progress {
+            height: 25px;
+            margin-bottom: 15px;
+        }
+        .progress-bar {
+            line-height: 25px;
+            font-weight: bold;
+        }
+        .peer-comparison {
+            margin-top: 30px;
+        }
+        .nav-tabs .nav-link.active {
+            font-weight: bold;
+            border-bottom: 3px solid #007bff;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+    <div class="container mt-4">
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <h1>{{ symbol }} - ESG Dashboard</h1>
+            <div>
+                <a href="{{ path('app_additional_metrics', {'symbol': symbol}) }}" class="btn btn-outline-primary">Overview</a>
+                <a href="{{ path('app_esg_dashboard', {'symbol': symbol}) }}" class="btn btn-outline-primary active">ESG</a>
+                <a href="{{ path('app_sec_filings', {'symbol': symbol}) }}" class="btn btn-outline-primary">SEC Filings</a>
+                <a href="{{ path('app_insider_trading', {'symbol': symbol}) }}" class="btn btn-outline-primary">Insider Trading</a>
+                <a href="{{ path('app_institutional_ownership', {'symbol': symbol}) }}" class="btn btn-outline-primary">Institutional Ownership</a>
+                <a href="{{ path('app_analyst_ratings', {'symbol': symbol}) }}" class="btn btn-outline-primary">Analyst Ratings</a>
+            </div>
+        </div>
+
+        {% if esgData.error is defined %}
+            <div class="alert alert-warning">{{ esgData.error }}</div>
+        {% else %}
+            <div class="row">
+                <!-- Overall ESG Score Card -->
+                <div class="col-md-12 mb-4">
+                    <div class="card metric-card">
+                        <div class="card-header bg-primary text-white">
+                            <span>Overall ESG Score</span>
+                        </div>
+                        <div class="card-body text-center">
+                            <div class="row">
+                                <div class="col-md-4">
+                                    {% set overallClass = esgData.overallScore > 70 ? 'score-high' : (esgData.overallScore > 40 ? 'score-medium' : 'score-low') %}
+                                    <div class="esg-score {{ overallClass }}">{{ esgData.overallScore|number_format(1) }}</div>
+                                    <div class="score-label">Overall ESG Score</div>
+                                    <div class="score-description">
+                                        {% if esgData.overallScore > 70 %}
+                                            Excellent ESG performance
+                                        {% elseif esgData.overallScore > 40 %}
+                                            Average ESG performance
+                                        {% else %}
+                                            Below average ESG performance
+                                        {% endif %}
+                                    </div>
+                                </div>
+                                <div class="col-md-8">
+                                    <div class="mt-3">
+                                        <h5>Score Breakdown</h5>
+                                        <div class="mt-4">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>Environmental</span>
+                                                <span>{{ esgData.environmentalScore|number_format(1) }}/100</span>
+                                            </div>
+                                            <div class="progress">
+                                                {% set envColor = esgData.environmentalScore > 70 ? 'bg-success' : (esgData.environmentalScore > 40 ? 'bg-warning' : 'bg-danger') %}
+                                                <div class="progress-bar {{ envColor }}" role="progressbar" style="width: {{ esgData.environmentalScore }}%" aria-valuenow="{{ esgData.environmentalScore }}" aria-valuemin="0" aria-valuemax="100">{{ esgData.environmentalScore|number_format(1) }}</div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>Social</span>
+                                                <span>{{ esgData.socialScore|number_format(1) }}/100</span>
+                                            </div>
+                                            <div class="progress">
+                                                {% set socialColor = esgData.socialScore > 70 ? 'bg-success' : (esgData.socialScore > 40 ? 'bg-warning' : 'bg-danger') %}
+                                                <div class="progress-bar {{ socialColor }}" role="progressbar" style="width: {{ esgData.socialScore }}%" aria-valuenow="{{ esgData.socialScore }}" aria-valuemin="0" aria-valuemax="100">{{ esgData.socialScore|number_format(1) }}</div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-3">
+                                            <div class="d-flex justify-content-between mb-1">
+                                                <span>Governance</span>
+                                                <span>{{ esgData.governanceScore|number_format(1) }}/100</span>
+                                            </div>
+                                            <div class="progress">
+                                                {% set govColor = esgData.governanceScore > 70 ? 'bg-success' : (esgData.governanceScore > 40 ? 'bg-warning' : 'bg-danger') %}
+                                                <div class="progress-bar {{ govColor }}" role="progressbar" style="width: {{ esgData.governanceScore }}%" aria-valuenow="{{ esgData.governanceScore }}" aria-valuemin="0" aria-valuemax="100">{{ esgData.governanceScore|number_format(1) }}</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="text-muted mt-3">
+                                <small>Last updated: {{ esgData.lastUpdated|date('Y-m-d') }}</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row">
+                <!-- Environmental Score Card -->
+                <div class="col-md-4">
+                    <div class="card metric-card">
+                        <div class="card-header bg-success text-white">
+                            <span>Environmental</span>
+                        </div>
+                        <div class="card-body">
+                            <h2 class="text-center">{{ esgData.environmentalScore|number_format(1) }}</h2>
+                            <div class="mt-3">
+                                <h5>Key Factors</h5>
+                                <ul>
+                                    <li>Carbon Emissions</li>
+                                    <li>Resource Use</li>
+                                    <li>Waste Management</li>
+                                    <li>Environmental Opportunities</li>
+                                </ul>
+                            </div>
+                            <div class="mt-3">
+                                <p>
+                                    {% if esgData.environmentalScore > 70 %}
+                                        Strong environmental practices with effective resource management and emissions control.
+                                    {% elseif esgData.environmentalScore > 40 %}
+                                        Average environmental performance with some areas needing improvement.
+                                    {% else %}
+                                        Below average environmental performance with significant room for improvement.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Social Score Card -->
+                <div class="col-md-4">
+                    <div class="card metric-card">
+                        <div class="card-header bg-info text-white">
+                            <span>Social</span>
+                        </div>
+                        <div class="card-body">
+                            <h2 class="text-center">{{ esgData.socialScore|number_format(1) }}</h2>
+                            <div class="mt-3">
+                                <h5>Key Factors</h5>
+                                <ul>
+                                    <li>Labor Practices</li>
+                                    <li>Human Rights</li>
+                                    <li>Community Relations</li>
+                                    <li>Product Responsibility</li>
+                                </ul>
+                            </div>
+                            <div class="mt-3">
+                                <p>
+                                    {% if esgData.socialScore > 70 %}
+                                        Excellent social responsibility with strong stakeholder engagement and community support.
+                                    {% elseif esgData.socialScore > 40 %}
+                                        Average social performance with some positive initiatives but room for improvement.
+                                    {% else %}
+                                        Below average social performance with significant concerns in key areas.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Governance Score Card -->
+                <div class="col-md-4">
+                    <div class="card metric-card">
+                        <div class="card-header bg-warning text-dark">
+                            <span>Governance</span>
+                        </div>
+                        <div class="card-body">
+                            <h2 class="text-center">{{ esgData.governanceScore|number_format(1) }}</h2>
+                            <div class="mt-3">
+                                <h5>Key Factors</h5>
+                                <ul>
+                                    <li>Board Structure</li>
+                                    <li>Executive Compensation</li>
+                                    <li>Shareholder Rights</li>
+                                    <li>Business Ethics</li>
+                                </ul>
+                            </div>
+                            <div class="mt-3">
+                                <p>
+                                    {% if esgData.governanceScore > 70 %}
+                                        Strong governance framework with transparent practices and effective oversight.
+                                    {% elseif esgData.governanceScore > 40 %}
+                                        Average governance structure with some areas needing improvement.
+                                    {% else %}
+                                        Below average governance practices with significant concerns about oversight and transparency.
+                                    {% endif %}
+                                </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Peer Comparison -->
+            <div class="row mt-4">
+                <div class="col-md-12">
+                    <div class="card metric-card">
+                        <div class="card-header bg-secondary text-white">
+                            <span>Industry Peer Comparison</span>
+                        </div>
+                        <div class="card-body">
+                            {% if esgData.peerComparison is defined and esgData.peerComparison is not empty %}
+                                <div class="table-responsive">
+                                    <table class="table table-striped">
+                                        <thead>
+                                            <tr>
+                                                <th>Company</th>
+                                                <th>Overall ESG Score</th>
+                                                <th>Environmental</th>
+                                                <th>Social</th>
+                                                <th>Governance</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr class="table-primary">
+                                                <td><strong>{{ symbol }}</strong> (This Company)</td>
+                                                <td>{{ esgData.overallScore|number_format(1) }}</td>
+                                                <td>{{ esgData.environmentalScore|number_format(1) }}</td>
+                                                <td>{{ esgData.socialScore|number_format(1) }}</td>
+                                                <td>{{ esgData.governanceScore|number_format(1) }}</td>
+                                            </tr>
+                                            {% for peer in esgData.peerComparison %}
+                                                <tr>
+                                                    <td>{{ peer.symbol }}</td>
+                                                    <td>{{ peer.overallScore|default(0)|number_format(1) }}</td>
+                                                    <td>{{ peer.environmentalScore|default(0)|number_format(1) }}</td>
+                                                    <td>{{ peer.socialScore|default(0)|number_format(1) }}</td>
+                                                    <td>{{ peer.governanceScore|default(0)|number_format(1) }}</td>
+                                                </tr>
+                                            {% endfor %}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            {% else %}
+                                <div class="alert alert-info">
+                                    No peer comparison data available.
+                                </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Add any JavaScript for interactive charts here
+        });
+    </script>
+{% endblock %}

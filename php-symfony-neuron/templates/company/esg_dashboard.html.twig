@@ -1,0 +1,882 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ company.name }} - ESG Dashboard{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .metrics-card {
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .metrics-card .card-header {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .metrics-nav {
+            margin-bottom: 1.5rem;
+        }
+        .metrics-nav .nav-link {
+            border-radius: 0.5rem;
+            padding: 0.75rem 1rem;
+            margin-right: 0.5rem;
+            font-weight: 500;
+            color: #495057;
+            background-color: #f8f9fa;
+            border: 1px solid #e9ecef;
+            transition: all 0.2s ease-in-out;
+        }
+        .metrics-nav .nav-link:hover {
+            background-color: #e9ecef;
+            border-color: #dee2e6;
+        }
+        .metrics-nav .nav-link.active {
+            color: #fff;
+            background-color: #0d6efd;
+            border-color: #0d6efd;
+        }
+        .metrics-nav .nav-link i {
+            margin-right: 0.5rem;
+        }
+        .esg-chart {
+            height: 300px;
+            width: 100%;
+        }
+        .esg-score-card {
+            padding: 1.5rem;
+            text-align: center;
+            border-radius: 8px;
+            background-color: #f8f9fa;
+            transition: all 0.2s ease-in-out;
+        }
+        .esg-score-card:hover {
+            background-color: #e9ecef;
+            transform: translateY(-5px);
+        }
+        .esg-score-value {
+            font-size: 2.5rem;
+            font-weight: 700;
+        }
+        .esg-score-label {
+            margin-top: 0.5rem;
+            font-weight: 600;
+        }
+        .esg-score-info {
+            color: #6c757d;
+            font-size: 0.875rem;
+            margin-top: 0.5rem;
+        }
+        .esg-score-excellent {
+            color: #198754;
+        }
+        .esg-score-good {
+            color: #20c997;
+        }
+        .esg-score-average {
+            color: #ffc107;
+        }
+        .esg-score-below-average {
+            color: #fd7e14;
+        }
+        .esg-score-poor {
+            color: #dc3545;
+        }
+        .esg-detail-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .esg-detail-row:last-child {
+            border-bottom: none;
+        }
+        .esg-detail-label {
+            font-weight: 500;
+        }
+        .esg-detail-value {
+            font-weight: 600;
+        }
+        .esg-progress {
+            height: 8px;
+            margin-top: 0.5rem;
+        }
+        .esg-progress-e {
+            background-color: #20c997;
+        }
+        .esg-progress-s {
+            background-color: #0dcaf0;
+        }
+        .esg-progress-g {
+            background-color: #6610f2;
+        }
+        .esg-peer-comparison {
+            padding: 1rem 0;
+        }
+        .esg-peer-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .esg-peer-item:last-child {
+            border-bottom: none;
+        }
+        .esg-peer-company {
+            font-weight: 500;
+        }
+        .esg-peer-score {
+            font-weight: 600;
+            width: 50px;
+            text-align: center;
+        }
+        .esg-peer-marker {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 0.5rem;
+        }
+        .esg-current-company {
+            font-weight: 700;
+        }
+        .esg-info-icon {
+            color: #6c757d;
+            cursor: pointer;
+        }
+        .industry-comparison-chart {
+            height: 350px;
+        }
+        .esg-category-detail {
+            margin-top: 1rem;
+        }
+        .esg-category-header {
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+        .esg-subcategory {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .esg-subcategory:last-child {
+            border-bottom: none;
+        }
+        .esg-subcategory-label {
+            font-size: 0.875rem;
+        }
+        .esg-subcategory-score {
+            font-weight: 600;
+            width: 40px;
+            text-align: center;
+        }
+        .esg-trend-indicator {
+            margin-left: 0.5rem;
+        }
+        .esg-trend-up {
+            color: #198754;
+        }
+        .esg-trend-down {
+            color: #dc3545;
+        }
+        .esg-trend-stable {
+            color: #6c757d;
+        }
+        .esg-historical-chart {
+            height: 250px;
+        }
+        .gauge-container {
+            width: 200px;
+            margin: 0 auto;
+        }
+        .gauge-container > .gauge > .dial {
+            stroke: #eee;
+            stroke-width: 5;
+            fill: rgba(0, 0, 0, 0);
+        }
+        .gauge-container > .gauge > .value {
+            stroke-width: 5;
+            fill: rgba(0, 0, 0, 0);
+        }
+        .gauge-container > .gauge > .value-text {
+            fill: #000;
+            font-family: sans-serif;
+            font-weight: bold;
+            font-size: 1em;
+        }
+    </style>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-datalabels@2.0.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/gauge-js-canvas@1.0.4/dist/gauge.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up ESG component radar chart
+            const esgComponentsCtx = document.getElementById('esgComponentsChart').getContext('2d');
+
+            new Chart(esgComponentsCtx, {
+                type: 'radar',
+                data: {
+                    labels: [
+                        'Carbon Emissions',
+                        'Resource Use',
+                        'Human Rights',
+                        'Community Relations',
+                        'Board Diversity',
+                        'Business Ethics',
+                        'Data Privacy'
+                    ],
+                    datasets: [{
+                        label: '{{ company.name }}',
+                        data: [
+                            {{ esgData.environmentalComponents.carbonEmissions|default(65) }},
+                            {{ esgData.environmentalComponents.resourceUse|default(72) }},
+                            {{ esgData.socialComponents.humanRights|default(81) }},
+                            {{ esgData.socialComponents.communityRelations|default(77) }},
+                            {{ esgData.governanceComponents.boardDiversity|default(69) }},
+                            {{ esgData.governanceComponents.businessEthics|default(85) }},
+                            {{ esgData.governanceComponents.dataPrivacy|default(62) }}
+                        ],
+                        fill: true,
+                        backgroundColor: 'rgba(13, 110, 253, 0.2)',
+                        borderColor: 'rgba(13, 110, 253, 1)',
+                        pointBackgroundColor: 'rgba(13, 110, 253, 1)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(13, 110, 253, 1)'
+                    },
+                    {
+                        label: 'Industry Average',
+                        data: [
+                            {{ esgData.industryAverage.carbonEmissions|default(55) }},
+                            {{ esgData.industryAverage.resourceUse|default(60) }},
+                            {{ esgData.industryAverage.humanRights|default(65) }},
+                            {{ esgData.industryAverage.communityRelations|default(58) }},
+                            {{ esgData.industryAverage.boardDiversity|default(62) }},
+                            {{ esgData.industryAverage.businessEthics|default(70) }},
+                            {{ esgData.industryAverage.dataPrivacy|default(60) }}
+                        ],
+                        fill: true,
+                        backgroundColor: 'rgba(108, 117, 125, 0.2)',
+                        borderColor: 'rgba(108, 117, 125, 1)',
+                        pointBackgroundColor: 'rgba(108, 117, 125, 1)',
+                        pointBorderColor: '#fff',
+                        pointHoverBackgroundColor: '#fff',
+                        pointHoverBorderColor: 'rgba(108, 117, 125, 1)'
+                    }]
+                },
+                options: {
+                    scales: {
+                        r: {
+                            angleLines: {
+                                display: true
+                            },
+                            suggestedMin: 0,
+                            suggestedMax: 100
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'ESG Component Performance'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.r + '/100';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Set up ESG industry comparison chart
+            const industryComparisonCtx = document.getElementById('industryComparisonChart').getContext('2d');
+
+            new Chart(industryComparisonCtx, {
+                type: 'bar',
+                data: {
+                    labels: [
+                        'Environmental',
+                        'Social',
+                        'Governance',
+                        'Overall ESG'
+                    ],
+                    datasets: [{
+                        label: '{{ company.name }}',
+                        data: [
+                            {{ esgData.environmentalScore|default(70) }},
+                            {{ esgData.socialScore|default(75) }},
+                            {{ esgData.governanceScore|default(80) }},
+                            {{ esgData.overallScore|default(75) }}
+                        ],
+                        backgroundColor: 'rgba(13, 110, 253, 0.8)',
+                        borderColor: 'rgba(13, 110, 253, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Industry Average',
+                        data: [
+                            {{ esgData.industryAverageE|default(60) }},
+                            {{ esgData.industryAverageS|default(65) }},
+                            {{ esgData.industryAverageG|default(70) }},
+                            {{ esgData.industryAverageESG|default(65) }}
+                        ],
+                        backgroundColor: 'rgba(108, 117, 125, 0.8)',
+                        borderColor: 'rgba(108, 117, 125, 1)',
+                        borderWidth: 1
+                    },
+                    {
+                        label: 'Industry Leader',
+                        data: [
+                            {{ esgData.industryLeaderE|default(85) }},
+                            {{ esgData.industryLeaderS|default(90) }},
+                            {{ esgData.industryLeaderG|default(95) }},
+                            {{ esgData.industryLeaderESG|default(90) }}
+                        ],
+                        backgroundColor: 'rgba(25, 135, 84, 0.8)',
+                        borderColor: 'rgba(25, 135, 84, 1)',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            suggestedMax: 100,
+                            title: {
+                                display: true,
+                                text: 'Score (0-100)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'ESG Categories'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Industry ESG Comparison'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y + '/100';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Set up ESG historical trend chart
+            const historicalTrendCtx = document.getElementById('historicalTrendChart').getContext('2d');
+
+            new Chart(historicalTrendCtx, {
+                type: 'line',
+                data: {
+                    labels: ['2021 Q1', '2021 Q2', '2021 Q3', '2021 Q4', '2022 Q1', '2022 Q2', '2022 Q3', '2022 Q4'],
+                    datasets: [
+                        {
+                            label: 'Environmental',
+                            data: [62, 65, 67, 68, 69, 70, 68, {{ esgData.environmentalScore|default(70) }}],
+                            borderColor: 'rgba(32, 201, 151, 1)',
+                            backgroundColor: 'rgba(32, 201, 151, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Social',
+                            data: [70, 71, 72, 73, 74, 75, 74, {{ esgData.socialScore|default(75) }}],
+                            borderColor: 'rgba(13, 202, 240, 1)',
+                            backgroundColor: 'rgba(13, 202, 240, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Governance',
+                            data: [75, 75, 76, 78, 79, 80, 80, {{ esgData.governanceScore|default(80) }}],
+                            borderColor: 'rgba(102, 16, 242, 1)',
+                            backgroundColor: 'rgba(102, 16, 242, 0.1)',
+                            borderWidth: 2,
+                            tension: 0.3
+                        },
+                        {
+                            label: 'Overall ESG',
+                            data: [69, 70, 72, 73, 74, 75, 74, {{ esgData.overallScore|default(75) }}],
+                            borderColor: 'rgba(13, 110, 253, 1)',
+                            backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                            borderWidth: 3,
+                            tension: 0.3
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    scales: {
+                        y: {
+                            beginAtZero: false,
+                            min: 50,
+                            max: 100,
+                            title: {
+                                display: true,
+                                text: 'Score (0-100)'
+                            }
+                        },
+                        x: {
+                            title: {
+                                display: true,
+                                text: 'Quarter'
+                            }
+                        }
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'ESG Score Trends'
+                        },
+                        tooltip: {
+                            callbacks: {
+                                label: function(context) {
+                                    return context.dataset.label + ': ' + context.parsed.y + '/100';
+                                }
+                            }
+                        }
+                    }
+                }
+            });
+
+            // Set up ESG gauge charts
+            const gaugeOptions = {
+                dialRadius: 40,
+                dialStartAngle: 135,
+                dialEndAngle: 45,
+                value: 0,
+                min: 0,
+                max: 100,
+                valueDialClass: 'value',
+                valueTextClass: 'value-text',
+                dialClass: 'dial',
+                gaugeClass: 'gauge',
+                showValue: true,
+                label: function(val) {return Math.round(val);},
+            };
+
+            const gaugeOverall = new Gauge(
+                document.querySelector('.gauge-container-overall > .gauge'),
+                {...gaugeOptions, color: function(val) {
+                    if (val >= 80) return '#198754';
+                    if (val >= 70) return '#20c997';
+                    if (val >= 60) return '#ffc107';
+                    if (val >= 50) return '#fd7e14';
+                    return '#dc3545';
+                }}
+            );
+            gaugeOverall.setValue({{ esgData.overallScore|default(75) }});
+
+            const gaugeE = new Gauge(
+                document.querySelector('.gauge-container-e > .gauge'),
+                {...gaugeOptions, color: '#20c997'}
+            );
+            gaugeE.setValue({{ esgData.environmentalScore|default(70) }});
+
+            const gaugeS = new Gauge(
+                document.querySelector('.gauge-container-s > .gauge'),
+                {...gaugeOptions, color: '#0dcaf0'}
+            );
+            gaugeS.setValue({{ esgData.socialScore|default(75) }});
+
+            const gaugeG = new Gauge(
+                document.querySelector('.gauge-container-g > .gauge'),
+                {...gaugeOptions, color: '#6610f2'}
+            );
+            gaugeG.setValue({{ esgData.governanceScore|default(80) }});
+        });
+    </script>
+{% endblock %}
+
+{% block body %}
+    <div class="container mt-4">
+        <h1>{{ company.name }} ({{ company.tickerSymbol }}) - ESG Dashboard</h1>
+
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ path('company_show', {'id': company.id}) }}">Company Profile</a></li>
+                <li class="breadcrumb-item"><a href="{{ path('company_additional_metrics', {'id': company.id}) }}">Additional Metrics</a></li>
+                <li class="breadcrumb-item active" aria-current="page">ESG Dashboard</li>
+            </ol>
+        </nav>
+
+        <div class="metrics-nav">
+            <ul class="nav nav-pills">
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('company_additional_metrics', {'id': company.id}) }}">
+                        <i class="fas fa-chart-line"></i> Overview
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link active" href="{{ path('company_esg_dashboard', {'id': company.id}) }}">
+                        <i class="fas fa-leaf"></i> ESG
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('company_sec_filings', {'id': company.id}) }}">
+                        <i class="fas fa-file-alt"></i> SEC Filings
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('company_insider_activity', {'id': company.id}) }}">
+                        <i class="fas fa-user-tie"></i> Insider Activity
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('company_institutional_ownership', {'id': company.id}) }}">
+                        <i class="fas fa-building"></i> Institutional Ownership
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a class="nav-link" href="{{ path('company_analyst_coverage', {'id': company.id}) }}">
+                        <i class="fas fa-chart-bar"></i> Analyst Coverage
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <!-- Summary ESG Scores -->
+        <div class="row mt-4">
+            <div class="col-lg-3 col-md-6">
+                <div class="card metrics-card">
+                    <div class="card-body text-center">
+                        <h5>Overall ESG Score</h5>
+                        <div class="gauge-container gauge-container-overall">
+                            <div class="gauge"></div>
+                        </div>
+                        <div class="mt-3">
+                            {% set overallScore = esgData.overallScore|default(75) %}
+                            <span class="
+                                {% if overallScore >= 80 %}esg-score-excellent{%
+                                elseif overallScore >= 70 %}esg-score-good{%
+                                elseif overallScore >= 60 %}esg-score-average{%
+                                elseif overallScore >= 50 %}esg-score-below-average{%
+                                else %}esg-score-poor{% endif %}
+                            ">
+                                {% if overallScore >= 80 %}Excellent{%
+                                elseif overallScore >= 70 %}Good{%
+                                elseif overallScore >= 60 %}Average{%
+                                elseif overallScore >= 50 %}Below Average{%
+                                else %}Poor{% endif %}
+                            </span>
+                            <div class="text-muted small mt-2">
+                                {% set industryAvg = esgData.industryAverageESG|default(65) %}
+                                {% if overallScore > industryAvg %}
+                                    {{ (overallScore - industryAvg)|number_format(1) }} points above industry average
+                                {% elseif overallScore < industryAvg %}
+                                    {{ (industryAvg - overallScore)|number_format(1) }} points below industry average
+                                {% else %}
+                                    Equal to industry average
+                                {% endif %}
+                            </div>
+                            <div class="text-muted small mt-1">
+                                Last updated: {{ esgData.lastUpdated|default('now')|date('M d, Y') }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6">
+                <div class="card metrics-card">
+                    <div class="card-body text-center">
+                        <h5>Environmental</h5>
+                        <div class="gauge-container gauge-container-e">
+                            <div class="gauge"></div>
+                        </div>
+                        <div class="esg-category-detail">
+                            <div class="esg-subcategory">
+                                <div class="esg-subcategory-label">Carbon Emissions</div>
+                                <div class="esg-subcategory-score">{{ esgData.environmentalComponents.carbonEmissions|default(65) }}</div>
+                            </div>
+                            <div class="esg-subcategory">
+                                <div class="esg-subcategory-label">Resource Use</div>
+                                <div class="esg-subcategory-score">{{ esgData.environmentalComponents.resourceUse|default(72) }}</div>
+                            </div>
+                            <div class="esg-subcategory">
+                                <div class="esg-subcategory-label">Pollution & Waste</div>
+                                <div class="esg-subcategory-score">{{ esgData.environmentalComponents.pollutionWaste|default(68) }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6">
+                <div class="card metrics-card">
+                    <div class="card-body text-center">
+                        <h5>Social</h5>
+                        <div class="gauge-container gauge-container-s">
+                            <div class="gauge"></div>
+                        </div>
+                        <div class="esg-category-detail">
+                            <div class="esg-subcategory">
+                                <div class="esg-subcategory-label">Human Rights</div>
+                                <div class="esg-subcategory-score">{{ esgData.socialComponents.humanRights|default(81) }}</div>
+                            </div>
+                            <div class="esg-subcategory">
+                                <div class="esg-subcategory-label">Community Relations</div>
+                                <div class="esg-subcategory-score">{{ esgData.socialComponents.communityRelations|default(77) }}</div>
+                            </div>
+                            <div class="esg-subcategory">
+                                <div class="esg-subcategory-label">Product Responsibility</div>
+                                <div class="esg-subcategory-score">{{ esgData.socialComponents.productResponsibility|default(74) }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-lg-3 col-md-6">
+                <div class="card metrics-card">
+                    <div class="card-body text-center">
+                        <h5>Governance</h5>
+                        <div class="gauge-container gauge-container-g">
+                            <div class="gauge"></div>
+                        </div>
+                        <div class="esg-category-detail">
+                            <div class="esg-subcategory">
+                                <div class="esg-subcategory-label">Board Diversity</div>
+                                <div class="esg-subcategory-score">{{ esgData.governanceComponents.boardDiversity|default(69) }}</div>
+                            </div>
+                            <div class="esg-subcategory">
+                                <div class="esg-subcategory-label">Business Ethics</div>
+                                <div class="esg-subcategory-score">{{ esgData.governanceComponents.businessEthics|default(85) }}</div>
+                            </div>
+                            <div class="esg-subcategory">
+                                <div class="esg-subcategory-label">Data Privacy</div>
+                                <div class="esg-subcategory-score">{{ esgData.governanceComponents.dataPrivacy|default(62) }}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ESG Performance Over Time -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card metrics-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>ESG Performance Trends</span>
+                        <div>
+                            <select class="form-select form-select-sm" style="width: auto; display: inline-block;">
+                                <option>Last 8 Quarters</option>
+                                <option>Last 3 Years</option>
+                                <option>Last 5 Years</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="esg-historical-chart">
+                            <canvas id="historicalTrendChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Industry Comparison -->
+        <div class="row mt-4">
+            <div class="col-md-6">
+                <div class="card metrics-card">
+                    <div class="card-header">
+                        ESG Component Analysis
+                    </div>
+                    <div class="card-body">
+                        <div class="esg-chart">
+                            <canvas id="esgComponentsChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card metrics-card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <span>Industry ESG Comparison</span>
+                        <div>
+                            <select class="form-select form-select-sm" style="width: auto; display: inline-block;">
+                                <option>{{ esgData.industryName|default('Technology') }}</option>
+                                <option>All Industries</option>
+                                <option>S&P 500</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div class="industry-comparison-chart">
+                            <canvas id="industryComparisonChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Peer Comparison -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card metrics-card">
+                    <div class="card-header">
+                        ESG Peer Comparison
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <table class="table">
+                                    <thead>
+                                        <tr>
+                                            <th>Company</th>
+                                            <th>Overall ESG</th>
+                                            <th>E</th>
+                                            <th>S</th>
+                                            <th>G</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr class="esg-current-company">
+                                            <td>
+                                                <span class="esg-peer-marker" style="background-color: #0d6efd;"></span>
+                                                {{ company.name }}
+                                            </td>
+                                            <td>{{ esgData.overallScore|default(75) }}</td>
+                                            <td>{{ esgData.environmentalScore|default(70) }}</td>
+                                            <td>{{ esgData.socialScore|default(75) }}</td>
+                                            <td>{{ esgData.governanceScore|default(80) }}</td>
+                                        </tr>
+                                        {% for peer in esgData.peers|default([
+                                            {name: 'Peer Company 1', overall: 80, environmental: 75, social: 82, governance: 84},
+                                            {name: 'Peer Company 2', overall: 72, environmental: 65, social: 70, governance: 81},
+                                            {name: 'Peer Company 3', overall: 68, environmental: 72, social: 65, governance: 68},
+                                            {name: 'Peer Company 4', overall: 77, environmental: 80, social: 76, governance: 75},
+                                            {name: 'Peer Company 5', overall: 63, environmental: 60, social: 67, governance: 63}
+                                        ]) %}
+                                            <tr>
+                                                <td>
+                                                    <span class="esg-peer-marker" style="background-color: #6c757d;"></span>
+                                                    {{ peer.name }}
+                                                </td>
+                                                <td>{{ peer.overall }}</td>
+                                                <td>{{ peer.environmental }}</td>
+                                                <td>{{ peer.social }}</td>
+                                                <td>{{ peer.governance }}</td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div class="col-md-6">
+                                <h5 class="mb-3">Key ESG Strengths & Challenges</h5>
+
+                                <h6 class="mt-3 text-success"><i class="fas fa-arrow-up me-2"></i>Top Strengths</h6>
+                                <ul class="list-group list-group-flush mb-3">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Business Ethics
+                                        <span class="badge bg-success rounded-pill">85</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Human Rights
+                                        <span class="badge bg-success rounded-pill">81</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Community Relations
+                                        <span class="badge bg-success rounded-pill">77</span>
+                                    </li>
+                                </ul>
+
+                                <h6 class="mt-3 text-danger"><i class="fas fa-arrow-down me-2"></i>Improvement Areas</h6>
+                                <ul class="list-group list-group-flush">
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Data Privacy
+                                        <span class="badge bg-danger rounded-pill">62</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Carbon Emissions
+                                        <span class="badge bg-warning rounded-pill">65</span>
+                                    </li>
+                                    <li class="list-group-item d-flex justify-content-between align-items-center">
+                                        Board Diversity
+                                        <span class="badge bg-warning rounded-pill">69</span>
+                                    </li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ESG Methodology & Understanding -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card metrics-card">
+                    <div class="card-header">
+                        Understanding ESG Ratings
+                    </div>
+                    <div class="card-body">
+                        <p>
+                            <strong>ESG (Environmental, Social, and Governance)</strong> ratings measure a company's performance across a range of sustainability and ethical business practices. These scores provide investors with insights beyond traditional financial metrics.
+                        </p>
+
+                        <div class="row mt-4">
+                            <div class="col-md-4">
+                                <h5 class="esg-category-header"><i class="fas fa-leaf me-2 text-success"></i>Environmental</h5>
+                                <p>Measures how a company manages its impact on the natural environment:</p>
+                                <ul>
+                                    <li>Carbon emissions and climate change strategies</li>
+                                    <li>Resource use and efficiency</li>
+                                    <li>Pollution and waste management</li>
+                                    <li>Environmental opportunities</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h5 class="esg-category-header"><i class="fas fa-users me-2 text-info"></i>Social</h5>
+                                <p>Evaluates how a company manages relationships with:</p>
+                                <ul>
+                                    <li>Employees (labor practices, health & safety)</li>
+                                    <li>Suppliers (supply chain standards)</li>
+                                    <li>Customers (product safety, data privacy)</li>
+                                    <li>Communities (human rights, community relations)</li>
+                                </ul>
+                            </div>
+                            <div class="col-md-4">
+                                <h5 class="esg-category-header"><i class="fas fa-balance-scale me-2 text-purple"></i>Governance</h5>
+                                <p>Examines how a company is governed:</p>
+                                <ul>
+                                    <li>Board structure, diversity, and independence</li>
+                                    <li>Executive compensation policies</li>
+                                    <li>Business ethics and transparency</li>
+                                    <li>Risk management practices</li>
+                                </ul>
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info mt-4">
+                            <h6 class="alert-heading"><i class="fas fa-info-circle me-2"></i>ESG Rating Methodology</h6>
+                            <p class="mb-0">ESG scores range from 0-100, with higher scores indicating better performance. Scores are calculated based on data from corporate disclosures, third-party sources, and proprietary research. Ratings are updated quarterly based on new information and company actions.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

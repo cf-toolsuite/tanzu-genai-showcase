@@ -2,13 +2,13 @@
 
 namespace App\Service\ApiClient;
 
-use Psr\Log\LoggerInterface; // Keep logger for consistency
+use Psr\Log\LoggerInterface;
 
 /**
  * Mock Implementation of Alpha Vantage API client
  * Returns predefined mock data.
  */
-class MockAlphaVantageClient implements ApiClientInterface // Directly implements interface
+class MockAlphaVantageClient implements ApiClientInterface
 {
     private LoggerInterface $logger;
 
@@ -99,7 +99,20 @@ class MockAlphaVantageClient implements ApiClientInterface // Directly implement
                 'sharesOutstanding' => 0 // Add defaults
             ];
         }
-        return ['symbol' => $symbol, 'price' => 0, 'change' => 0, 'changePercent' => 0, 'volume' => 0, 'latestTradingDay' => date('Y-m-d'), 'previousClose' => 0, 'open' => 0, 'high' => 0, 'low' => 0, 'marketCap' => 0, 'sharesOutstanding' => 0]; // Default empty structure
+        return [
+            'symbol' => $symbol,
+            'price' => 0,
+            'change' => 0,
+            'changePercent' => 0,
+            'volume' => 0,
+            'latestTradingDay' => date('Y-m-d'),
+            'previousClose' => 0,
+            'open' => 0,
+            'high' => 0,
+            'low' => 0,
+            'marketCap' => 0,
+            'sharesOutstanding' => 0
+        ]; // Default empty structure
     }
 
     public function getFinancials(string $symbol, string $period = 'quarterly'): array
@@ -139,9 +152,20 @@ class MockAlphaVantageClient implements ApiClientInterface // Directly implement
         $getFloat = fn($key) => isset($report[$key]) ? (float)$report[$key] : 0.0;
         $revenue = $getFloat('totalRevenue');
         $netIncome = $getFloat('netIncome');
-        return ['symbol' => $symbol, 'fiscalDate' => $fiscalDate, 'fiscalQuarter' => $quarter, 'fiscalYear' => $year, 'reportDate' => $fiscalDate, 'reportType' => 'Income Statement', 'currency' => $report['reportedCurrency'] ?? 'USD', 'revenue' => $revenue, 'netIncome' => $netIncome, 'eps' => $getFloat('reportedEPS'), /* ... add other needed fields with default 0 ... */ 'profitMargin' => ($revenue != 0) ? ($netIncome / $revenue) : 0];
+        return [
+            'symbol' => $symbol,
+            'fiscalDate' => $fiscalDate,
+            'fiscalQuarter' => $quarter,
+            'fiscalYear' => $year,
+            'reportDate' => $fiscalDate,
+            'reportType' => 'Income Statement',
+            'currency' => $report['reportedCurrency'] ?? 'USD',
+            'revenue' => $revenue,
+            'netIncome' => $netIncome,
+            'eps' => $getFloat('reportedEPS'),
+            'profitMargin' => ($revenue != 0) ? ($netIncome / $revenue) : 0
+        ];
     }
-
 
     public function getCompanyNews(string $symbol, int $limit = 5): array
     {
@@ -179,6 +203,7 @@ class MockAlphaVantageClient implements ApiClientInterface // Directly implement
             'daily' => 'Time Series (Daily)',
             'weekly' => 'Weekly Adjusted Time Series',
             'monthly' => 'Monthly Adjusted Time Series',
+            default => 'Time Series (Daily)',
         };
         $mockRawData = $this->getMockTimeSeries($interval);
         // Process mock data to match expected output format
@@ -210,82 +235,450 @@ class MockAlphaVantageClient implements ApiClientInterface // Directly implement
         return $prices;
     }
 
-    // --- Mock Data Generation Methods (Copied from original AlphaVantageClient) ---
+    /**
+     * {@inheritdoc}
+     */
+    public function getESGData(string $symbol): array
+    {
+        $this->logger->info("MockAlphaVantageClient::getESGData called", ['symbol' => $symbol]);
+
+        // Generate mock ESG data
+        return [
+            'totalEsg' => mt_rand(50, 95) / 10,
+            'environmentScore' => mt_rand(40, 100) / 10,
+            'socialScore' => mt_rand(40, 100) / 10,
+            'governanceScore' => mt_rand(40, 100) / 10,
+            'peerComparison' => [
+                [
+                    'symbol' => 'MOCK1',
+                    'name' => 'Mock Peer 1',
+                    'totalEsg' => mt_rand(40, 100) / 10,
+                    'environmentScore' => mt_rand(40, 100) / 10,
+                    'socialScore' => mt_rand(40, 100) / 10,
+                    'governanceScore' => mt_rand(40, 100) / 10,
+                ],
+                [
+                    'symbol' => 'MOCK2',
+                    'name' => 'Mock Peer 2',
+                    'totalEsg' => mt_rand(40, 100) / 10,
+                    'environmentScore' => mt_rand(40, 100) / 10,
+                    'socialScore' => mt_rand(40, 100) / 10,
+                    'governanceScore' => mt_rand(40, 100) / 10,
+                ]
+            ],
+            'lastUpdated' => date('Y-m-d', strtotime('-' . mt_rand(1, 30) . ' days'))
+        ];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getRecentSecFilings(string $symbol, int $limit = 5): array
+    {
+        $this->logger->info("MockAlphaVantageClient::getRecentSecFilings called", ['symbol' => $symbol, 'limit' => $limit]);
+
+        $filingTypes = ['10-K', '10-Q', '8-K', 'S-1', 'DEF 14A'];
+        $descriptions = [
+            'Annual Report',
+            'Quarterly Report',
+            'Current Report',
+            'Registration Statement',
+            'Proxy Statement'
+        ];
+
+        $filings = [];
+        for ($i = 0; $i < $limit; $i++) {
+            $typeIndex = array_rand($filingTypes);
+            $date = date('Y-m-d', strtotime('-' . mt_rand(1, 365) . ' days'));
+
+            $filings[] = [
+                'id' => 'mock-' . md5($symbol . $i),
+                'cik' => '000' . mt_rand(100000, 999999),
+                'companyName' => $this->getMockCompanyProfileData($symbol)['Name'] ?? 'Mock Company',
+                'formType' => $filingTypes[$typeIndex],
+                'formDescription' => $descriptions[$typeIndex],
+                'filingDate' => $date,
+                'reportDate' => $date,
+                'accessionNumber' => '000' . mt_rand(1000000000, 9999999999) . '-' . mt_rand(10, 99) . '-' . mt_rand(100000, 999999),
+                'htmlUrl' => 'https://www.sec.gov/Archives/mock/' . mt_rand(10000, 99999) . '.html',
+                'pdfUrl' => 'https://www.sec.gov/Archives/mock/' . mt_rand(10000, 99999) . '.pdf',
+                'ticker' => $symbol,
+                'fiscalYear' => date('Y', strtotime($date))
+            ];
+        }
+
+        return $filings;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getAnalystRatings(string $symbol): array
+    {
+        $this->logger->info("MockAlphaVantageClient::getAnalystRatings called", ['symbol' => $symbol]);
+
+        $firms = ['Morgan Stanley', 'Goldman Sachs', 'JP Morgan', 'Bank of America', 'Wells Fargo'];
+        $analysts = ['John Smith', 'Jane Doe', 'Robert Johnson', 'Emily Williams', 'Michael Brown'];
+        $ratingTypes = ['Buy', 'Outperform', 'Hold', 'Underperform', 'Sell'];
+
+        $buy = mt_rand(3, 15);
+        $hold = mt_rand(1, 10);
+        $sell = mt_rand(0, 5);
+        $total = $buy + $hold + $sell;
+        $buyPercent = $total > 0 ? ($buy / $total) * 100 : 0;
+
+        $targetHigh = mt_rand(120, 200);
+        $targetLow = mt_rand(50, 110);
+        $targetAvg = ($targetHigh + $targetLow) / 2 + mt_rand(-10, 10);
+
+        // Get mock stock price
+        $quoteData = $this->getQuote($symbol);
+        $currentPrice = $quoteData['price'] ?? 0;
+
+        $upside = $currentPrice > 0 ? (($targetAvg - $currentPrice) / $currentPrice) * 100 : 0;
+
+        $ratings = [];
+        for ($i = 0; $i < 10; $i++) {
+            $firmIndex = array_rand($firms);
+            $analystIndex = array_rand($analysts);
+            $ratingIndex = array_rand($ratingTypes);
+
+            $ratings[] = [
+                'firm' => $firms[$firmIndex],
+                'analyst' => $analysts[$analystIndex],
+                'rating' => $ratingTypes[$ratingIndex],
+                'previousRating' => $ratingTypes[array_rand($ratingTypes)],
+                'priceTarget' => mt_rand(round($targetLow), round($targetHigh)),
+                'previousPriceTarget' => mt_rand(round($targetLow * 0.8), round($targetHigh * 1.2)),
+                'date' => date('Y-m-d', strtotime('-' . mt_rand(1, 90) . ' days')),
+                'commentary' => 'Mock commentary on ' . $symbol . ' stock performance and outlook.'
+            ];
+        }
+
+        return [
+            'ratings' => $ratings,
+            'consensus' => [
+                'consensusRating' => $buyPercent > 60 ? 'Buy' : ($buyPercent > 40 ? 'Overweight' : 'Hold'),
+                'averagePriceTarget' => $targetAvg,
+                'lowPriceTarget' => $targetLow,
+                'highPriceTarget' => $targetHigh,
+                'buy' => $buy,
+                'hold' => $hold,
+                'sell' => $sell,
+                'upside' => $upside
+            ]
+        ];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getInsiderTrading(string $symbol, int $limit = 20): array
+    {
+        $this->logger->info("MockAlphaVantageClient::getInsiderTrading called", ['symbol' => $symbol, 'limit' => $limit]);
+
+        $insiderNames = [
+            'John Smith',
+            'Jane Doe',
+            'Robert Johnson',
+            'Emily Williams',
+            'Michael Brown',
+            'Sarah Davis',
+            'David Miller',
+            'Lisa Wilson'
+        ];
+
+        $positions = [
+            'CEO',
+            'CFO',
+            'COO',
+            'CTO',
+            'Director',
+            'VP of Sales',
+            'VP of Marketing',
+            'General Counsel'
+        ];
+
+        $transactionTypes = ['Purchase', 'Sale', 'Option Exercise'];
+        $transactions = [];
+
+        for ($i = 0; $i < $limit; $i++) {
+            $nameIndex = array_rand($insiderNames);
+            $positionIndex = array_rand($positions);
+            $typeIndex = array_rand($transactionTypes);
+
+            $shares = mt_rand(100, 10000);
+            $price = mt_rand(1000, 50000) / 100;
+            $value = $shares * $price;
+            $sharesOwned = mt_rand(10000, 1000000);
+
+            $transactions[] = [
+                'insiderName' => $insiderNames[$nameIndex],
+                'position' => $positions[$positionIndex],
+                'transactionDate' => date('Y-m-d', strtotime('-' . mt_rand(1, 180) . ' days')),
+                'transactionType' => $transactionTypes[$typeIndex],
+                'shares' => $shares,
+                'price' => $price,
+                'value' => $value,
+                'sharesOwned' => $sharesOwned,
+                'symbol' => $symbol
+            ];
+        }
+
+        return $transactions;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getInstitutionalOwnership(string $symbol, int $limit = 20): array
+    {
+        $this->logger->info("MockAlphaVantageClient::getInstitutionalOwnership called", ['symbol' => $symbol, 'limit' => $limit]);
+
+        $institutionNames = [
+            'Vanguard Group',
+            'BlackRock Inc.',
+            'State Street Corporation',
+            'Fidelity Investments',
+            'T. Rowe Price',
+            'JPMorgan Chase & Co.',
+            'Goldman Sachs Group',
+            'Morgan Stanley',
+            'Wellington Management',
+            'Capital Group Companies'
+        ];
+
+        $institutions = [];
+
+        for ($i = 0; $i < $limit; $i++) {
+            $nameIndex = $i % count($institutionNames);
+
+            $shares = mt_rand(100000, 10000000);
+            $value = $shares * (mt_rand(1000, 50000) / 100);
+            $percentOwned = mt_rand(1, 1000) / 100;
+            $previousShares = $shares - mt_rand(-500000, 500000);
+            $percentChange = (($shares - $previousShares) / $previousShares) * 100;
+
+            $institutions[] = [
+                'institutionName' => $institutionNames[$nameIndex],
+                'shares' => $shares,
+                'value' => $value,
+                'percentageOwned' => $percentOwned,
+                'previousShares' => $previousShares,
+                'percentageChange' => $percentChange,
+                'reportDate' => date('Y-m-d', strtotime('-' . mt_rand(1, 90) . ' days')),
+                'symbol' => $symbol
+            ];
+        }
+
+        return $institutions;
+    }
+
+    // --- Mock Data Generation Methods ---
     private function getMockSearchResults(string $term): array
-    { /* ... */
+    {
         $term = strtoupper($term);
         $matches = [];
         if (strpos($term, 'AVGO') !== false || strpos($term, 'BROADCOM') !== false) {
-            $matches[] = ['1. symbol' => 'AVGO', '2. name' => 'Broadcom Inc', '3. type' => 'Equity', '4. region' => 'United States', '8. currency' => 'USD', '9. matchScore' => '0.9000'];
+            $matches[] = [
+                '1. symbol' => 'AVGO',
+                '2. name' => 'Broadcom Inc',
+                '3. type' => 'Equity',
+                '4. region' => 'United States',
+                '8. currency' => 'USD',
+                '9. matchScore' => '0.9000'
+            ];
         }
         if (strpos($term, 'AAPL') !== false || strpos($term, 'APPLE') !== false) {
-            $matches[] = ['1. symbol' => 'AAPL', '2. name' => 'Apple Inc', '3. type' => 'Equity', '4. region' => 'United States', '8. currency' => 'USD', '9. matchScore' => '0.9500'];
+            $matches[] = [
+                '1. symbol' => 'AAPL',
+                '2. name' => 'Apple Inc',
+                '3. type' => 'Equity',
+                '4. region' => 'United States',
+                '8. currency' => 'USD',
+                '9. matchScore' => '0.9500'
+            ];
         }
         if (strpos($term, 'MSFT') !== false || strpos($term, 'MICROSOFT') !== false) {
-            $matches[] = ['1. symbol' => 'MSFT', '2. name' => 'Microsoft Corporation', '3. type' => 'Equity', '4. region' => 'United States', '8. currency' => 'USD', '9. matchScore' => '0.9500'];
+            $matches[] = [
+                '1. symbol' => 'MSFT',
+                '2. name' => 'Microsoft Corporation',
+                '3. type' => 'Equity',
+                '4. region' => 'United States',
+                '8. currency' => 'USD',
+                '9. matchScore' => '0.9500'
+            ];
         }
         return ['bestMatches' => $matches];
     }
+
     private function getMockCompanyProfileData(string $symbol): array
-    { /* ... */
+    {
         switch (strtoupper($symbol)) {
             case 'AVGO':
-                return ['Symbol' => 'AVGO', 'Name' => 'Broadcom Inc', 'Description' => 'Mock AVGO description', 'Exchange' => 'NASDAQ', 'Currency' => 'USD', 'Country' => 'USA', 'Sector' => 'Technology', 'Industry' => 'Semiconductors', 'Address' => '1 Mock Way', 'FullTimeEmployees' => '20000', 'MarketCapitalization' => '515000000000', 'PERatio' => '35.6', 'DividendYield' => '0.0155', 'EPS' => '32.50', 'Beta' => '1.1'];
+                return [
+                    'Symbol' => 'AVGO',
+                    'Name' => 'Broadcom Inc',
+                    'Description' => 'Mock AVGO description',
+                    'Exchange' => 'NASDAQ',
+                    'Currency' => 'USD',
+                    'Country' => 'USA',
+                    'Sector' => 'Technology',
+                    'Industry' => 'Semiconductors',
+                    'Address' => '1 Mock Way',
+                    'FullTimeEmployees' => '20000',
+                    'MarketCapitalization' => '515000000000',
+                    'PERatio' => '35.6',
+                    'DividendYield' => '0.0155',
+                    'EPS' => '32.50',
+                    'Beta' => '1.1'
+                ];
             case 'AAPL':
-                return ['Symbol' => 'AAPL', 'Name' => 'Apple Inc', 'Description' => 'Mock AAPL description', 'Exchange' => 'NASDAQ', 'Currency' => 'USD', 'Country' => 'USA', 'Sector' => 'Technology', 'Industry' => 'Consumer Electronics', 'Address' => '1 Infinite Loop', 'FullTimeEmployees' => '154000', 'MarketCapitalization' => '2750000000000', 'PERatio' => '29.8', 'DividendYield' => '0.0054', 'EPS' => '6.14', 'Beta' => '1.3'];
+                return [
+                    'Symbol' => 'AAPL',
+                    'Name' => 'Apple Inc',
+                    'Description' => 'Mock AAPL description',
+                    'Exchange' => 'NASDAQ',
+                    'Currency' => 'USD',
+                    'Country' => 'USA',
+                    'Sector' => 'Technology',
+                    'Industry' => 'Consumer Electronics',
+                    'Address' => '1 Infinite Loop',
+                    'FullTimeEmployees' => '154000',
+                    'MarketCapitalization' => '2750000000000',
+                    'PERatio' => '29.8',
+                    'DividendYield' => '0.0054',
+                    'EPS' => '6.14',
+                    'Beta' => '1.3'
+                ];
             default:
-                return ['Symbol' => $symbol, 'Name' => 'Mock Company', 'Description' => 'Mock Default description', 'Exchange' => 'MOCK', 'Currency' => 'USD', 'Country' => 'USA', 'Sector' => 'Mock Sector', 'Industry' => 'Mock Industry', 'Address' => '456 Default Dr', 'FullTimeEmployees' => '1000', 'MarketCapitalization' => '1000000000', 'PERatio' => '15.0', 'DividendYield' => '0.02', 'EPS' => '5.00', 'Beta' => '1.0'];
+                return [
+                    'Symbol' => $symbol,
+                    'Name' => 'Mock Company',
+                    'Description' => 'Mock Default description',
+                    'Exchange' => 'MOCK',
+                    'Currency' => 'USD',
+                    'Country' => 'USA',
+                    'Sector' => 'Mock Sector',
+                    'Industry' => 'Mock Industry',
+                    'Address' => '456 Default Dr',
+                    'FullTimeEmployees' => '1000',
+                    'MarketCapitalization' => '1000000000',
+                    'PERatio' => '15.0',
+                    'DividendYield' => '0.02',
+                    'EPS' => '5.00',
+                    'Beta' => '1.0'
+                ];
         }
     }
+
     private function getMockQuoteData(string $symbol): array
-    { /* ... */
+    {
         $price = mt_rand(100, 1500);
         $change = mt_rand(-10, 10);
-        return ['Global Quote' => ['01. symbol' => $symbol, '05. price' => $price, '09. change' => $change, '10. change percent' => ($price - $change != 0 ? ($change / ($price - $change) * 100) : 0) . '%', '06. volume' => mt_rand(1000000, 5000000), '07. latest trading day' => date('Y-m-d'), '08. previous close' => $price - $change, '02. open' => $price + mt_rand(-1, 1), '03. high' => $price + mt_rand(0, 2), '04. low' => $price - mt_rand(0, 2)]];
+        return [
+            'Global Quote' => [
+                '01. symbol' => $symbol,
+                '05. price' => $price,
+                '09. change' => $change,
+                '10. change percent' => ($price - $change != 0 ? ($change / ($price - $change) * 100) : 0) . '%',
+                '06. volume' => mt_rand(1000000, 5000000),
+                '07. latest trading day' => date('Y-m-d'),
+                '08. previous close' => $price - $change,
+                '02. open' => $price + mt_rand(-1, 1),
+                '03. high' => $price + mt_rand(0, 2),
+                '04. low' => $price - mt_rand(0, 2)
+            ]
+        ];
     }
+
     private function getMockIncomeStatementData(string $symbol): array
-    { /* ... */
+    {
         $qReports = [];
         $aReports = [];
         for ($i = 0; $i < 4; $i++) {
-            $qReports[] = ['fiscalDateEnding' => date('Y-m-d', strtotime("-{$i} quarter")), 'totalRevenue' => mt_rand(10, 15) * 1e9, 'netIncome' => mt_rand(1, 4) * 1e9, 'reportedEPS' => mt_rand(1, 5), 'reportedCurrency' => 'USD'];
+            $qReports[] = [
+                'fiscalDateEnding' => date('Y-m-d', strtotime("-{$i} quarter")),
+                'totalRevenue' => mt_rand(10, 15) * 1e9,
+                'netIncome' => mt_rand(1, 4) * 1e9,
+                'reportedEPS' => mt_rand(1, 5),
+                'reportedCurrency' => 'USD'
+            ];
         }
         for ($i = 0; $i < 3; $i++) {
-            $aReports[] = ['fiscalDateEnding' => date('Y-m-d', strtotime("-{$i} year")), 'totalRevenue' => mt_rand(40, 60) * 1e9, 'netIncome' => mt_rand(5, 15) * 1e9, 'reportedEPS' => mt_rand(5, 20), 'reportedCurrency' => 'USD'];
+            $aReports[] = [
+                'fiscalDateEnding' => date('Y-m-d', strtotime("-{$i} year")),
+                'totalRevenue' => mt_rand(40, 60) * 1e9,
+                'netIncome' => mt_rand(5, 15) * 1e9,
+                'reportedEPS' => mt_rand(5, 20),
+                'reportedCurrency' => 'USD'
+            ];
         }
         return ['quarterlyReports' => $qReports, 'annualReports' => $aReports];
     }
+
     private function getMockNewsFeed(string $symbol): array
-    { /* ... */
+    {
         $feed = [];
         for ($i = 0; $i < 5; $i++) {
-            $feed[] = ['title' => "Mock News {$i} for {$symbol}", 'summary' => 'This is mock news content.', 'url' => 'https://example.com', 'time_published' => date('Ymd\THis', strtotime("-{$i} day")), 'authors' => ['Mock Author'], 'source' => 'Mock Source', 'banner_image' => '', 'overall_sentiment_score' => (mt_rand(-50, 50) / 100)];
+            $feed[] = [
+                'title' => "Mock News {$i} for {$symbol}",
+                'summary' => 'This is mock news content.',
+                'url' => 'https://example.com',
+                'time_published' => date('Ymd\THis', strtotime("-{$i} day")),
+                'authors' => ['Mock Author'],
+                'source' => 'Mock Source',
+                'banner_image' => '',
+                'overall_sentiment_score' => (mt_rand(-50, 50) / 100)
+            ];
         }
         return $feed;
     }
+
     private function getMockExecutivesData(string $symbol): array
-    { /* Provides default mock executive data */
-        return [['name' => 'Mock CEO', 'title' => 'Chief Executive Officer'], ['name' => 'Mock CFO', 'title' => 'Chief Financial Officer']];
+    {
+        return [
+            ['name' => 'Mock CEO', 'title' => 'Chief Executive Officer'],
+            ['name' => 'Mock CFO', 'title' => 'Chief Financial Officer'],
+            ['name' => 'Mock CTO', 'title' => 'Chief Technology Officer'],
+            ['name' => 'Mock COO', 'title' => 'Chief Operating Officer']
+        ];
     }
+
     private function getMockTimeSeries(string $interval): array
-    { /* ... */
+    {
         $series = [];
         $days = $interval === 'daily' ? 100 : ($interval === 'weekly' ? 52 : 24);
         $step = $interval === 'daily' ? '-1 day' : ($interval === 'weekly' ? '-1 week' : '-1 month');
         $price = mt_rand(100, 1000);
+
         for ($i = 0; $i < $days; $i++) {
             $date = date('Y-m-d', strtotime("{$i} {$step}"));
             $open = $price;
             $close = $open + mt_rand(-5, 5);
             $high = max($open, $close) + mt_rand(0, 2);
             $low = min($open, $close) - mt_rand(0, 2);
+
             $volume = mt_rand(500000, 10000000);
             $adjustedClose = $close * (1 + (mt_rand(-1, 1) / 100));
             $dividend = (mt_rand(0, 10) == 0) ? mt_rand(1, 5) / 10 : 0;
             $split = 1;
-            $series[$date] = ['1. open' => (string)$open, '2. high' => (string)$high, '3. low' => (string)$low, '4. close' => (string)$close, '5. adjusted close' => (string)$adjustedClose, '6. volume' => (string)$volume, '7. dividend amount' => (string)$dividend, '8. split coefficient' => (string)$split];
-            $price = $close;
+
+            $series[$date] = [
+                '1. open' => (string)$open,
+                '2. high' => (string)$high,
+                '3. low' => (string)$low,
+                '4. close' => (string)$close,
+                '5. adjusted close' => (string)$adjustedClose,
+                '6. volume' => (string)$volume,
+                '7. dividend amount' => (string)$dividend,
+                '8. split coefficient' => (string)$split
+            ];
+
+            // Use current close as next open with some randomness
+            $price = $close + mt_rand(-2, 2);
         }
+
         return $series;
     }
 }

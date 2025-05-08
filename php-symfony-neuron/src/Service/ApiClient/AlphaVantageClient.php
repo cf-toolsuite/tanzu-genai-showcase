@@ -20,7 +20,7 @@ class AlphaVantageClient extends AbstractApiClient
         $this->baseUrl = 'https://www.alphavantage.co'; // Base URL without /query
         // API Key is read from params via AbstractApiClient constructor
         $this->apiKey = $this->params->get('alpha_vantage.api_key', '');
-        
+
         // Log API initialization
         $this->logger->debug('AlphaVantageClient initialized with API Key: ' . ($this->apiKey ? 'Set' : 'Missing'));
     }
@@ -306,5 +306,118 @@ class AlphaVantageClient extends AbstractApiClient
              // Don't throw, just return empty array if no data
         }
         return $prices;
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getESGData(string $symbol): array
+    {
+        $this->logger->warning('AlphaVantageClient does not support getESGData method.', ['symbol' => $symbol]);
+        return [
+            'totalEsg' => null,
+            'environmentScore' => null,
+            'socialScore' => null,
+            'governanceScore' => null,
+            'peerComparison' => [],
+            'lastUpdated' => null
+        ];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getRecentSecFilings(string $symbol, int $limit = 5): array
+    {
+        $this->logger->warning('AlphaVantageClient does not support getRecentSecFilings method.', ['symbol' => $symbol]);
+        return [];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getAnalystRatings(string $symbol): array
+    {
+        $this->logger->warning('AlphaVantageClient does not support getAnalystRatings method.', ['symbol' => $symbol]);
+
+        // We can try to extract some basic analyst data from OVERVIEW endpoint
+        try {
+            $endpoint = '/query';
+            $params = [
+                'function' => 'OVERVIEW',
+                'symbol' => $symbol
+            ];
+
+            $data = $this->request('GET', $endpoint, $params);
+
+            // Create a minimal structure with any available analyst data
+            $targetPrice = (float)($data['AnalystTargetPrice'] ?? 0);
+            $currentPrice = 0;
+
+            // Try to get current price to calculate upside
+            try {
+                $quoteData = $this->getQuote($symbol);
+                $currentPrice = $quoteData['price'] ?? 0;
+            } catch (\Exception $e) {
+                // Ignore error, just use 0
+            }
+
+            $upside = 0;
+            if ($currentPrice > 0 && $targetPrice > 0) {
+                $upside = (($targetPrice - $currentPrice) / $currentPrice) * 100;
+            }
+
+            return [
+                'ratings' => [],
+                'consensus' => [
+                    'consensusRating' => 'N/A',
+                    'averagePriceTarget' => $targetPrice,
+                    'lowPriceTarget' => 0,
+                    'highPriceTarget' => 0,
+                    'buy' => 0,
+                    'hold' => 0,
+                    'sell' => 0,
+                    'upside' => $upside
+                ]
+            ];
+
+        } catch (\Exception $e) {
+            $this->logger->error('Error getting even basic analyst data', [
+                'symbol' => $symbol,
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'ratings' => [],
+                'consensus' => [
+                    'consensusRating' => 'N/A',
+                    'averagePriceTarget' => 0,
+                    'lowPriceTarget' => 0,
+                    'highPriceTarget' => 0,
+                    'buy' => 0,
+                    'hold' => 0,
+                    'sell' => 0,
+                    'upside' => 0
+                ]
+            ];
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getInsiderTrading(string $symbol, int $limit = 20): array
+    {
+        $this->logger->warning('AlphaVantageClient does not support getInsiderTrading method.', ['symbol' => $symbol]);
+        return [];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getInstitutionalOwnership(string $symbol, int $limit = 20): array
+    {
+        $this->logger->warning('AlphaVantageClient does not support getInstitutionalOwnership method.', ['symbol' => $symbol]);
+        return [];
     }
 }

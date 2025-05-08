@@ -1,148 +1,62 @@
-# FILE: php-symfony-neuron/config/services.yaml
-# Purpose: Defines application services and default configurations.
-
 parameters:
-    llm.api_key: '%env(GENAI_API_KEY)%'
-    llm.base_url: '%env(GENAI_BASE_URL)%'
-    llm.model: '%env(GENAI_MODEL)%'
-    use_mock_data: '%env(bool:USE_MOCK_DATA)%'
-    alpha_vantage.api_key: '%env(ALPHA_VANTAGE_API_KEY)%'
-    kaleidoscope_api.key: '%env(KALEIDOSCOPE_API_KEY)%' # API key for Kaleidoscope API
+    app.rapid_api_key: '%env(resolve:RAPID_API_KEY)%'
+    app.genai_api_key: '%env(resolve:GENAI_API_KEY)%'
+    app.genai_base_url: '%env(resolve:GENAI_BASE_URL)%'
+    app.genai_model: '%env(resolve:GENAI_MODEL)%'
 
 services:
-    # Default configuration for services in *this* file
+    # default configuration for services in *this* file
     _defaults:
-        autowire: true      # Automatically injects dependencies
-        autoconfigure: true # Automatically registers services
-        bind:
-            Psr\Log\LoggerInterface: '@logger'
-            # API keys are best bound in package configs or injected via constructor args
+        autowire: true      # Automatically injects dependencies in your services.
+        autoconfigure: true # Automatically registers your services as commands, event subscribers, etc.
 
-    # Makes classes in src/ available to be used as services
+    # makes classes in src/ available to be used as services
+    # this creates a service per class whose id is the fully-qualified class name
     App\:
         resource: '../src/'
         exclude:
+            - '../src/DependencyInjection/'
             - '../src/Entity/'
             - '../src/Kernel.php'
 
-    # Configure LLM services explicitly
+    # controllers are imported separately to make sure services can be injected
+    # as action arguments even if you don't extend any base controller class
+    App\Controller\:
+        resource: '../src/Controller/'
+        tags: ['controller.service_arguments']
+
+    # add more service definitions when explicit configuration is needed
+    # please note that last definitions always *replace* previous ones
+
+    # Yahoo Finance API Configuration
+    App\Service\ApiClient\YahooFinanceClient:
+        arguments:
+            $params: '@parameter_bag'
+
+    # Yahoo Finance API Service using the client
+    App\Service\YahooFinanceService:
+        arguments:
+            $rapidApiKey: '%app.rapid_api_key%'
+            $useMockData: '%env(default:false:bool:USE_MOCK_DATA)%'
+
+    # Stock Clients Factory Configuration
+    App\Service\ApiClient\StockClientsFactory:
+        arguments:
+            $useMockData: '%env(default:false:bool:USE_MOCK_DATA)%'
+
+    # LinkedIn Client Factory Configuration
+    App\Service\ApiClient\LinkedInClientFactory:
+        arguments:
+            $useMockData: '%env(default:false:bool:USE_MOCK_DATA)%'
+
+    # LLM Client Factory Configuration
     App\Service\LlmClientFactory:
         arguments:
-            $apiKey: '%llm.api_key%'
-            $baseUrl: '%llm.base_url%'
-            $model: '%llm.model%'
+            $apiKey: '%app.genai_api_key%'
+            $baseUrl: '%app.genai_base_url%'
+            $model: '%app.genai_model%'
 
-    # Configure NeuronAiService explicitly with the LlmClientFactory dependency
+    # Neuron AI Service Configuration
     App\Service\NeuronAiService:
         arguments:
             $clientFactory: '@App\Service\LlmClientFactory'
-
-    # --- Define ALL Concrete Implementations (Real & Mock) ---
-    # Alpha Vantage
-    App\Service\ApiClient\AlphaVantageClient:
-        public: true
-        arguments:
-            $httpClient: '@http_client'
-            $params: '@parameter_bag'
-            $logger: '@logger'
-
-    App\Service\ApiClient\MockAlphaVantageClient:
-        public: true
-
-    # Yahoo Finance
-    App\Service\ApiClient\YahooFinanceClient:
-        public: true
-        arguments:
-            $httpClient: '@http_client'
-            $params: '@parameter_bag'
-            $logger: '@logger'
-
-    App\Service\ApiClient\MockYahooFinanceClient:
-        public: true
-
-    # SEC API (Kaleidoscope)
-    App\Service\ApiClient\SecApiClient:
-        public: true
-        arguments:
-            $httpClient: '@http_client'
-            $params: '@parameter_bag'
-            $logger: '@logger'
-
-    App\Service\ApiClient\MockSecApiClient:
-        public: true
-
-    # News API
-    App\Service\ApiClient\NewsApiClient:
-        public: true
-        arguments:
-            $httpClient: '@http_client'
-            $params: '@parameter_bag'
-            $logger: '@logger'
-
-    App\Service\ApiClient\MockNewsApiClient:
-        public: true
-
-    # Kaleidoscope API (Now the only SEC filings provider)
-    App\Service\ApiClient\KaleidoscopeApiClient:
-        public: true
-        arguments:
-            $httpClient: '@http_client'
-            $params: '@parameter_bag'
-            $logger: '@logger'
-
-    App\Service\ApiClient\MockKaleidoscopeApiClient:
-        public: true
-
-    # LinkedIn API
-    App\Service\ApiClient\LinkedInApiClient:
-        public: true
-        arguments:
-            $params: '@parameter_bag'
-            $logger: '@logger'
-            $requestStack: '@request_stack'
-
-    App\Service\ApiClient\MockLinkedInApiClient:
-        public: true
-
-    # LinkedIn Client Factory
-    App\Service\ApiClient\LinkedInClientFactory.locator:
-        public: true
-        class: Symfony\Component\DependencyInjection\ServiceLocator
-        tags: ['container.service_locator']
-        arguments:
-            -
-                App\Service\ApiClient\LinkedInApiClient: '@App\Service\ApiClient\LinkedInApiClient'
-                App\Service\ApiClient\MockLinkedInApiClient: '@App\Service\ApiClient\MockLinkedInApiClient'
-
-    App\Service\ApiClient\LinkedInClientFactory:
-        public: true
-        arguments:
-            $locator: '@App\Service\ApiClient\LinkedInClientFactory.locator'
-            $useMockData: '%env(bool:USE_MOCK_DATA)%'
-        tags: ['container.service_subscriber']
-
-    # SEC API Client Factory (Kaleidoscope only)
-    App\Service\ApiClient\SecApiClientFactory.locator:
-        public: true
-        class: Symfony\Component\DependencyInjection\ServiceLocator
-        tags: ['container.service_locator']
-        arguments:
-            -
-                App\Service\ApiClient\KaleidoscopeApiClient: '@App\Service\ApiClient\KaleidoscopeApiClient'
-                App\Service\ApiClient\MockKaleidoscopeApiClient: '@App\Service\ApiClient\MockKaleidoscopeApiClient'
-
-    App\Service\ApiClient\SecApiClientFactory:
-        public: true
-        arguments:
-            $locator: '@App\Service\ApiClient\SecApiClientFactory.locator'
-            $useMockData: '%env(bool:USE_MOCK_DATA)%'
-            $logger: '@logger'
-        tags: ['container.service_subscriber']
-
-    # Define the stock data cache service
-    stock_data.cache:
-        class: Symfony\Component\Cache\Adapter\FilesystemAdapter
-        arguments:
-            $namespace: 'stock_data'
-            $defaultLifetime: 3600
-            $directory: '%kernel.cache_dir%/stock_data'

@@ -2,8 +2,9 @@
 
 namespace App\Service;
 
+use Symfony\Component\HttpClient\HttpClient;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
-use Symfony\Component\HttpClient\Exception\TransportException;
+use Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface;
 
 /**
  * Service for interacting with Neuron AI LLM APIs
@@ -27,15 +28,68 @@ class NeuronAiService
      */
     private function extractJsonFromText(string $text): string
     {
+        // Log the original response for debugging
+        error_log('Raw LLM response: ' . substr($text, 0, 500) . (strlen($text) > 500 ? '...' : ''));
+
         // Look for JSON object pattern ({...})
         if (preg_match('/\{(?:[^{}]|(?R))*\}/s', $text, $matches)) {
-            return $matches[0];
+            $jsonCandidate = $matches[0];
+
+            // Verify it's valid JSON
+            if ($this->isValidJson($jsonCandidate)) {
+                return $jsonCandidate;
+            }
+
+            // If not valid, try to clean it up
+            $cleaned = $this->cleanJsonString($jsonCandidate);
+            if ($this->isValidJson($cleaned)) {
+                return $cleaned;
+            }
         }
 
         // Remove markdown code block markers if present
         $text = preg_replace('/```(?:json)?\s*(.*?)\s*```/s', '$1', $text);
+        $cleaned = $this->cleanJsonString(trim($text));
 
-        return trim($text);
+        return $cleaned;
+    }
+
+    /**
+     * Check if a string is valid JSON
+     *
+     * @param string $string The string to check
+     * @return bool Whether the string is valid JSON
+     */
+    private function isValidJson(string $string): bool
+    {
+        json_decode($string);
+        return json_last_error() === JSON_ERROR_NONE;
+    }
+
+    /**
+     * Clean a JSON string to make it more likely to parse correctly
+     *
+     * @param string $string The JSON string to clean
+     * @return string The cleaned JSON string
+     */
+    private function cleanJsonString(string $string): string
+    {
+        // Replace common issues with Together API responses
+
+        // Fix unescaped quotes in strings
+        $string = preg_replace('/"([^"]*?)(?<!\\\\)"([^"]*?)"/', '"$1\\"$2"', $string);
+
+        // Fix missing commas between objects
+        $string = preg_replace('/}(\s*){/', '},${1}{', $string);
+
+        // Fix trailing commas in objects/arrays
+        $string = preg_replace('/,(\s*)}/', '$1}', $string);
+        $string = preg_replace('/,(\s*)]/', '$1]', $string);
+
+        // Fix missing quotes around property names
+        $string = preg_replace('/([{,]\s*)(\w+)(\s*:)/', '$1"$2"$3', $string);
+
+        return $string;
     }
 
     /**
@@ -76,7 +130,7 @@ class NeuronAiService
             }
 
             return trim($data['choices'][0]['text']);
-        } catch (TransportException $e) {
+        } catch (TransportExceptionInterface $e) {
             throw new \Exception('Failed to connect to LLM API: ' . $e->getMessage());
         } catch (\Exception $e) {
             throw new \Exception('Error in LLM request: ' . $e->getMessage());
@@ -112,18 +166,26 @@ class NeuronAiService
 
             $statusCode = $response->getStatusCode();
             if ($statusCode !== 200) {
+                error_log('LLM API returned non-200 status code: ' . $statusCode);
                 throw new \Exception('LLM API returned status code ' . $statusCode);
             }
 
             $data = $response->toArray();
             if (empty($data['choices'][0]['message']['content'])) {
+                error_log('LLM API returned empty response: ' . json_encode($data));
                 throw new \Exception('LLM API returned no completions');
             }
 
             return trim($data['choices'][0]['message']['content']);
-        } catch (TransportException $e) {
+        } catch (TransportExceptionInterface $e) {
+            error_log('LLM API transport error: ' . $e->getMessage());
+            error_log('API URL: ' . $this->clientFactory->getBaseUrl());
+            error_log('API Model: ' . $this->clientFactory->getModel());
+            $apiKey = $this->clientFactory->getApiKey();
+            error_log('API Key Format: ' . substr($apiKey, 0, 8) . '...' . substr($apiKey, -5));
             throw new \Exception('Failed to connect to LLM API: ' . $e->getMessage());
         } catch (\Exception $e) {
+            error_log('LLM API error: ' . $e->getMessage());
             throw new \Exception('Error in LLM request: ' . $e->getMessage());
         }
     }

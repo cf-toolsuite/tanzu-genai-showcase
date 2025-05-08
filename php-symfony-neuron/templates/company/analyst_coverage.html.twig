@@ -1,0 +1,663 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ company.name }} - Analyst Coverage{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .analyst-card {
+            margin-bottom: 1.5rem;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .analyst-card .card-header {
+            background-color: #f8f9fa;
+            font-weight: 600;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .firm-name {
+            font-weight: 500;
+        }
+        .rating-buy {
+            color: #198754;
+            font-weight: 500;
+        }
+        .rating-hold {
+            color: #fd7e14;
+            font-weight: 500;
+        }
+        .rating-sell {
+            color: #dc3545;
+            font-weight: 500;
+        }
+        .rating-neutral {
+            color: #6c757d;
+            font-weight: 500;
+        }
+        .price-target {
+            font-weight: 500;
+        }
+        .price-target-up {
+            color: #198754;
+        }
+        .price-target-down {
+            color: #dc3545;
+        }
+        .price-target-unchanged {
+            color: #6c757d;
+        }
+        .filter-section {
+            background-color: #f8f9fa;
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+        }
+        .consensus-score {
+            font-size: 2.5rem;
+            font-weight: bold;
+            text-align: center;
+        }
+        .consensus-label {
+            font-size: 1rem;
+            color: #6c757d;
+            text-align: center;
+        }
+        .rating-distribution {
+            display: flex;
+            align-items: center;
+            margin-bottom: 0.75rem;
+        }
+        .rating-label {
+            width: 60px;
+            font-weight: 500;
+        }
+        .rating-bar {
+            flex-grow: 1;
+            height: 24px;
+            margin-right: 10px;
+        }
+        .rating-count {
+            width: 30px;
+            text-align: right;
+        }
+        .price-range {
+            display: flex;
+            align-items: center;
+            margin-top: 1.5rem;
+        }
+        .price-range-bar {
+            flex-grow: 1;
+            height: 8px;
+            background-color: #e9ecef;
+            position: relative;
+            margin: 0 15px;
+            border-radius: 4px;
+        }
+        .price-range-inner {
+            position: absolute;
+            height: 8px;
+            background-color: #0d6efd;
+            border-radius: 4px;
+        }
+        .price-marker {
+            position: absolute;
+            width: 2px;
+            height: 16px;
+            background-color: #212529;
+            top: -4px;
+        }
+        .price-label {
+            font-size: 0.875rem;
+            color: #6c757d;
+        }
+        .price-value {
+            font-weight: 500;
+        }
+        .analyst-chart {
+            height: 300px;
+            width: 100%;
+        }
+    </style>
+{% endblock %}
+
+{% block javascripts %}
+    {{ parent() }}
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Create price target trend chart
+            {% if analystRatings is not empty %}
+                const ctx = document.getElementById('priceTargetChart').getContext('2d');
+
+                // Group ratings by date
+                const ratingData = {};
+
+                {% for rating in analystRatings %}
+                    const date = '{{ rating.ratingDate|date("Y-m-d") }}';
+                    const priceTarget = {{ rating.priceTarget|default(0) }};
+
+                    if (!ratingData[date]) {
+                        ratingData[date] = {
+                            targets: [],
+                            count: 0
+                        };
+                    }
+
+                    if (priceTarget > 0) {
+                        ratingData[date].targets.push(priceTarget);
+                        ratingData[date].count++;
+                    }
+                {% endfor %}
+
+                // Calculate averages and prepare data for chart
+                const dates = Object.keys(ratingData).sort();
+                const averages = [];
+                const highs = [];
+                const lows = [];
+
+                dates.forEach(date => {
+                    if (ratingData[date].count > 0) {
+                        const targets = ratingData[date].targets;
+                        const sum = targets.reduce((a, b) => a + b, 0);
+                        const avg = sum / targets.length;
+                        const high = Math.max(...targets);
+                        const low = Math.min(...targets);
+
+                        averages.push(avg);
+                        highs.push(high);
+                        lows.push(low);
+                    } else {
+                        // If no price targets on this date, use previous values or 0
+                        const prevIndex = averages.length - 1;
+                        averages.push(prevIndex >= 0 ? averages[prevIndex] : 0);
+                        highs.push(prevIndex >= 0 ? highs[prevIndex] : 0);
+                        lows.push(prevIndex >= 0 ? lows[prevIndex] : 0);
+                    }
+                });
+
+                new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: dates,
+                        datasets: [
+                            {
+                                label: 'Average Price Target',
+                                data: averages,
+                                borderColor: '#0d6efd',
+                                backgroundColor: 'rgba(13, 110, 253, 0.1)',
+                                borderWidth: 2,
+                                fill: false,
+                                tension: 0.1
+                            },
+                            {
+                                label: 'High Price Target',
+                                data: highs,
+                                borderColor: '#198754',
+                                backgroundColor: 'rgba(25, 135, 84, 0.1)',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                fill: false,
+                                tension: 0.1
+                            },
+                            {
+                                label: 'Low Price Target',
+                                data: lows,
+                                borderColor: '#dc3545',
+                                backgroundColor: 'rgba(220, 53, 69, 0.1)',
+                                borderWidth: 2,
+                                borderDash: [5, 5],
+                                fill: false,
+                                tension: 0.1
+                            }
+                        ]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        scales: {
+                            y: {
+                                title: {
+                                    display: true,
+                                    text: 'Price Target ($)'
+                                },
+                                ticks: {
+                                    callback: function(value) {
+                                        return '$' + value;
+                                    }
+                                }
+                            },
+                            x: {
+                                title: {
+                                    display: true,
+                                    text: 'Date'
+                                }
+                            }
+                        },
+                        plugins: {
+                            title: {
+                                display: true,
+                                text: 'Analyst Price Target Trends'
+                            },
+                            tooltip: {
+                                mode: 'index',
+                                intersect: false,
+                                callbacks: {
+                                    label: function(context) {
+                                        let label = context.dataset.label || '';
+                                        if (label) {
+                                            label += ': ';
+                                        }
+                                        if (context.parsed.y !== null) {
+                                            label += new Intl.NumberFormat('en-US', {
+                                                style: 'currency',
+                                                currency: 'USD',
+                                                minimumFractionDigits: 2,
+                                                maximumFractionDigits: 2
+                                            }).format(context.parsed.y);
+                                        }
+                                        return label;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+
+                // Create rating distribution chart
+                const distributionCtx = document.getElementById('ratingDistributionChart').getContext('2d');
+
+                new Chart(distributionCtx, {
+                    type: 'pie',
+                    data: {
+                        labels: ['Buy', 'Hold', 'Sell'],
+                        datasets: [{
+                            data: [
+                                {{ analystConsensus.buy }},
+                                {{ analystConsensus.hold }},
+                                {{ analystConsensus.sell }}
+                            ],
+                            backgroundColor: ['#198754', '#fd7e14', '#dc3545'],
+                            borderColor: ['#198754', '#fd7e14', '#dc3545'],
+                            borderWidth: 1
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom'
+                            },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        const value = context.parsed;
+                                        const total = context.dataset.data.reduce((a, b) => a + b, 0);
+                                        const percentage = Math.round((value / total) * 100);
+                                        return context.label + ': ' + value + ' (' + percentage + '%)';
+                                    }
+                                }
+                            }
+                        }
+                    }
+                });
+            {% endif %}
+        });
+    </script>
+{% endblock %}
+
+{% block body %}
+    <div class="container mt-4">
+        <h1>{{ company.name }} ({{ company.tickerSymbol }}) - Analyst Coverage</h1>
+
+        <nav aria-label="breadcrumb" class="mb-4">
+            <ol class="breadcrumb">
+                <li class="breadcrumb-item"><a href="{{ path('company_show', {'id': company.id}) }}">Company Profile</a></li>
+                <li class="breadcrumb-item"><a href="{{ path('company_additional_metrics', {'id': company.id}) }}">Additional Metrics</a></li>
+                <li class="breadcrumb-item active" aria-current="page">Analyst Coverage</li>
+            </ol>
+        </nav>
+
+        <div class="filter-section">
+            <form method="get" class="row g-3">
+                <div class="col-md-4">
+                    <label for="firm" class="form-label">Firm</label>
+                    <select class="form-select" id="firm" name="firm">
+                        <option value="">All Firms</option>
+                        {% for name, label in firmNames %}
+                            <option value="{{ name }}" {% if currentFirm == name %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4">
+                    <label for="rating" class="form-label">Rating</label>
+                    <select class="form-select" id="rating" name="rating">
+                        <option value="">All Ratings</option>
+                        {% for type, label in ratingTypes %}
+                            <option value="{{ type }}" {% if currentRating == type %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-md-4 d-flex align-items-end">
+                    <button type="submit" class="btn btn-primary">Apply Filters</button>
+                    {% if app.request.query.count > 0 %}
+                        <a href="{{ path('company_analyst_coverage', {'id': company.id}) }}" class="btn btn-outline-secondary ms-2">Clear Filters</a>
+                    {% endif %}
+                </div>
+            </form>
+        </div>
+
+        {% if analystRatings is not empty %}
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card analyst-card">
+                        <div class="card-header">
+                            <span>Analyst Consensus</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="consensus-score">
+                                {% if analystConsensus.buy > analystConsensus.hold and analystConsensus.buy > analystConsensus.sell %}
+                                    <span class="rating-buy">Buy</span>
+                                {% elseif analystConsensus.sell > analystConsensus.buy and analystConsensus.sell > analystConsensus.hold %}
+                                    <span class="rating-sell">Sell</span>
+                                {% else %}
+                                    <span class="rating-hold">Hold</span>
+                                {% endif %}
+                            </div>
+                            <div class="consensus-label">Consensus Rating</div>
+
+                            <div class="mt-4">
+                                <div class="rating-distribution">
+                                    <span class="rating-label">Buy</span>
+                                    <div class="rating-bar">
+                                        <div class="progress" style="height: 24px;">
+                                            <div class="progress-bar bg-success" role="progressbar"
+                                                 style="width: {{ (analystConsensus.buy / analystConsensus.total * 100)|number_format }}%"
+                                                 aria-valuenow="{{ analystConsensus.buy }}"
+                                                 aria-valuemin="0"
+                                                 aria-valuemax="{{ analystConsensus.total }}">
+                                                {{ (analystConsensus.buy / analystConsensus.total * 100)|number_format }}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <span class="rating-count">{{ analystConsensus.buy }}</span>
+                                </div>
+
+                                <div class="rating-distribution">
+                                    <span class="rating-label">Hold</span>
+                                    <div class="rating-bar">
+                                        <div class="progress" style="height: 24px;">
+                                            <div class="progress-bar bg-warning" role="progressbar"
+                                                 style="width: {{ (analystConsensus.hold / analystConsensus.total * 100)|number_format }}%"
+                                                 aria-valuenow="{{ analystConsensus.hold }}"
+                                                 aria-valuemin="0"
+                                                 aria-valuemax="{{ analystConsensus.total }}">
+                                                {{ (analystConsensus.hold / analystConsensus.total * 100)|number_format }}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <span class="rating-count">{{ analystConsensus.hold }}</span>
+                                </div>
+
+                                <div class="rating-distribution">
+                                    <span class="rating-label">Sell</span>
+                                    <div class="rating-bar">
+                                        <div class="progress" style="height: 24px;">
+                                            <div class="progress-bar bg-danger" role="progressbar"
+                                                 style="width: {{ (analystConsensus.sell / analystConsensus.total * 100)|number_format }}%"
+                                                 aria-valuenow="{{ analystConsensus.sell }}"
+                                                 aria-valuemin="0"
+                                                 aria-valuemax="{{ analystConsensus.total }}">
+                                                {{ (analystConsensus.sell / analystConsensus.total * 100)|number_format }}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <span class="rating-count">{{ analystConsensus.sell }}</span>
+                                </div>
+                            </div>
+
+                            <div class="analyst-chart mt-4">
+                                <canvas id="ratingDistributionChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card analyst-card">
+                        <div class="card-header">
+                            <span>Price Target Summary</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="text-center mb-4">
+                                <div class="h2">${{ analystConsensus.averagePriceTarget|number_format(2) }}</div>
+                                <div class="text-muted">Average Price Target</div>
+                            </div>
+
+                            <div class="price-range">
+                                <div>
+                                    <div class="price-label">Low</div>
+                                    <div class="price-value">${{ analystConsensus.lowPriceTarget|number_format(2) }}</div>
+                                </div>
+                                <div class="price-range-bar">
+                                    {% set range = analystConsensus.highPriceTarget - analystConsensus.lowPriceTarget %}
+                                    {% set rangeStart = 0 %}
+                                    {% set rangeWidth = 100 %}
+                                    {% if range > 0 %}
+                                        {% set rangeStart = ((analystConsensus.averagePriceTarget - analystConsensus.lowPriceTarget) / range * 100)|number_format %}
+                                        {% set rangeWidth = ((analystConsensus.highPriceTarget - analystConsensus.lowPriceTarget) / range * 100)|number_format %}
+                                    {% endif %}
+                                    <div class="price-range-inner" style="left: 0%; width: {{ rangeWidth }}%;"></div>
+                                    <div class="price-marker" style="left: {{ rangeStart }}%;"></div>
+                                </div>
+                                <div>
+                                    <div class="price-label">High</div>
+                                    <div class="price-value">${{ analystConsensus.highPriceTarget|number_format(2) }}</div>
+                                </div>
+                            </div>
+
+                            <div class="row mt-5">
+                                <div class="col-md-6">
+                                    <h5>Price Target Statistics</h5>
+                                    <table class="table table-sm">
+                                        <tbody>
+                                            <tr>
+                                                <td>Average</td>
+                                                <td class="text-end">${{ analystConsensus.averagePriceTarget|number_format(2) }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Median</td>
+                                                <td class="text-end">${{ analystConsensus.medianPriceTarget|number_format(2) }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>High</td>
+                                                <td class="text-end">${{ analystConsensus.highPriceTarget|number_format(2) }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Low</td>
+                                                <td class="text-end">${{ analystConsensus.lowPriceTarget|number_format(2) }}</td>
+                                            </tr>
+                                            <tr>
+                                                <td>Standard Deviation</td>
+                                                <td class="text-end">${{ analystConsensus.standardDeviation|number_format(2) }}</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5>Current Stock Price</h5>
+                                    <div class="h3">${{ company.currentPrice|number_format(2) }}</div>
+
+                                    <h5 class="mt-3">Upside Potential</h5>
+                                    {% set upside = ((analystConsensus.averagePriceTarget - company.currentPrice) / company.currentPrice * 100)|number_format(2) %}
+                                    <div class="h3 {% if upside > 0 %}text-success{% else %}text-danger{% endif %}">
+                                        {{ upside }}%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card analyst-card">
+                        <div class="card-header">
+                            <span>Price Target Trends</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="analyst-chart">
+                                <canvas id="priceTargetChart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card analyst-card">
+                        <div class="card-header">
+                            <span>
+                                {% if currentFirm %}
+                                    Ratings from {{ currentFirm }}
+                                {% elseif currentRating %}
+                                    {{ currentRating }} Ratings
+                                {% else %}
+                                    Recent Analyst Ratings
+                                {% endif %}
+                            </span>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-responsive">
+                                <table class="table table-hover">
+                                    <thead>
+                                        <tr>
+                                            <th>Date</th>
+                                            <th>Firm</th>
+                                            <th>Analyst</th>
+                                            <th>Rating</th>
+                                            <th>Previous Rating</th>
+                                            <th>Price Target</th>
+                                            <th>Previous Target</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        {% for rating in analystRatings %}
+                                            <tr>
+                                                <td>{{ rating.ratingDate|date('M d, Y') }}</td>
+                                                <td class="firm-name">
+                                                    <a href="{{ path('company_analyst_coverage', {'id': company.id, 'firm': rating.firmName}) }}">
+                                                        {{ rating.firmName }}
+                                                    </a>
+                                                </td>
+                                                <td>{{ rating.analystName|default('-') }}</td>
+                                                <td>
+                                                    {% if rating.rating matches '/buy|outperform|overweight|strong buy/i' %}
+                                                        <span class="rating-buy">{{ rating.rating }}</span>
+                                                    {% elseif rating.rating matches '/sell|underperform|underweight|reduce/i' %}
+                                                        <span class="rating-sell">{{ rating.rating }}</span>
+                                                    {% elseif rating.rating matches '/hold|neutral|market perform|equal weight/i' %}
+                                                        <span class="rating-hold">{{ rating.rating }}</span>
+                                                    {% else %}
+                                                        <span class="rating-neutral">{{ rating.rating }}</span>
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if rating.previousRating %}
+                                                        {{ rating.previousRating }}
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </td>
+                                                <td class="price-target">
+                                                    {% if rating.priceTarget %}
+                                                        ${{ rating.priceTarget|number_format(2) }}
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </td>
+                                                <td>
+                                                    {% if rating.previousPriceTarget %}
+                                                        {% if rating.priceTarget > rating.previousPriceTarget %}
+                                                            <span class="price-target-up">
+                                                                ${{ rating.previousPriceTarget|number_format(2) }}
+                                                                <i class="fas fa-arrow-up"></i>
+                                                            </span>
+                                                        {% elseif rating.priceTarget < rating.previousPriceTarget %}
+                                                            <span class="price-target-down">
+                                                                ${{ rating.previousPriceTarget|number_format(2) }}
+                                                                <i class="fas fa-arrow-down"></i>
+                                                            </span>
+                                                        {% else %}
+                                                            <span class="price-target-unchanged">
+                                                                ${{ rating.previousPriceTarget|number_format(2) }}
+                                                                <i class="fas fa-equals"></i>
+                                                            </span>
+                                                        {% endif %}
+                                                    {% else %}
+                                                        -
+                                                    {% endif %}
+                                                </td>
+                                            </tr>
+                                        {% endfor %}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="row mt-4">
+                <div class="col-12">
+                    <div class="card analyst-card">
+                        <div class="card-header">
+                            <span>Understanding Analyst Ratings</span>
+                        </div>
+                        <div class="card-body">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <h5>What are Analyst Ratings?</h5>
+                                    <p>Analyst ratings are recommendations made by financial analysts who study publicly traded companies and attempt to evaluate their future performance. These professionals work for investment banks, brokerage firms, and research houses.</p>
+
+                                    <h5>Rating Categories</h5>
+                                    <ul>
+                                        <li><strong>Buy/Outperform/Overweight:</strong> The stock is expected to outperform the market or its sector</li>
+                                        <li><strong>Hold/Neutral/Market Perform:</strong> The stock is expected to perform in line with the market</li>
+                                        <li><strong>Sell/Underperform/Underweight:</strong> The stock is expected to underperform the market or its sector</li>
+                                    </ul>
+                                </div>
+                                <div class="col-md-6">
+                                    <h5>Price Targets</h5>
+                                    <p>A price target represents an analyst's projection of a stock's future price, typically within a 12-month timeframe. It's based on:</p>
+                                    <ul>
+                                        <li>Financial analysis and modeling</li>
+                                        <li>Industry trends and competitive positioning</li>
+                                        <li>Management quality and strategy</li>
+                                        <li>Macroeconomic factors</li>
+                                    </ul>
+
+                                    <h5>Interpreting Consensus</h5>
+                                    <p>While analyst ratings provide valuable insights, they should be considered alongside other research. Analysts may have conflicts of interest, and consensus views can sometimes reflect groupthink rather than independent analysis.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="alert alert-info">
+                <h4 class="alert-heading">No Analyst Ratings Available</h4>
+                <p>Analyst ratings are not currently available for {{ company.name }}{% if currentFirm %} from {{ currentFirm }}{% endif %}{% if currentRating %} with the rating "{{ currentRating }}"{% endif %}. This could be because:</p>
+                <ul>
+                    <li>The company may not be widely covered by analysts</li>
+                    <li>The selected filters don't match any ratings</li>
+                    <li>Our data provider has not yet indexed these ratings</li>
+                </ul>
+                <p>Try selecting different filters or check back later.</p>
+            </div>
+        {% endif %}
+    </div>
+{% endblock %}

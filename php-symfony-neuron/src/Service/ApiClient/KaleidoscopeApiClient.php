@@ -359,6 +359,118 @@ class KaleidoscopeApiClient extends AbstractApiClient
     }
 
     /**
+     * {@inheritdoc}
+     */
+    public function getESGData(string $symbol): array
+    {
+        if ($this->logger) {
+            $this->logger->warning('KaleidoscopeApiClient does not support ESG data retrieval.', ['symbol' => $symbol]);
+        }
+
+        return [
+            'totalEsg' => null,
+            'environmentScore' => null,
+            'socialScore' => null,
+            'governanceScore' => null,
+            'peerComparison' => [],
+            'lastUpdated' => null
+        ];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getRecentSecFilings(string $symbol, int $limit = 5): array
+    {
+        try {
+            // This method is perfect for Kaleidoscope as it specializes in SEC filings
+            $filings = $this->searchFilings($symbol, ['limit' => $limit]);
+
+            if (empty($filings['data'])) {
+                return [];
+            }
+
+            $result = [];
+            foreach (array_slice($filings['data'], 0, $limit) as $filing) {
+                $result[] = $this->normalizeFilingData($filing);
+            }
+
+            return $result;
+        } catch (\Exception $e) {
+            if ($this->logger) {
+                $this->logger->error("Failed to retrieve recent SEC filings", [
+                    'symbol' => $symbol,
+                    'error' => $e->getMessage()
+                ]);
+            }
+            return [];
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getAnalystRatings(string $symbol): array
+    {
+        if ($this->logger) {
+            $this->logger->warning('KaleidoscopeApiClient does not support analyst ratings.', ['symbol' => $symbol]);
+        }
+
+        return [
+            'ratings' => [],
+            'consensus' => [
+                'consensusRating' => 'N/A',
+                'averagePriceTarget' => 0,
+                'lowPriceTarget' => 0,
+                'highPriceTarget' => 0,
+                'buy' => 0,
+                'hold' => 0,
+                'sell' => 0,
+                'upside' => 0
+            ]
+        ];
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getInsiderTrading(string $symbol, int $limit = 20): array
+    {
+        if ($this->logger) {
+            $this->logger->warning('KaleidoscopeApiClient does not support insider trading data.', ['symbol' => $symbol]);
+        }
+
+        // For insider trading, we can check if there are any Form 4 filings
+        // Form 4 is used to report changes in insider ownership
+        try {
+            $filings = $this->searchFilings($symbol);
+            return $this->filterFilingsByType($filings, '4', $limit);
+        } catch (\Exception $e) {
+            if ($this->logger) {
+                $this->logger->error("Error searching for Form 4 filings", [
+                    'symbol' => $symbol,
+                    'error' => $e->getMessage()
+                ]);
+            }
+            return [];
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    public function getInstitutionalOwnership(string $symbol, int $limit = 20): array
+    {
+        if ($this->logger) {
+            $this->logger->warning('KaleidoscopeApiClient does not support institutional ownership data.', ['symbol' => $symbol]);
+        }
+
+        // Could potentially extract from 13F filings, but that's complex
+        // Just return empty array for now
+        return [];
+    }
+
+    /**
      * Get mock data for testing (not used in real implementation)
      */
     protected function getMockData(string $endpoint, array $params): array

@@ -49,6 +49,8 @@ class MockYahooFinanceClient implements ApiClientInterface
         $summaryDetail = $result['summaryDetail'] ?? [];
         $financialData = $result['financialData'] ?? [];
         $price = $result['price'] ?? [];
+        $esgData = $this->getESGData($symbol);
+
         return [
             'symbol' => $symbol,
             'name' => $assetProfile['longName'] ?? ($price['shortName'] ?? ''),
@@ -64,7 +66,7 @@ class MockYahooFinanceClient implements ApiClientInterface
             'zip' => $assetProfile['zip'] ?? '',
             'website' => $assetProfile['website'] ?? '',
             'employees' => (int)($assetProfile['fullTimeEmployees'] ?? 0),
-            'officers' => $assetProfile['companyOfficers'] ?? [],
+            'officers' => $this->getExecutives($symbol),
             'marketCap' => (float)($summaryDetail['marketCap']['raw'] ?? 0),
             'peRatio' => (float)($summaryDetail['trailingPE']['raw'] ?? 0),
             'pegRatio' => (float)($summaryDetail['pegRatio']['raw'] ?? 0),
@@ -82,6 +84,12 @@ class MockYahooFinanceClient implements ApiClientInterface
             'grossMargins' => (float)($financialData['grossMargins']['raw'] ?? 0),
             'operatingMargins' => (float)($financialData['operatingMargins']['raw'] ?? 0),
             'profitMargins' => (float)($financialData['profitMargins']['raw'] ?? 0),
+            // New fields to match updated client
+            'esgScore' => $esgData['totalEsg'] ?? null,
+            'environmentScore' => $esgData['environmentScore'] ?? null,
+            'socialScore' => $esgData['socialScore'] ?? null,
+            'governanceScore' => $esgData['governanceScore'] ?? null,
+            'recentSecFilings' => $this->getRecentSecFilings($symbol, 3),
         ];
     }
 
@@ -108,6 +116,11 @@ class MockYahooFinanceClient implements ApiClientInterface
             'low' => (float)($price['regularMarketDayLow']['raw'] ?? 0),
             'marketCap' => (float)($summary['marketCap']['raw'] ?? 0),
             'sharesOutstanding' => (float)($price['sharesOutstanding']['raw'] ?? 0),
+            // Add new fields to match the real client
+            'fiftyTwoWeekHigh' => (float)($summary['fiftyTwoWeekHigh']['raw'] ?? 0),
+            'fiftyTwoWeekLow' => (float)($summary['fiftyTwoWeekLow']['raw'] ?? 0),
+            'averageVolume' => (int)($summary['averageVolume']['raw'] ?? 0),
+            'marketState' => $price['marketState'] ?? 'REGULAR',
         ];
     }
 
@@ -160,14 +173,14 @@ class MockYahooFinanceClient implements ApiClientInterface
             $publishedTime = $item['provider_publish_time'] ?? null;
             $news[] = [
                 'title' => $item['title'] ?? '',
-                'description' => '',
+                'description' => $item['summary'] ?? '',
                 'url' => $item['link'] ?? '',
                 'imageUrl' => $item['thumbnail']['resolutions'][0]['url'] ?? null,
                 'source' => $item['publisher'] ?? 'Yahoo Mock',
-                'author' => '',
+                'author' => $item['author'] ?? '',
                 'publishedAt' => $publishedTime ? date('Y-m-d H:i:s', $publishedTime) : date('Y-m-d H:i:s'),
                 'sentiment' => 0,
-                'content' => ''
+                'content' => $item['content'] ?? ''
             ];
             if (count($news) >= $limit) break;
         }
@@ -177,13 +190,24 @@ class MockYahooFinanceClient implements ApiClientInterface
     public function getExecutives(string $symbol): array
     {
         $this->logger->info("MockYahooFinanceClient::getExecutives called", ['symbol' => $symbol]);
-        $mockSummary = $this->mockDataStore[strtoupper($symbol)] ?? $this->getMockSummaryData($symbol);
-        $result = $mockSummary['quoteSummary']['result'][0] ?? [];
-        $assetProfile = $result['assetProfile'] ?? [];
-        // Process mock data to match expected output format
+        $mockExecs = $this->getMockExecutives($symbol);
+
         $executives = [];
-        foreach ($assetProfile['companyOfficers'] ?? [] as $officer) {
-            $executives[] = ['name' => $officer['name'] ?? 'Unknown', 'title' => $officer['title'] ?? 'Unknown', 'age' => null, 'yearJoined' => null, 'bio' => '', 'compensation' => $officer['totalPay']['raw'] ?? 0, 'education' => '', 'previousCompanies' => ''];
+        foreach ($mockExecs as $exec) {
+            $executives[] = [
+                'name' => $exec['name'] ?? 'Unknown',
+                'title' => $exec['title'] ?? 'Unknown',
+                'age' => null,
+                'yearJoined' => null,
+                'bio' => '',
+                'compensation' => 0,
+                'education' => '',
+                'previousCompanies' => '',
+                // New fields to match real client
+                'sharesHeld' => mt_rand(1000, 100000),
+                'latestTransaction' => date('Y-m-d', strtotime('-' . mt_rand(1, 30) . ' days')),
+                'position' => $exec['title'] ?? 'Officer',
+            ];
         }
         return $executives;
     }
@@ -285,11 +309,21 @@ class MockYahooFinanceClient implements ApiClientInterface
         return ['incomeStatementHistory' => ['quarterlyIncomeStatementHistory' => $qReports, 'annualIncomeStatementHistory' => $aReports]];
     }
     private function getMockNewsData(string $symbol): array
-    { /* ... Same as before, returns ['news' => [...]] ... */
+    {
         $news = [];
         $limit = 5;
         for ($i = 0; $i < $limit; $i++) {
-            $news[] = ['uuid' => 'mock-' . $i, 'title' => "Mock News {$i} for {$symbol}", 'publisher' => 'Mock Source', 'link' => 'https://example.com', 'provider_publish_time' => strtotime("-{$i} day"), 'thumbnail' => ['resolutions' => [['url' => 'https://via.placeholder.com/80?text=Nws']]]];
+            $news[] = [
+                'uuid' => 'mock-' . $i,
+                'title' => "Mock News {$i} for {$symbol}",
+                'summary' => "This is a mock summary for news article {$i} about {$symbol}.",
+                'publisher' => 'Mock Source',
+                'author' => 'Mock Author',
+                'link' => 'https://example.com',
+                'provider_publish_time' => strtotime("-{$i} day"),
+                'thumbnail' => ['resolutions' => [['url' => 'https://via.placeholder.com/80?text=Nws']]],
+                'content' => "This is the full content of mock news article {$i} about {$symbol}. It contains detailed information that would be relevant to investors."
+            ];
         }
         return ['news' => $news];
     }
@@ -297,6 +331,222 @@ class MockYahooFinanceClient implements ApiClientInterface
     { /* ... Same as before, returns array of officers ... */
         return [['name' => 'Mock CEO', 'title' => 'Chief Executive Officer'], ['name' => 'Mock CFO', 'title' => 'Chief Financial Officer']];
     }
+
+    /**
+     * Get ESG (Environmental, Social, Governance) data for a company
+     *
+     * @param string $symbol Company ticker symbol
+     * @return array ESG data with scores
+     */
+    public function getESGData(string $symbol): array
+    {
+        $this->logger->info("MockYahooFinanceClient::getESGData called", ['symbol' => $symbol]);
+
+        $mockEsgData = [
+            'totalEsg' => mt_rand(50, 90) / 10,  // Random score between 5.0 and 9.0
+            'environmentScore' => mt_rand(40, 95) / 10,
+            'socialScore' => mt_rand(40, 95) / 10,
+            'governanceScore' => mt_rand(40, 95) / 10,
+            'peerComparison' => [
+                'totalEsg' => mt_rand(50, 90) / 10,
+                'environmentScore' => mt_rand(40, 95) / 10,
+                'socialScore' => mt_rand(40, 95) / 10,
+                'governanceScore' => mt_rand(40, 95) / 10,
+            ],
+            'lastUpdated' => date('Y-m-d', strtotime('-' . mt_rand(1, 60) . ' days'))
+        ];
+
+        return $mockEsgData;
+    }
+
+    /**
+     * Get recent SEC filings for a company
+     *
+     * @param string $symbol Company ticker symbol
+     * @param int $limit Maximum number of filings to return
+     * @return array SEC filings data
+     */
+    public function getRecentSecFilings(string $symbol, int $limit = 5): array
+    {
+        $this->logger->info("MockYahooFinanceClient::getRecentSecFilings called", ['symbol' => $symbol]);
+
+        $filingTypes = ['10-K', '10-Q', '8-K', 'S-1', '424B2'];
+        $filings = [];
+
+        for ($i = 0; $i < $limit; $i++) {
+            $type = $filingTypes[array_rand($filingTypes)];
+            $filings[] = [
+                'date' => date('Y-m-d', strtotime('-' . ($i * 30 + mt_rand(1, 15)) . ' days')),
+                'type' => $type,
+                'title' => "{$type}: " . ucwords(strtolower($symbol)) . " " . match($type) {
+                    '10-K' => 'Annual Report',
+                    '10-Q' => 'Quarterly Report',
+                    '8-K' => 'Current Report',
+                    'S-1' => 'Registration Statement',
+                    default => 'Filing'
+                },
+                'url' => "https://www.sec.gov/mock/{$symbol}/{$type}-" . date('Ymd', strtotime('-' . ($i * 30) . ' days')),
+                'exhibits' => []
+            ];
+        }
+
+        return $filings;
+    }
+
+    /**
+     * Get analyst ratings for a company
+     *
+     * @param string $symbol Company ticker symbol
+     * @return array Analyst ratings data
+     */
+    public function getAnalystRatings(string $symbol): array
+    {
+        $this->logger->info("MockYahooFinanceClient::getAnalystRatings called", ['symbol' => $symbol]);
+
+        $ratingTypes = ['Buy', 'Hold', 'Sell', 'Outperform', 'Underperform', 'Neutral', 'Overweight', 'Equal-Weight'];
+        $firms = ['Morgan Stanley', 'Goldman Sachs', 'JP Morgan', 'Bank of America', 'Citigroup', 'Wells Fargo', 'UBS', 'Barclays'];
+
+        $buy = mt_rand(3, 15);
+        $hold = mt_rand(2, 10);
+        $sell = mt_rand(0, 5);
+        $total = $buy + $hold + $sell;
+
+        // Determine consensus based on distribution
+        $consensusRating = "Hold";
+        if ($buy > ($hold + $sell)) {
+            $consensusRating = "Buy";
+        } elseif ($sell > ($buy + $hold)) {
+            $consensusRating = "Sell";
+        }
+
+        $currentPrice = mt_rand(50, 500);
+        $meanTarget = $currentPrice * (1 + (mt_rand(-20, 40) / 100));
+        $highTarget = $meanTarget * (1 + (mt_rand(5, 20) / 100));
+        $lowTarget = $meanTarget * (1 - (mt_rand(5, 20) / 100));
+        $upside = (($meanTarget - $currentPrice) / $currentPrice) * 100;
+
+        $consensus = [
+            'consensusRating' => $consensusRating,
+            'averagePriceTarget' => $meanTarget,
+            'lowPriceTarget' => $lowTarget,
+            'highPriceTarget' => $highTarget,
+            'buy' => $buy,
+            'hold' => $hold,
+            'sell' => $sell,
+            'upside' => $upside,
+        ];
+
+        $ratings = [];
+        $numRatings = min($total, 10); // Cap at 10 individual ratings
+
+        for ($i = 0; $i < $numRatings; $i++) {
+            $firm = $firms[array_rand($firms)];
+            $toGrade = $ratingTypes[array_rand($ratingTypes)];
+            $fromGrade = $ratingTypes[array_rand($ratingTypes)];
+            $action = ($toGrade === $fromGrade) ? 'Reiterated' : ($toGrade > $fromGrade ? 'Upgraded' : 'Downgraded');
+
+            $ratings[] = [
+                'firm' => $firm,
+                'toGrade' => $toGrade,
+                'fromGrade' => $fromGrade,
+                'action' => $action,
+                'date' => date('Y-m-d', strtotime('-' . mt_rand(1, 90) . ' days')),
+                'priceTarget' => $currentPrice * (1 + (mt_rand(-30, 50) / 100))
+            ];
+        }
+
+        return [
+            'ratings' => $ratings,
+            'consensus' => $consensus
+        ];
+    }
+
+    /**
+     * Get insider trading data for a company
+     *
+     * @param string $symbol Company ticker symbol
+     * @param int $limit Maximum number of records to return
+     * @return array Insider trading data
+     */
+    public function getInsiderTrading(string $symbol, int $limit = 20): array
+    {
+        $this->logger->info("MockYahooFinanceClient::getInsiderTrading called", ['symbol' => $symbol]);
+
+        $insiders = $this->getMockExecutives($symbol); // Reuse executives as insiders
+        $transactionTypes = ['Purchase', 'Sale', 'Option Exercise', 'Grant', 'Sale+OE'];
+
+        $transactions = [];
+        for ($i = 0; $i < min(count($insiders) * 3, $limit); $i++) {
+            $insider = $insiders[$i % count($insiders)];
+            $shares = mt_rand(100, 10000);
+            $price = mt_rand(50, 500);
+
+            $transactions[] = [
+                'date' => date('Y-m-d', strtotime('-' . mt_rand(1, 180) . ' days')),
+                'insider' => $insider['name'],
+                'title' => $insider['title'],
+                'transactionType' => $transactionTypes[array_rand($transactionTypes)],
+                'shares' => $shares,
+                'sharesOwned' => mt_rand(10000, 1000000),
+                'price' => $price,
+                'value' => $shares * $price
+            ];
+        }
+
+        return $transactions;
+    }
+
+    /**
+     * Get institutional ownership data for a company
+     *
+     * @param string $symbol Company ticker symbol
+     * @param int $limit Maximum number of records to return
+     * @return array Institutional ownership data
+     */
+    public function getInstitutionalOwnership(string $symbol, int $limit = 20): array
+    {
+        $this->logger->info("MockYahooFinanceClient::getInstitutionalOwnership called", ['symbol' => $symbol]);
+
+        $institutions = [
+            'BlackRock Inc.', 'Vanguard Group Inc.', 'State Street Corporation',
+            'Fidelity Management & Research', 'T. Rowe Price Associates',
+            'Capital Research Global Investors', 'JPMorgan Chase & Co.',
+            'Bank of America Corporation', 'Berkshire Hathaway Inc.',
+            'Morgan Stanley', 'Goldman Sachs Group Inc.', 'Wellington Management Group',
+            'TIAA-CREF', 'Northern Trust Corporation', 'Dimensional Fund Advisors'
+        ];
+
+        $institutionalHolders = [];
+        $totalShares = mt_rand(500000000, 2000000000); // Total outstanding shares
+        $sharesAllocated = 0;
+
+        for ($i = 0; $i < min(count($institutions), $limit); $i++) {
+            $percentOwnership = mt_rand(1, 15) / 100; // 0.01 to 0.15 (1% to 15%)
+            $sharesHeld = (int)($totalShares * $percentOwnership);
+            $sharesAllocated += $sharesHeld;
+
+            // Adjust if we're allocating too many shares
+            if ($sharesAllocated > ($totalShares * 0.8)) {
+                $percentOwnership = mt_rand(1, 5) / 1000; // Much smaller for remaining holders
+                $sharesHeld = (int)($totalShares * $percentOwnership);
+            }
+
+            $value = $sharesHeld * mt_rand(50, 500); // Share price between $50-$500
+
+            $institutionalHolders[] = [
+                'name' => $institutions[$i],
+                'sharesHeld' => $sharesHeld,
+                'value' => $value,
+                'percentOwnership' => $percentOwnership * 100, // Convert to percentage
+                'change' => mt_rand(-500, 500) / 100, // -5% to +5%
+                'dateReported' => date('Y-m-d', strtotime('-' . mt_rand(1, 90) . ' days')),
+                'type' => ($i < 10) ? 'Institution' : 'Fund'
+            ];
+        }
+
+        return $institutionalHolders;
+    }
+
     private function getMockChartData(string $symbol): array
     { /* ... Same as before, returns chart structure ... */
         $timestamps = [];

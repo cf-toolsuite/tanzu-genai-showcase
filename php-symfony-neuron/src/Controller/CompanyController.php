@@ -173,7 +173,12 @@ class CompanyController extends AbstractController
     }
 
     #[Route('/{id}/news', name: 'company_news', methods: ['GET'])]
-    public function news(Company $company, Request $request, StockDataService $stockDataService): Response
+    public function news(
+        Company $company,
+        Request $request,
+        StockDataService $stockDataService,
+        \App\Service\ApiClient\StockClientsFactory $clientsFactory
+    ): Response
     {
         $limit = $request->query->getInt('limit', 10);
         $days = $request->query->getInt('days', 30);
@@ -184,10 +189,7 @@ class CompanyController extends AbstractController
         // Get business headlines for comparison/context
         $marketNews = [];
         try {
-            $newsApiClient = $this->getParameter('news_api.api_key')
-                ? $this->container->get('App\Service\ApiClient\NewsApiClient')
-                : null;
-
+            $newsApiClient = $clientsFactory->getNewsApiClient();
             if ($newsApiClient) {
                 $marketNews = $newsApiClient->getTopHeadlines('business', 'us', 5);
             }
@@ -207,18 +209,28 @@ class CompanyController extends AbstractController
     #[Route('/{id}/analyst-ratings', name: 'company_analyst_ratings', methods: ['GET'])]
     public function analystRatings(Company $company, Request $request, StockDataService $stockDataService): Response
     {
-        // Get analyst ratings data
-        $ratingsData = $stockDataService->getAnalystRatings($company->getTickerSymbol());
-
-        // Get consensus data
+        // Get consensus data which includes dataAvailable flag
         $consensusData = $stockDataService->getAnalystConsensus($company->getTickerSymbol());
 
         // Get current stock price for context
         $quote = $stockDataService->getStockQuote($company->getTickerSymbol());
 
+        // Only fetch detailed ratings if data is available
+        $ratings = [];
+        if ($consensusData['dataAvailable']) {
+            try {
+                $ratingsData = $stockDataService->getAnalystRatings($company->getTickerSymbol());
+                $ratings = $ratingsData['ratings'] ?? [];
+            } catch (\Exception $e) {
+                $this->addFlash('warning', 'Could not retrieve detailed analyst ratings data.');
+            }
+        } else {
+            $this->addFlash('info', 'Analyst ratings data is not available for this company through the current data provider.');
+        }
+
         return $this->render('company/analyst_ratings.html.twig', [
             'company' => $company,
-            'ratings' => $ratingsData['ratings'] ?? [],
+            'ratings' => $ratings,
             'consensus' => $consensusData,
             'currentPrice' => $quote['price'] ?? 0,
         ]);
@@ -228,9 +240,16 @@ class CompanyController extends AbstractController
     public function insiderTrading(Company $company, Request $request, StockDataService $stockDataService): Response
     {
         $limit = $request->query->getInt('limit', 20);
+        $dataAvailable = true;
+        $insiderData = [];
 
-        // Get insider trading data
-        $insiderData = $stockDataService->getInsiderTrading($company->getTickerSymbol(), $limit);
+        try {
+            // Get insider trading data
+            $insiderData = $stockDataService->getInsiderTrading($company->getTickerSymbol(), $limit);
+        } catch (\Exception $e) {
+            $dataAvailable = false;
+            $this->addFlash('info', 'Insider trading data is not available for this company through the current data provider.');
+        }
 
         // Get current stock quote for context
         $quote = $stockDataService->getStockQuote($company->getTickerSymbol());
@@ -239,7 +258,8 @@ class CompanyController extends AbstractController
             'company' => $company,
             'insiderData' => $insiderData,
             'currentPrice' => $quote['price'] ?? 0,
-            'limit' => $limit
+            'limit' => $limit,
+            'dataAvailable' => $dataAvailable
         ]);
     }
 
@@ -247,9 +267,16 @@ class CompanyController extends AbstractController
     public function institutionalOwnership(Company $company, Request $request, StockDataService $stockDataService): Response
     {
         $limit = $request->query->getInt('limit', 20);
+        $dataAvailable = true;
+        $ownershipData = [];
 
-        // Get institutional ownership data
-        $ownershipData = $stockDataService->getInstitutionalOwnership($company->getTickerSymbol(), $limit);
+        try {
+            // Get institutional ownership data
+            $ownershipData = $stockDataService->getInstitutionalOwnership($company->getTickerSymbol(), $limit);
+        } catch (\Exception $e) {
+            $dataAvailable = false;
+            $this->addFlash('info', 'Institutional ownership data is not available for this company through the current data provider.');
+        }
 
         // Get current stock quote and total shares outstanding (if available)
         $quote = $stockDataService->getStockQuote($company->getTickerSymbol());
@@ -271,7 +298,8 @@ class CompanyController extends AbstractController
             'ownershipData' => $ownershipData,
             'institutionalOwnershipPercent' => $institutionalOwnershipPercent,
             'sharesOutstanding' => $sharesOutstanding,
-            'limit' => $limit
+            'limit' => $limit,
+            'dataAvailable' => $dataAvailable
         ]);
     }
 

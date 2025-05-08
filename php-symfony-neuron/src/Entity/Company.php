@@ -5,9 +5,13 @@ namespace App\Entity;
 use App\Repository\CompanyRepository;
 use Doctrine\Common\Collections\ArrayCollection;
 use Doctrine\Common\Collections\Collection;
-use App\Entity\SecFiling;
 use Doctrine\ORM\Mapping as ORM;
 use App\Entity\StockPrice;
+use App\Entity\ESGData;
+use App\Entity\SecFiling;
+use App\Entity\InsiderTransaction;
+use App\Entity\InstitutionalOwnership;
+use App\Entity\AnalystRating;
 
 #[ORM\Entity(repositoryClass: CompanyRepository::class)]
 class Company
@@ -65,8 +69,20 @@ class Company
     #[ORM\OneToMany(mappedBy: 'company', targetEntity: StockPrice::class, cascade: ['persist', 'remove'])]
     private Collection $stockPrices;
 
+    #[ORM\OneToMany(mappedBy: 'company', targetEntity: ESGData::class, cascade: ['persist', 'remove'])]
+    private Collection $esgData;
+
     #[ORM\OneToMany(mappedBy: 'company', targetEntity: SecFiling::class, cascade: ['persist', 'remove'])]
     private Collection $secFilings;
+
+    #[ORM\OneToMany(mappedBy: 'company', targetEntity: InsiderTransaction::class, cascade: ['persist', 'remove'])]
+    private Collection $insiderTransactions;
+
+    #[ORM\OneToMany(mappedBy: 'company', targetEntity: InstitutionalOwnership::class, cascade: ['persist', 'remove'])]
+    private Collection $institutionalOwnerships;
+
+    #[ORM\OneToMany(mappedBy: 'company', targetEntity: AnalystRating::class, cascade: ['persist', 'remove'])]
+    private Collection $analystRatings;
 
     public function __construct()
     {
@@ -77,6 +93,10 @@ class Company
         $this->researchReports = new ArrayCollection();
         $this->stockPrices = new ArrayCollection();
         $this->secFilings = new ArrayCollection();
+        $this->esgData = new ArrayCollection();
+        $this->insiderTransactions = new ArrayCollection();
+        $this->institutionalOwnerships = new ArrayCollection();
+        $this->analystRatings = new ArrayCollection();
     }
 
     public function getId(): ?int
@@ -367,6 +387,36 @@ class Company
     }
 
     /**
+     * @return Collection<int, ESGData>
+     */
+    public function getEsgData(): Collection
+    {
+        return $this->esgData;
+    }
+
+    public function addEsgData(ESGData $esgData): static
+    {
+        if (!$this->esgData->contains($esgData)) {
+            $this->esgData->add($esgData);
+            $esgData->setCompany($this);
+        }
+
+        return $this;
+    }
+
+    public function removeEsgData(ESGData $esgData): static
+    {
+        if ($this->esgData->removeElement($esgData)) {
+            // set the owning side to null (unless already changed)
+            if ($esgData->getCompany() === $this) {
+                $esgData->setCompany(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
      * @return Collection<int, SecFiling>
      */
     public function getSecFilings(): Collection
@@ -390,6 +440,96 @@ class Company
             // set the owning side to null (unless already changed)
             if ($secFiling->getCompany() === $this) {
                 $secFiling->setCompany(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, InsiderTransaction>
+     */
+    public function getInsiderTransactions(): Collection
+    {
+        return $this->insiderTransactions;
+    }
+
+    public function addInsiderTransaction(InsiderTransaction $insiderTransaction): static
+    {
+        if (!$this->insiderTransactions->contains($insiderTransaction)) {
+            $this->insiderTransactions->add($insiderTransaction);
+            $insiderTransaction->setCompany($this);
+        }
+
+        return $this;
+    }
+
+    public function removeInsiderTransaction(InsiderTransaction $insiderTransaction): static
+    {
+        if ($this->insiderTransactions->removeElement($insiderTransaction)) {
+            // set the owning side to null (unless already changed)
+            if ($insiderTransaction->getCompany() === $this) {
+                $insiderTransaction->setCompany(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, InstitutionalOwnership>
+     */
+    public function getInstitutionalOwnerships(): Collection
+    {
+        return $this->institutionalOwnerships;
+    }
+
+    public function addInstitutionalOwnership(InstitutionalOwnership $institutionalOwnership): static
+    {
+        if (!$this->institutionalOwnerships->contains($institutionalOwnership)) {
+            $this->institutionalOwnerships->add($institutionalOwnership);
+            $institutionalOwnership->setCompany($this);
+        }
+
+        return $this;
+    }
+
+    public function removeInstitutionalOwnership(InstitutionalOwnership $institutionalOwnership): static
+    {
+        if ($this->institutionalOwnerships->removeElement($institutionalOwnership)) {
+            // set the owning side to null (unless already changed)
+            if ($institutionalOwnership->getCompany() === $this) {
+                $institutionalOwnership->setCompany(null);
+            }
+        }
+
+        return $this;
+    }
+
+    /**
+     * @return Collection<int, AnalystRating>
+     */
+    public function getAnalystRatings(): Collection
+    {
+        return $this->analystRatings;
+    }
+
+    public function addAnalystRating(AnalystRating $analystRating): static
+    {
+        if (!$this->analystRatings->contains($analystRating)) {
+            $this->analystRatings->add($analystRating);
+            $analystRating->setCompany($this);
+        }
+
+        return $this;
+    }
+
+    public function removeAnalystRating(AnalystRating $analystRating): static
+    {
+        if ($this->analystRatings->removeElement($analystRating)) {
+            // set the owning side to null (unless already changed)
+            if ($analystRating->getCompany() === $this) {
+                $analystRating->setCompany(null);
             }
         }
 

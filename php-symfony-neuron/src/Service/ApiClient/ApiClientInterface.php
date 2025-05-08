@@ -73,4 +73,52 @@ interface ApiClientInterface
      * @throws \Exception If the API request fails
      */
     public function getHistoricalPrices(string $symbol, string $interval = 'daily', string $outputSize = 'compact'): array;
+
+    /**
+     * Get ESG (Environmental, Social, Governance) data for a company
+     *
+     * @param string $symbol Company ticker symbol
+     * @return array ESG data with scores
+     * @throws \Exception If the API request fails
+     */
+    public function getESGData(string $symbol): array;
+
+    /**
+     * Get recent SEC filings for a company
+     *
+     * @param string $symbol Company ticker symbol
+     * @param int $limit Maximum number of filings to return
+     * @return array SEC filings data
+     * @throws \Exception If the API request fails
+     */
+    public function getRecentSecFilings(string $symbol, int $limit = 5): array;
+
+    /**
+     * Get analyst ratings for a company
+     *
+     * @param string $symbol Company ticker symbol
+     * @return array Analyst ratings data
+     * @throws \Exception If the API request fails
+     */
+    public function getAnalystRatings(string $symbol): array;
+
+    /**
+     * Get insider trading data for a company
+     *
+     * @param string $symbol Company ticker symbol
+     * @param int $limit Maximum number of records to return
+     * @return array Insider trading data
+     * @throws \Exception If the API request fails
+     */
+    public function getInsiderTrading(string $symbol, int $limit = 20): array;
+
+    /**
+     * Get institutional ownership data for a company
+     *
+     * @param string $symbol Company ticker symbol
+     * @param int $limit Maximum number of records to return
+     * @return array Institutional ownership data
+     * @throws \Exception If the API request fails
+     */
+    public function getInstitutionalOwnership(string $symbol, int $limit = 20): array;
 }
