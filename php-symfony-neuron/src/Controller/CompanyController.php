@@ -20,10 +20,18 @@ use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
 use Symfony\Component\HttpFoundation\ResponseHeaderBag;
 use Symfony\Component\Routing\Annotation\Route;
+use Psr\Log\LoggerInterface;
 
 #[Route('/company')]
 class CompanyController extends AbstractController
 {
+    private LoggerInterface $logger;
+
+    public function __construct(LoggerInterface $logger)
+    {
+        $this->logger = $logger;
+    }
+
     #[Route('/', name: 'company_index', methods: ['GET'])]
     public function index(CompanyRepository $companyRepository): Response
     {
@@ -358,7 +366,22 @@ class CompanyController extends AbstractController
                 default => 365,
             };
 
-            $stockDataService->importHistoricalPrices($company, $interval, $importLimit);
+            try {
+                $count = $stockDataService->importHistoricalPrices($company, $interval, $importLimit);
+                $this->logger->info("Imported {$count} {$interval} price records for {$company->getTickerSymbol()}");
+
+                // Force refresh if we need daily data but got no results
+                if ($count === 0 && $interval === 'daily') {
+                    // Try weekly as fallback
+                    $this->logger->warning("No daily data available, trying weekly as fallback");
+                    $stockDataService->importHistoricalPrices($company, 'weekly', 260);
+                }
+            } catch (\Exception $e) {
+                $this->logger->error("Error importing historical prices: " . $e->getMessage(), [
+                    'symbol' => $company->getTickerSymbol(),
+                    'interval' => $interval
+                ]);
+            }
         }
 
         // Get date range based on selected period

@@ -1,0 +1,21 @@
+# TradeFeeds API configuration
+parameters:
+    # Map the environment variable to the parameter used by TradeFeedsApiClient
+    tradefeeds.api_key: '%env(TRADEFEEDS_API_KEY)%'
+
+services:
+    # Configure the TradeFeedsApiClient service
+    App\Service\ApiClient\TradeFeedsApiClient:
+        arguments:
+            $client: '@http_client'
+            $params: '@parameter_bag'
+            $logger: '@logger'
+        tags: ['app.api_client']
+
+    # Configure the MockTradeFeedsApiClient service for development/testing
+    App\Service\ApiClient\MockTradeFeedsApiClient:
+        arguments:
+            $client: '@http_client'
+            $params: '@parameter_bag'
+            $logger: '@logger'
+        tags: ['app.api_client']

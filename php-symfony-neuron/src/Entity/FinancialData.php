@@ -21,6 +21,12 @@ class FinancialData
     #[ORM\Column(length: 20)]
     private ?string $reportType = null;
 
+    #[ORM\Column(length: 10, nullable: true)]
+    private ?string $fiscalQuarter = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?int $fiscalYear = null;
+
     #[ORM\Column(type: Types::DATE_MUTABLE, nullable: true)]
     private ?\DateTimeInterface $reportDate = null;
 
@@ -35,6 +41,39 @@ class FinancialData
 
     #[ORM\Column(nullable: true)]
     private ?float $ebitda = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $profitMargin = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $peRatio = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $dividendYield = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $roe = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $debtToEquity = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $currentRatio = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $grossMargin = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $operatingMargin = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $marketCap = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $shareholderEquity = null;
+
+    #[ORM\Column(nullable: true)]
+    private ?float $longTermDebt = null;
 
     #[ORM\Column(nullable: true)]
     private ?float $totalAssets = null;
@@ -156,6 +195,162 @@ class FinancialData
     public function setEbitda(?float $ebitda): static
     {
         $this->ebitda = $ebitda;
+
+        return $this;
+    }
+
+    public function getFiscalQuarter(): ?string
+    {
+        return $this->fiscalQuarter;
+    }
+
+    public function setFiscalQuarter(?string $fiscalQuarter): static
+    {
+        $this->fiscalQuarter = $fiscalQuarter;
+
+        return $this;
+    }
+
+    public function getFiscalYear(): ?int
+    {
+        return $this->fiscalYear;
+    }
+
+    public function setFiscalYear(?int $fiscalYear): static
+    {
+        $this->fiscalYear = $fiscalYear;
+
+        return $this;
+    }
+
+    public function getProfitMargin(): ?float
+    {
+        return $this->profitMargin;
+    }
+
+    public function setProfitMargin(?float $profitMargin): static
+    {
+        $this->profitMargin = $profitMargin;
+
+        return $this;
+    }
+
+    public function getPeRatio(): ?float
+    {
+        return $this->peRatio;
+    }
+
+    public function setPeRatio(?float $peRatio): static
+    {
+        $this->peRatio = $peRatio;
+
+        return $this;
+    }
+
+    public function getDividendYield(): ?float
+    {
+        return $this->dividendYield;
+    }
+
+    public function setDividendYield(?float $dividendYield): static
+    {
+        $this->dividendYield = $dividendYield;
+
+        return $this;
+    }
+
+    public function getRoe(): ?float
+    {
+        return $this->roe;
+    }
+
+    public function setRoe(?float $roe): static
+    {
+        $this->roe = $roe;
+
+        return $this;
+    }
+
+    public function getDebtToEquity(): ?float
+    {
+        return $this->debtToEquity;
+    }
+
+    public function setDebtToEquity(?float $debtToEquity): static
+    {
+        $this->debtToEquity = $debtToEquity;
+
+        return $this;
+    }
+
+    public function getCurrentRatio(): ?float
+    {
+        return $this->currentRatio;
+    }
+
+    public function setCurrentRatio(?float $currentRatio): static
+    {
+        $this->currentRatio = $currentRatio;
+
+        return $this;
+    }
+
+    public function getGrossMargin(): ?float
+    {
+        return $this->grossMargin;
+    }
+
+    public function setGrossMargin(?float $grossMargin): static
+    {
+        $this->grossMargin = $grossMargin;
+
+        return $this;
+    }
+
+    public function getOperatingMargin(): ?float
+    {
+        return $this->operatingMargin;
+    }
+
+    public function setOperatingMargin(?float $operatingMargin): static
+    {
+        $this->operatingMargin = $operatingMargin;
+
+        return $this;
+    }
+
+    public function getMarketCap(): ?float
+    {
+        return $this->marketCap;
+    }
+
+    public function setMarketCap(?float $marketCap): static
+    {
+        $this->marketCap = $marketCap;
+
+        return $this;
+    }
+
+    public function getShareholderEquity(): ?float
+    {
+        return $this->shareholderEquity;
+    }
+
+    public function setShareholderEquity(?float $shareholderEquity): static
+    {
+        $this->shareholderEquity = $shareholderEquity;
+
+        return $this;
+    }
+
+    public function getLongTermDebt(): ?float
+    {
+        return $this->longTermDebt;
+    }
+
+    public function setLongTermDebt(?float $longTermDebt): static
+    {
+        $this->longTermDebt = $longTermDebt;
 
         return $this;
     }

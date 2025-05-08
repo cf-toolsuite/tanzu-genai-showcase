@@ -1,8 +1,11 @@
 parameters:
-    alpha_vantage.api_key: '%env(default:STOCK_API_KEY:ALPHA_VANTAGE_API_KEY)%'
-    yahoo_finance.api_key: '%env(default::RAPID_API_KEY)%'
-    news_api.api_key: '%env(NEWS_API_KEY)%'
-    sec_api.api_key: '%env(default::SEC_API_KEY)%'
+    # Stock and financial APIs
+    alpha_vantage.api_key: '%env(resolve:ALPHA_VANTAGE_API_KEY)%'
+    yahoo_finance.api_key: '%env(resolve:RAPID_API_KEY)%'
+    news_api.api_key: '%env(resolve:NEWS_API_KEY)%'
+    kaleidoscope_api.key: '%env(resolve:KALEIDOSCOPE_API_KEY)%'
+    kaleidoscope_api.base_url_default: 'https://api.kscope.io/v2'
+    kaleidoscope_api.base_url: '%env(default:kaleidoscope_api.base_url_default:KALEIDOSCOPE_BASE_URL)%'
 
 services:
     # Configure cache for the stock data service

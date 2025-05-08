@@ -463,36 +463,97 @@ class YahooFinanceClient extends AbstractApiClient
      */
     public function getInsiderTrading(string $symbol, int $limit = 20): array
     {
-        $endpoint = '/stock/get-holders';
+        $transactionsEndpoint = '/stock/get-insider-transactions';
+        $rosterEndpoint = '/stock/get-insider-roster';
         $params = ['symbol' => $symbol, 'region' => 'US'];
 
         try {
-            // Real API call
-            $data = $this->request('GET', $endpoint, $params);
+            // Get both transaction data and insider roster data
+            $transactionData = $this->request('GET', $transactionsEndpoint, $params);
+            $rosterData = $this->request('GET', $rosterEndpoint, $params);
+
+            // Create a mapping of insider names to their current share positions
+            $insiderPositions = [];
+            if (isset($rosterData['insiderHolders']['holders']) && is_array($rosterData['insiderHolders']['holders'])) {
+                foreach ($rosterData['insiderHolders']['holders'] as $holder) {
+                    if (isset($holder['name']) && isset($holder['positionDirect']['raw'])) {
+                        $insiderPositions[$holder['name']] = (int)$holder['positionDirect']['raw'];
+                    }
+                }
+            }
 
             $transactions = [];
 
-            if (isset($data['insiderTransactions'])) {
-                $insiderData = $data['insiderTransactions'];
+            if (isset($transactionData['insiderTransactions']['transactions']) && is_array($transactionData['insiderTransactions']['transactions'])) {
+                foreach ($transactionData['insiderTransactions']['transactions'] as $transaction) {
+                    $filerName = $transaction['filerName'] ?? 'Unknown';
 
-                foreach ($insiderData as $transaction) {
-                    $transactions[] = [
-                        'date' => $transaction['startDate'] ?? date('Y-m-d'),
-                        'insider' => $transaction['filerName'] ?? 'Unknown',
+                    $transactionData = [
+                        'ownerName' => $filerName, // Map to ownerName for template compatibility
+                        'insider' => $filerName,
                         'title' => $transaction['filerRelation'] ?? 'Unknown',
-                        'transactionType' => $transaction['transactionDescription'] ?? 'Unknown',
-                        'shares' => (int)($transaction['shares'] ?? 0),
-                        'sharesOwned' => (int)($transaction['positionDirect'] ?? 0) + (int)($transaction['positionIndirect'] ?? 0),
-                        'price' => isset($transaction['shares']) && isset($transaction['value']) && ($transaction['shares'] > 0)
-                            ? (float)$transaction['value'] / (int)$transaction['shares']
-                            : 0,
-                        'value' => (float)($transaction['value'] ?? 0)
+                        'transactionType' => $transaction['transactionText'] ?? 'Unknown',
+                        'ownership' => $transaction['ownership'] ?? 'Direct',
                     ];
+
+                    // Date handling - extract from nested structure
+                    if (isset($transaction['startDate']['fmt'])) {
+                        $transactionData['date'] = $transaction['startDate']['fmt'];
+                    } elseif (isset($transaction['startDate']['raw'])) {
+                        $transactionData['date'] = date('Y-m-d', $transaction['startDate']['raw']);
+                    } else {
+                        $transactionData['date'] = date('Y-m-d');
+                    }
+
+                    // Shares handling
+                    if (isset($transaction['shares']['raw'])) {
+                        $transactionData['shares'] = (int)$transaction['shares']['raw'];
+                    } else {
+                        $transactionData['shares'] = 0;
+                    }
+
+                    // Value handling
+                    if (isset($transaction['value']['raw'])) {
+                        $transactionData['value'] = (float)$transaction['value']['raw'];
+
+                        // Calculate price per share if we have both shares and value
+                        if (isset($transaction['shares']['raw']) && $transaction['shares']['raw'] > 0) {
+                            $transactionData['price'] = (float)$transaction['value']['raw'] / (int)$transaction['shares']['raw'];
+                        } else {
+                            $transactionData['price'] = 0;
+                        }
+                    } else {
+                        $transactionData['value'] = 0;
+                        $transactionData['price'] = 0;
+                    }
+
+                    // Look up shares owned from the insider roster data
+                    $transactionData['sharesOwned'] = $insiderPositions[$filerName] ?? 0;
+
+                    $transactions[] = $transactionData;
 
                     if (count($transactions) >= $limit) {
                         break;
                     }
                 }
+            }
+
+            // If we got aggregate data and no transactions, create a placeholder
+            if (empty($transactions) && isset($transactionData['netSharePurchaseActivity'])) {
+                $netActivity = $transactionData['netSharePurchaseActivity'];
+                $summary = [
+                    'ownerName' => 'All Insiders (Summary)',
+                    'insider' => 'All Insiders',
+                    'title' => 'Company Insiders',
+                    'date' => date('Y-m-d'),
+                    'transactionType' => 'Summary',
+                    'shares' => isset($netActivity['netInfoShares']) ? (int)$netActivity['netInfoShares'] : 0,
+                    'sharesOwned' => isset($netActivity['totalInsiderShares']) ? (int)$netActivity['totalInsiderShares'] : 0,
+                    'price' => 0, // Not applicable for summary
+                    'value' => 0, // Not applicable for summary
+                    'ownership' => 'Direct'
+                ];
+                $transactions[] = $summary;
             }
 
             return $transactions;

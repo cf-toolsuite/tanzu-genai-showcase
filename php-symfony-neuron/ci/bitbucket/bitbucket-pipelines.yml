@@ -132,8 +132,8 @@ pipelines:
               fi
 
               # Set environment variables
-              if [ -n "$STOCK_API_KEY" ]; then
-                cf set-env "$APP_NAME" "STOCK_API_KEY" "$STOCK_API_KEY"
+              if [ -n "$ALPHA_VANTAGE_API_KEY" ]; then
+                cf set-env "$APP_NAME" "ALPHA_VANTAGE_API_KEY" "$ALPHA_VANTAGE_API_KEY"
               fi
 
               if [ -n "$NEWS_API_KEY" ]; then
@@ -173,7 +173,7 @@ options:
 # CF_ORG: Cloud Foundry organization
 # CF_SPACE: Cloud Foundry space
 # RANDOM_ROUTE: Whether to use a random route (true/false)
-# STOCK_API_KEY: Stock API key
+# ALPHA_VANTAGE_API_KEY: Stock API key
 # NEWS_API_KEY: News API key
 # KALEIDOSCOPE_API_KEY: Kaleidoscope API key
 # OPENAI_API_KEY: OpenAI API key

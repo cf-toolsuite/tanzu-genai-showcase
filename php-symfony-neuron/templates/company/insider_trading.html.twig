@@ -145,9 +145,9 @@
                                 <div class="card-header">
                                     <div class="d-flex justify-content-between align-items-center">
                                         <div>
-                                            <h5 class="mb-0">{{ filing.ownerName }}</h5>
+                                            <h5 class="mb-0">{{ filing.ownerName|default('Unknown') }}</h5>
                                             <span class="owner-title">
-                                                {{ filing.ownerTitle }}
+                                                {{ filing.ownerTitle|default('') }}
                                                 {% if filing.isDirector %} | Director{% endif %}
                                                 {% if filing.isOfficer %} | Officer{% endif %}
                                                 {% if filing.isTenPercentOwner %} | 10% Owner{% endif %}

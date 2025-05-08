@@ -1,8 +1,11 @@
 parameters:
-    app.rapid_api_key: '%env(resolve:RAPID_API_KEY)%'
-    app.genai_api_key: '%env(resolve:GENAI_API_KEY)%'
-    app.genai_base_url: '%env(resolve:GENAI_BASE_URL)%'
-    app.genai_model: '%env(resolve:GENAI_MODEL)%'
+    # General services
+    rapid_api.api_key: '%env(resolve:RAPID_API_KEY)%'
+
+    # GenAI/LLM Integration
+    genai.api_key: '%env(resolve:GENAI_API_KEY)%'
+    genai.base_url: '%env(resolve:GENAI_BASE_URL)%'
+    genai.model: '%env(resolve:GENAI_MODEL)%'
 
 services:
     # default configuration for services in *this* file
@@ -36,25 +39,25 @@ services:
     # Yahoo Finance API Service using the client
     App\Service\YahooFinanceService:
         arguments:
-            $rapidApiKey: '%app.rapid_api_key%'
-            $useMockData: '%env(default:false:bool:USE_MOCK_DATA)%'
+            $rapidApiKey: '%rapid_api.api_key%'
+            $useMockData: '%env(default::bool:USE_MOCK_DATA)%'
 
     # Stock Clients Factory Configuration
     App\Service\ApiClient\StockClientsFactory:
         arguments:
-            $useMockData: '%env(default:false:bool:USE_MOCK_DATA)%'
+            $useMockData: '%env(default::bool:USE_MOCK_DATA)%'
 
     # LinkedIn Client Factory Configuration
     App\Service\ApiClient\LinkedInClientFactory:
         arguments:
-            $useMockData: '%env(default:false:bool:USE_MOCK_DATA)%'
+            $useMockData: '%env(default::bool:USE_MOCK_DATA)%'
 
     # LLM Client Factory Configuration
     App\Service\LlmClientFactory:
         arguments:
-            $apiKey: '%app.genai_api_key%'
-            $baseUrl: '%app.genai_base_url%'
-            $model: '%app.genai_model%'
+            $apiKey: '%genai.api_key%'
+            $baseUrl: '%genai.base_url%'
+            $model: '%genai.model%'
 
     # Neuron AI Service Configuration
     App\Service\NeuronAiService:

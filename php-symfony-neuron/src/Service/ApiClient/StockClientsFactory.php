@@ -80,6 +80,20 @@ class StockClientsFactory implements ServiceSubscriberInterface
     }
 
     /**
+     * Gets the appropriate TradeFeeds API client instance.
+     *
+     * @return ApiClientInterface The TradeFeeds API client instance.
+     */
+     public function getTradeFeedsClient(): ApiClientInterface
+    {
+         $serviceId = $this->useMockData
+            ? 'App\Service\ApiClient\MockTradeFeedsApiClient'
+            : 'App\Service\ApiClient\TradeFeedsApiClient';
+
+         return $this->locator->get($serviceId);
+    }
+
+    /**
      * Defines the services this factory needs access to via the locator.
      *
      * @return array An array of service class names.
@@ -96,6 +110,8 @@ class StockClientsFactory implements ServiceSubscriberInterface
             'App\Service\ApiClient\MockNewsApiClient',
             'App\Service\ApiClient\SecApiClient',
             'App\Service\ApiClient\MockSecApiClient',
+            'App\Service\ApiClient\TradeFeedsApiClient',
+            'App\Service\ApiClient\MockTradeFeedsApiClient',
         ];
     }
 }
