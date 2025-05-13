@@ -2,6 +2,19 @@
 
 {% block title %}{{ company.name }} - News & Events{% endblock %}
 
+{% block javascripts %}
+    {{ parent() }}
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Initialize tooltips
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+                return new bootstrap.Tooltip(tooltipTriggerEl);
+            });
+        });
+    </script>
+{% endblock %}
+
 {% block stylesheets %}
     {{ parent() }}
     <style>
@@ -88,8 +101,17 @@
                                 <option value="90" {% if days == 90 %}selected{% endif %}>Last 90 days</option>
                             </select>
                         </div>
-                        <div class="col-md-4">
+                        <div class="col-md-3">
                             <button type="submit" class="btn btn-primary w-100">Update</button>
+                        </div>
+                        <div class="col-md-1">
+                            <a href="{{ path('company_news', {'id': company.id, 'limit': limit, 'days': days, 'refresh': true}) }}"
+                               class="btn btn-outline-info w-100"
+                               data-bs-toggle="tooltip"
+                               data-bs-placement="top"
+                               title="Force refresh news cache to get the latest articles">
+                                <i class="fas fa-redo-alt"></i>
+                            </a>
                         </div>
                     </form>
                 </div>

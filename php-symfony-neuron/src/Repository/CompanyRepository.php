@@ -41,15 +41,16 @@ class CompanyRepository extends ServiceEntityRepository
 
     /**
      * Find companies by name, ticker symbol, industry, or sector
+     * Uses case-insensitive contains search logic
      */
     public function findBySearchCriteria(string $searchTerm, int $limit = 25): array
     {
         $queryBuilder = $this->createQueryBuilder('c')
-            ->where('c.name LIKE :searchTerm')
-            ->orWhere('c.tickerSymbol LIKE :searchTerm')
-            ->orWhere('c.industry LIKE :searchTerm')
-            ->orWhere('c.sector LIKE :searchTerm')
-            ->setParameter('searchTerm', '%' . $searchTerm . '%')
+            ->where('LOWER(c.name) LIKE LOWER(:searchTerm)')
+            ->orWhere('LOWER(c.tickerSymbol) LIKE LOWER(:searchTerm)')
+            ->orWhere('LOWER(c.industry) LIKE LOWER(:searchTerm)')
+            ->orWhere('LOWER(c.sector) LIKE LOWER(:searchTerm)')
+            ->setParameter('searchTerm', '%' . strtolower($searchTerm) . '%')
             ->orderBy('c.name', 'ASC')
             ->setMaxResults($limit);
 

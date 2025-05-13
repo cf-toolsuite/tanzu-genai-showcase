@@ -51,6 +51,7 @@ class StockDataService
 
     /**
      * Search for companies by name or ticker symbol
+     * Implements case-insensitive contains search and deduplication
      */
     public function searchCompanies(string $term, int $limit = 25): array
     {
@@ -58,23 +59,55 @@ class StockDataService
         return $this->cache->get($cacheKey, function (ItemInterface $item) use ($term, $limit) {
             $item->expiresAfter(3600); // Cache for 1 hour
             $this->logger->info('Cache miss for company search', ['term' => $term]);
+
+            $results = [];
+            $processedNames = []; // Track processed company names to avoid duplicates
+            $processedSymbols = []; // Track processed symbols to avoid duplicates
+
             try {
-                $results = $this->alphaVantageClient->searchCompanies($term);
-                // Add provider information to each result
-                foreach ($results as &$result) {
+                // Get results from Alpha Vantage
+                $alphaResults = $this->alphaVantageClient->searchCompanies($term);
+                foreach ($alphaResults as &$result) {
                     $result['provider'] = 'Alpha Vantage API';
-                }
-                if (empty($results)) {
-                    $this->logger->info('No results from Alpha Vantage, trying Yahoo Finance');
-                    $results = $this->yahooFinanceClient->searchCompanies($term);
-                    // Add provider information to each result
-                    foreach ($results as &$result) {
-                        $result['provider'] = 'Yahoo Finance API';
+                    $normalizedName = strtolower($result['name']);
+                    $normalizedSymbol = strtolower($result['symbol']);
+
+                    // Only add if we haven't seen this company name or symbol before
+                    if (!isset($processedNames[$normalizedName]) && !isset($processedSymbols[$normalizedSymbol])) {
+                        $results[] = $result;
+                        $processedNames[$normalizedName] = true;
+                        $processedSymbols[$normalizedSymbol] = true;
                     }
                 }
+
+                // Try Yahoo Finance regardless of Alpha Vantage results to get more comprehensive results
+                try {
+                    $yahooResults = $this->yahooFinanceClient->searchCompanies($term);
+                    foreach ($yahooResults as &$result) {
+                        $result['provider'] = 'Yahoo Finance API';
+                        $normalizedName = strtolower($result['name']);
+                        $normalizedSymbol = strtolower($result['symbol']);
+
+                        // Only add if we haven't seen this company name or symbol before
+                        if (!isset($processedNames[$normalizedName]) && !isset($processedSymbols[$normalizedSymbol])) {
+                            $results[] = $result;
+                            $processedNames[$normalizedName] = true;
+                            $processedSymbols[$normalizedSymbol] = true;
+
+                            // Stop if we've reached the limit
+                            if (count($results) >= $limit) {
+                                break;
+                            }
+                        }
+                    }
+                } catch (\Exception $e) {
+                    $this->logger->error('Error with Yahoo Finance search: ' . $e->getMessage());
+                    // Continue with Alpha Vantage results
+                }
+
                 return $results;
             } catch (\Exception $e) {
-                $this->logger->error('Error searching companies: ' . $e->getMessage());
+                $this->logger->error('Error searching companies with Alpha Vantage: ' . $e->getMessage());
                 try {
                     $results = $this->yahooFinanceClient->searchCompanies($term);
                     // Add provider information to each result
@@ -180,35 +213,268 @@ class StockDataService
     /**
      * Get company news
      */
-    public function getCompanyNews(string $symbol, int $limit = 5): array
+    public function getCompanyNews(string $symbol, int $limit = 5, bool $forceRefresh = false): array
     {
         $cacheKey = 'company_news_' . $symbol . '_' . $limit;
+
+        // If force refresh is requested, delete the existing cache item
+        if ($forceRefresh) {
+            $this->cache->delete($cacheKey);
+            $this->logger->info('Forced cache refresh for company news', ['symbol' => $symbol]);
+        }
+
         return $this->cache->get($cacheKey, function (ItemInterface $item) use ($symbol, $limit) {
-            $item->expiresAfter(3600); // Cache for 1 hour
+            // Reduce cache time to 5 minutes to get more recent news throughout the day
+            $item->expiresAfter(300);
             $this->logger->info('Cache miss for company news', ['symbol' => $symbol]);
+
+            $allNews = [];
+
             try {
                 $companyInfo = $this->getCompanyProfile($symbol);
                 $companyName = $companyInfo['name'] ?? '';
                 $searchTerm = !empty($companyName) ? $companyName : $symbol;
-                $news = $this->newsApiClient->getCompanyNews($searchTerm, $limit);
-                return $news;
-            } catch (\Exception $e) {
-                $this->logger->error('Error getting company news from NewsAPI: ' . $e->getMessage());
+
+                // Try NewsAPI first
                 try {
-                    $news = $this->yahooFinanceClient->getCompanyNews($symbol, $limit);
-                    return $news;
+                    $newsApiResults = $this->newsApiClient->getCompanyNews($searchTerm, $limit * 2); // Get more to account for filtering
+                    foreach ($newsApiResults as $article) {
+                        $article['provider'] = 'NewsAPI';
+                        $allNews[] = $this->validateNewsArticle($article);
+                    }
+                } catch (\Exception $e) {
+                    $this->logger->error('Error getting company news from NewsAPI: ' . $e->getMessage());
+                }
+
+                // Try Yahoo Finance regardless of NewsAPI success
+                try {
+                    $yahooResults = $this->yahooFinanceClient->getCompanyNews($symbol, $limit * 2);
+                    foreach ($yahooResults as $article) {
+                        $article['provider'] = 'Yahoo Finance';
+                        $allNews[] = $this->validateNewsArticle($article);
+                    }
                 } catch (\Exception $e2) {
-                    $this->logger->error('Error with Yahoo Finance news fallback: ' . $e2->getMessage());
+                    $this->logger->error('Error with Yahoo Finance news: ' . $e2->getMessage());
+                }
+
+                // Try Alpha Vantage if we still need more articles
+                if (count($allNews) < $limit) {
                     try {
-                        $news = $this->alphaVantageClient->getCompanyNews($symbol, $limit);
-                        return $news;
+                        $alphaResults = $this->alphaVantageClient->getCompanyNews($symbol, $limit * 2);
+                        foreach ($alphaResults as $article) {
+                            $article['provider'] = 'Alpha Vantage';
+                            $allNews[] = $this->validateNewsArticle($article);
+                        }
                     } catch (\Exception $e3) {
-                        $this->logger->error('Error with all news sources: ' . $e3->getMessage());
-                        return [];
+                        $this->logger->error('Error with Alpha Vantage news: ' . $e3->getMessage());
                     }
                 }
+
+                // Deduplicate news articles
+                $dedupedNews = $this->deduplicateNewsArticles($allNews);
+
+                // Sort by published date (newest first)
+                usort($dedupedNews, function($a, $b) {
+                    $dateA = strtotime($a['publishedAt'] ?? 0);
+                    $dateB = strtotime($b['publishedAt'] ?? 0);
+
+                    // Check if either article is from today
+                    $todayStart = strtotime('today midnight');
+                    $isAToday = ($dateA >= $todayStart);
+                    $isBToday = ($dateB >= $todayStart);
+
+                    // Prioritize today's news
+                    if ($isAToday && !$isBToday) {
+                        return -1; // A is from today, B is not, so A comes first
+                    } elseif (!$isAToday && $isBToday) {
+                        return 1;  // B is from today, A is not, so B comes first
+                    }
+
+                    // If both are from today or both are older, sort by date (newest first)
+                    return $dateB - $dateA;
+                });
+
+                // Return only the requested number of articles
+                return array_slice($dedupedNews, 0, $limit);
+            } catch (\Exception $e) {
+                $this->logger->error('Error with all news sources: ' . $e->getMessage());
+                return [];
             }
         });
+    }
+
+    /**
+     * Validate and enhance a news article
+     *
+     * @param array $article The news article to validate
+     * @return array The validated and enhanced article
+     */
+    private function validateNewsArticle(array $article): array
+    {
+        // Ensure all required fields exist
+        $article['title'] = $article['title'] ?? 'Untitled Article';
+        $article['description'] = $article['description'] ?? '';
+        $article['url'] = $article['url'] ?? '';
+        $article['source'] = $article['source'] ?? 'Unknown Source';
+        $article['publishedAt'] = $article['publishedAt'] ?? date('Y-m-d H:i:s');
+
+        // Validate image URL
+        if (!empty($article['imageUrl'])) {
+            // Check if URL is valid
+            if (!filter_var($article['imageUrl'], FILTER_VALIDATE_URL)) {
+                $article['imageUrl'] = null;
+            }
+
+            // Check if URL uses HTTPS (some news sites block HTTP requests)
+            if ($article['imageUrl'] && strpos($article['imageUrl'], 'http://') === 0) {
+                $article['imageUrl'] = 'https://' . substr($article['imageUrl'], 7);
+            }
+        }
+
+        // If no image URL, try to generate one based on the source
+        if (empty($article['imageUrl'])) {
+            $article['imageUrl'] = $this->getDefaultImageForSource($article['source']);
+        }
+
+        return $article;
+    }
+
+    /**
+     * Get a default image URL based on the news source
+     *
+     * @param string $source The news source name
+     * @return string|null A default image URL or null
+     */
+    private function getDefaultImageForSource(string $source): ?string
+    {
+        // Map common news sources to their logos
+        // In a real implementation, these would be stored in a configuration file or database
+        $sourceLogos = [
+            'Yahoo Finance' => 'https://s.yimg.com/cv/apiv2/social/images/yahoo_default_logo.png',
+            'CNBC' => 'https://www.cnbc.com/favicon.ico',
+            'Bloomberg' => 'https://assets.bwbx.io/s3/javelin/public/javelin/images/bloomberg-logo-black-f11ef4d4c2.svg',
+            'Reuters' => 'https://www.reuters.com/pf/resources/images/reuters/logo-vertical-default.svg?d=116',
+            'Financial Times' => 'https://www.ft.com/__origami/service/image/v2/images/raw/ftlogo-v1:brand-ft-logo-square-coloured?source=origami-build-service',
+            'Wall Street Journal' => 'https://www.wsj.com/favicon.ico',
+            'MarketWatch' => 'https://www.marketwatch.com/favicon.ico',
+            'Seeking Alpha' => 'https://seekingalpha.com/favicon.ico',
+            'Motley Fool' => 'https://www.fool.com/favicon.ico',
+            'Investopedia' => 'https://www.investopedia.com/favicon.ico',
+            'Business Insider' => 'https://www.businessinsider.com/favicon.ico',
+            'Forbes' => 'https://www.forbes.com/favicon.ico',
+        ];
+
+        // Try to find an exact match
+        if (isset($sourceLogos[$source])) {
+            return $sourceLogos[$source];
+        }
+
+        // Try to find a partial match
+        foreach ($sourceLogos as $sourceName => $logo) {
+            if (stripos($source, $sourceName) !== false || stripos($sourceName, $source) !== false) {
+                return $logo;
+            }
+        }
+
+        // Default to a generic financial news icon from a public URL
+        return 'https://cdn-icons-png.flaticon.com/512/2965/2965879.png';
+    }
+
+    /**
+     * Deduplicate news articles based on title similarity
+     *
+     * @param array $articles Array of news articles
+     * @return array Deduplicated array of news articles
+     */
+    private function deduplicateNewsArticles(array $articles): array
+    {
+        if (count($articles) <= 1) {
+            return $articles;
+        }
+
+        $dedupedArticles = [];
+        $processedTitles = [];
+
+        foreach ($articles as $article) {
+            $title = $article['title'] ?? '';
+            if (empty($title)) {
+                continue;
+            }
+
+            // Normalize the title for comparison
+            $normalizedTitle = $this->normalizeTitle($title);
+
+            // Check if we've already seen a similar title
+            $isDuplicate = false;
+            foreach ($processedTitles as $existingTitle) {
+                if ($this->areTitlesSimilar($normalizedTitle, $existingTitle)) {
+                    $isDuplicate = true;
+                    break;
+                }
+            }
+
+            if (!$isDuplicate) {
+                $dedupedArticles[] = $article;
+                $processedTitles[] = $normalizedTitle;
+            }
+        }
+
+        return $dedupedArticles;
+    }
+
+    /**
+     * Normalize a title for comparison
+     *
+     * @param string $title The title to normalize
+     * @return string The normalized title
+     */
+    private function normalizeTitle(string $title): string
+    {
+        // Convert to lowercase
+        $title = strtolower($title);
+
+        // Remove common prefixes like "Breaking: ", "Exclusive: ", etc.
+        $prefixes = ['breaking:', 'exclusive:', 'just in:', 'update:', 'alert:'];
+        foreach ($prefixes as $prefix) {
+            if (strpos($title, $prefix) === 0) {
+                $title = trim(substr($title, strlen($prefix)));
+            }
+        }
+
+        // Remove punctuation and special characters
+        $title = preg_replace('/[^\p{L}\p{N}\s]/u', '', $title);
+
+        // Remove extra whitespace
+        $title = preg_replace('/\s+/', ' ', $title);
+
+        return trim($title);
+    }
+
+    /**
+     * Check if two titles are similar
+     *
+     * @param string $title1 First normalized title
+     * @param string $title2 Second normalized title
+     * @return bool True if titles are similar, false otherwise
+     */
+    private function areTitlesSimilar(string $title1, string $title2): bool
+    {
+        // If one title contains the other, they're similar
+        if (strpos($title1, $title2) !== false || strpos($title2, $title1) !== false) {
+            return true;
+        }
+
+        // Calculate similarity using Levenshtein distance
+        $maxLength = max(strlen($title1), strlen($title2));
+        if ($maxLength === 0) {
+            return true; // Both empty strings
+        }
+
+        $levenshtein = levenshtein($title1, $title2);
+        $similarity = 1 - ($levenshtein / $maxLength);
+
+        // Titles are similar if they're at least 80% similar
+        return $similarity >= 0.8;
     }
 
     /**
@@ -238,10 +504,23 @@ class StockDataService
 
     /**
      * Get historical stock prices
+     *
+     * @param string $symbol The stock symbol
+     * @param string $interval The interval (daily, weekly, monthly)
+     * @param string $outputSize The output size (compact, full)
+     * @param bool $forceRefresh Whether to force a cache refresh
+     * @return array Array of historical price data
      */
-    public function getHistoricalPrices(string $symbol, string $interval = 'daily', string $outputSize = 'compact'): array
+    public function getHistoricalPrices(string $symbol, string $interval = 'daily', string $outputSize = 'compact', bool $forceRefresh = false): array
     {
         $cacheKey = 'historical_prices_' . $symbol . '_' . $interval . '_' . $outputSize;
+
+        // If force refresh is requested, delete the existing cache item
+        if ($forceRefresh) {
+            $this->cache->delete($cacheKey);
+            $this->logger->info('Forced cache refresh for historical prices', ['symbol' => $symbol]);
+        }
+
         return $this->cache->get($cacheKey, function (ItemInterface $item) use ($symbol, $interval, $outputSize) {
             // Reduce cache TTL significantly for more frequent data refreshes
             // Daily data: 5 minutes (300 seconds) during market hours, 1 hour otherwise
@@ -316,14 +595,14 @@ class StockDataService
         // First persist the company to ensure it has an ID before creating related entities
         $this->entityManager->persist($company);
         $this->entityManager->flush();
-        
+
         // Now import related data
         $this->importFinancialData($company);
         $this->importExecutiveProfiles($company);
-        
+
         // Persist these changes before moving to historical prices (which can be more numerous)
         $this->entityManager->flush();
-        
+
         // Import historical price data
         $this->importHistoricalPrices($company, 'daily', 100);
         $this->importHistoricalPrices($company, 'weekly', 52);
@@ -889,7 +1168,7 @@ class StockDataService
                 $price->setPeriod($interval);
                 $price->setCreatedAt(new \DateTimeImmutable());
                 $this->logger->debug('Creating price data for ' . $company->getTickerSymbol() . ': ' . $priceData['date']);
-                
+
                 // Add this new price to the company's collection to ensure bidirectional relationship
                 $company->addStockPrice($price);
             } else {

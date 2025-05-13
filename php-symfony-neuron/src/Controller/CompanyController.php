@@ -15,6 +15,7 @@ use App\Service\ReportExportService;
 use App\Service\StockDataService;
 use Doctrine\ORM\EntityManagerInterface;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\HttpFoundation\BinaryFileResponse;
@@ -51,10 +52,12 @@ class CompanyController extends AbstractController
             // First search in local database
             $dbResults = $companyRepository->findBySearchCriteria($searchTerm);
 
-            // If we have any database results, collect their ticker symbols
+            // If we have any database results, collect their ticker symbols and company names
             $existingSymbols = [];
+            $existingNames = [];
             foreach ($dbResults as $company) {
-                $existingSymbols[] = $company->getTickerSymbol();
+                $existingSymbols[] = strtolower($company->getTickerSymbol() ?? '');
+                $existingNames[] = strtolower($company->getName() ?? '');
             }
 
             // Get external API results
@@ -63,29 +66,47 @@ class CompanyController extends AbstractController
                 // Search in external APIs
                 $allApiResults = $stockDataService->searchCompanies($searchTerm);
 
-                // Filter out companies that already exist in DB results by ticker symbol
-                $filteredApiResults = array_filter($allApiResults, function($result) use ($existingSymbols) {
-                    return !in_array($result['symbol'], $existingSymbols);
+                // Filter out companies that already exist in DB results by ticker symbol or similar name
+                $filteredApiResults = array_filter($allApiResults, function($result) use ($existingSymbols, $existingNames) {
+                    // Check if ticker symbol already exists (case-insensitive)
+                    if (in_array(strtolower($result['symbol'] ?? ''), $existingSymbols)) {
+                        return false;
+                    }
+
+                    // Check for similar company names (case-insensitive)
+                    $normalizedName = strtolower($result['name'] ?? '');
+                    foreach ($existingNames as $existingName) {
+                        // If the name is very similar or contained within each other
+                        if ($existingName === $normalizedName ||
+                            strpos($existingName, $normalizedName) !== false ||
+                            strpos($normalizedName, $existingName) !== false) {
+                            return false;
+                        }
+                    }
+
+                    return true;
                 });
 
-                // Group results by provider
-                $resultsByProvider = [];
+                // Group results by company name to avoid duplicates across providers
+                $resultsByName = [];
                 foreach ($filteredApiResults as $result) {
-                    $provider = $result['provider'] ?? 'Unknown';
-                    if (!isset($resultsByProvider[$provider])) {
-                        $resultsByProvider[$provider] = [];
+                    $normalizedName = strtolower($result['name'] ?? 'Unknown');
+
+                    if (!isset($resultsByName[$normalizedName])) {
+                        $resultsByName[$normalizedName] = [];
                     }
-                    $resultsByProvider[$provider][] = $result;
+                    $resultsByName[$normalizedName][] = $result;
                 }
 
-                // Take only the first result from each provider
-                foreach ($resultsByProvider as $provider => $results) {
+                // Take only the first result for each unique company name
+                foreach ($resultsByName as $normalizedName => $results) {
                     if (!empty($results)) {
-                        $apiResults[] = $results[0]; // Add only the first result from each provider
+                        $apiResults[] = $results[0]; // Add only the first result for each unique company name
                     }
                 }
 
             } catch (\Exception $e) {
+                $this->logger->error('Error fetching external search results: ' . $e->getMessage());
                 // Log error but continue with DB results
                 $this->addFlash('warning', 'Could not fetch additional results from external sources');
             }
@@ -203,8 +224,11 @@ class CompanyController extends AbstractController
         $limit = $request->query->getInt('limit', 10);
         $days = $request->query->getInt('days', 30);
 
-        // Get news from the service
-        $companyNews = $stockDataService->getCompanyNews($company->getTickerSymbol(), $limit);
+        // Force cache refresh if requested
+        $refresh = $request->query->getBoolean('refresh', false);
+
+        // Get news from the service, force refresh if requested
+        $companyNews = $stockDataService->getCompanyNews($company->getTickerSymbol(), $limit, $refresh);
 
         // Get business headlines for comparison/context
         $marketNews = [];
@@ -217,12 +241,30 @@ class CompanyController extends AbstractController
             $this->addFlash('warning', 'Could not retrieve market headlines: ' . $e->getMessage());
         }
 
+        // Check for duplicate titles and add a note if found
+        $titles = [];
+        $duplicateCount = 0;
+        foreach ($companyNews as $article) {
+            $normalizedTitle = strtolower(trim($article['title']));
+            if (in_array($normalizedTitle, $titles)) {
+                $duplicateCount++;
+            } else {
+                $titles[] = $normalizedTitle;
+            }
+        }
+
+        // If there were duplicates before our deduplication logic, show a message
+        if ($duplicateCount > 0) {
+            $this->addFlash('info', 'Duplicate articles were detected and filtered out.');
+        }
+
         return $this->render('company/news.html.twig', [
             'company' => $company,
             'news' => $companyNews,
             'marketNews' => $marketNews,
             'limit' => $limit,
             'days' => $days,
+            'refresh' => $refresh,
         ]);
     }
 
@@ -518,11 +560,209 @@ class CompanyController extends AbstractController
     }
 
     #[Route('/{id}/stockprices', name: 'company_stockprices', methods: ['GET'])]
-    public function stockprices(Company $company): Response
+    public function stockprices(Company $company, Request $request, StockDataService $stockDataService): Response
     {
+        $interval = $request->query->get('interval', 'daily');
+        $timeRange = $request->query->get('range', '1M'); // Default to 1 month
+        $forceRefresh = $request->query->getBoolean('refresh', false);
+
+        // Get current stock quote for real-time price display
+        $quote = $stockDataService->getStockQuote($company->getTickerSymbol());
+
+        // Calculate date range based on selected time range
+        $endDate = new \DateTime();
+        $startDate = $this->calculateStartDate($endDate, $timeRange);
+
+        // Get historical prices with appropriate caching
+        $prices = $stockDataService->getHistoricalPrices(
+            $company->getTickerSymbol(),
+            $interval,
+            $this->getOutputSizeForTimeRange($timeRange),
+            $forceRefresh
+        );
+
+        // Filter prices based on the selected time range
+        $filteredPrices = array_filter($prices, function($price) use ($startDate) {
+            $priceDate = new \DateTime($price['date']);
+            return $priceDate >= $startDate;
+        });
+
+        // For intraday data during market hours, set up for real-time updates
+        $enableRealTimeUpdates = $interval === 'daily' &&
+                                $timeRange === '1D' &&
+                                $this->isMarketHours();
+
         return $this->render('company/stockprices.html.twig', [
             'company' => $company,
+            'prices' => array_values($filteredPrices), // Re-index array after filtering
+            'quote' => $quote,
+            'interval' => $interval,
+            'timeRange' => $timeRange,
+            'enableRealTimeUpdates' => $enableRealTimeUpdates,
+            'lastUpdated' => new \DateTime(),
         ]);
+    }
+
+    /**
+     * Calculate start date based on time range
+     */
+    private function calculateStartDate(\DateTime $endDate, string $timeRange): \DateTime
+    {
+        $startDate = clone $endDate;
+
+        switch ($timeRange) {
+            case '1D':
+                $startDate->modify('-1 day');
+                break;
+            case '5D':
+                $startDate->modify('-5 days');
+                break;
+            case '1M':
+                $startDate->modify('-1 month');
+                break;
+            case '3M':
+                $startDate->modify('-3 months');
+                break;
+            case '6M':
+                $startDate->modify('-6 months');
+                break;
+            case '1Y':
+                $startDate->modify('-1 year');
+                break;
+            case '5Y':
+                $startDate->modify('-5 years');
+                break;
+            case 'MAX':
+                $startDate->modify('-10 years'); // Use 10 years as "MAX"
+                break;
+            default:
+                $startDate->modify('-1 month'); // Default to 1 month
+        }
+
+        return $startDate;
+    }
+
+    /**
+     * Get output size parameter for API calls based on time range
+     */
+    private function getOutputSizeForTimeRange(string $timeRange): string
+    {
+        // For longer time ranges, use 'full' output size
+        return in_array($timeRange, ['1Y', '5Y', 'MAX']) ? 'full' : 'compact';
+    }
+
+    /**
+     * Check if current time is during market hours (9:30 AM - 4:00 PM ET, Monday-Friday)
+     */
+    private function isMarketHours(): bool
+    {
+        // Convert to Eastern Time (ET) where US markets operate
+        $easternTz = new \DateTimeZone('America/New_York');
+        $now = new \DateTime();
+        $now->setTimezone($easternTz);
+
+        // Get day of week (0 = Sunday, 6 = Saturday)
+        $dayOfWeek = (int)$now->format('w');
+
+        // Check if it's a weekday
+        if ($dayOfWeek === 0 || $dayOfWeek === 6) {
+            return false;
+        }
+
+        // Get current hour and minute in ET
+        $hour = (int)$now->format('G');
+        $minute = (int)$now->format('i');
+        $timeInMinutes = ($hour * 60) + $minute;
+
+        // Market hours: 9:30 AM - 4:00 PM ET
+        $marketOpen = (9 * 60) + 30;  // 9:30 AM
+        $marketClose = (16 * 60);     // 4:00 PM
+
+        return $timeInMinutes >= $marketOpen && $timeInMinutes <= $marketClose;
+    }
+
+    /**
+     * API endpoint to get the latest stock price for real-time updates
+     */
+    #[Route('/api/company/{id}/latest-price', name: 'api_company_latest_price', methods: ['GET'])]
+    public function getLatestPrice(Company $company, StockDataService $stockDataService): JsonResponse
+    {
+        try {
+            // Use a very short cache (30 seconds) for the latest price
+            $quote = $stockDataService->getStockQuote($company->getTickerSymbol());
+
+            return $this->json([
+                'success' => true,
+                'price' => [
+                    'symbol' => $quote['symbol'] ?? $company->getTickerSymbol(),
+                    'price' => $quote['price'] ?? 0,
+                    'change' => $quote['change'] ?? 0,
+                    'changePercent' => $quote['changePercent'] ?? 0,
+                    'volume' => $quote['volume'] ?? 0,
+                    'open' => $quote['open'] ?? 0,
+                    'high' => $quote['high'] ?? 0,
+                    'low' => $quote['low'] ?? 0,
+                    'previousClose' => $quote['previousClose'] ?? 0,
+                    'timestamp' => (new \DateTime())->format('Y-m-d H:i:s')
+                ]
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Error fetching latest price data: ' . $e->getMessage());
+            return $this->json([
+                'success' => false,
+                'message' => 'Could not fetch latest price data'
+            ], 500);
+        }
+    }
+
+    /**
+     * API endpoint to get historical price data for interactive charts
+     */
+    #[Route('/api/company/{id}/historical-prices', name: 'api_company_historical_prices', methods: ['GET'])]
+    public function getHistoricalPrices(
+        Company $company,
+        Request $request,
+        StockDataService $stockDataService
+    ): JsonResponse
+    {
+        try {
+            $interval = $request->query->get('interval', 'daily');
+            $timeRange = $request->query->get('range', '1M');
+            $forceRefresh = $request->query->getBoolean('refresh', false);
+
+            // Calculate date range based on selected time range
+            $endDate = new \DateTime();
+            $startDate = $this->calculateStartDate($endDate, $timeRange);
+
+            // Get historical prices with appropriate caching
+            $prices = $stockDataService->getHistoricalPrices(
+                $company->getTickerSymbol(),
+                $interval,
+                $this->getOutputSizeForTimeRange($timeRange),
+                $forceRefresh
+            );
+
+            // Filter prices based on the selected time range
+            $filteredPrices = array_filter($prices, function($price) use ($startDate) {
+                $priceDate = new \DateTime($price['date']);
+                return $priceDate >= $startDate;
+            });
+
+            return $this->json([
+                'success' => true,
+                'symbol' => $company->getTickerSymbol(),
+                'interval' => $interval,
+                'timeRange' => $timeRange,
+                'prices' => array_values($filteredPrices), // Re-index array after filtering
+                'lastUpdated' => (new \DateTime())->format('Y-m-d H:i:s')
+            ]);
+        } catch (\Exception $e) {
+            $this->logger->error('Error fetching historical price data: ' . $e->getMessage());
+            return $this->json([
+                'success' => false,
+                'message' => 'Could not fetch historical price data'
+            ], 500);
+        }
     }
 
     #[Route('/{id}/institutional-ownership', name: 'company_institutional_ownership', methods: ['GET'])]
@@ -633,7 +873,7 @@ class CompanyController extends AbstractController
             ], 500);
         }
     }
-    
+
     #[Route('/{id}/generate-financial', name: 'company_generate_financial', methods: ['POST'])]
     public function generateFinancial(Company $company, Request $request, NeuronAiService $neuronAiService, EntityManagerInterface $entityManager): Response
     {
@@ -643,7 +883,7 @@ class CompanyController extends AbstractController
 
         try {
             // Before generating data, check if we need to set up the entity manager
-            // This is needed because our generateFinancialData method in NeuronAiService 
+            // This is needed because our generateFinancialData method in NeuronAiService
             // doesn't have direct access to the entity manager
             $reflection = new \ReflectionClass($company);
             try {
@@ -655,10 +895,10 @@ class CompanyController extends AbstractController
                     return $entityManager;
                 };
             }
-            
+
             // Generate financial data using NeuronAiService
             $dataGenerated = $neuronAiService->generateFinancialData($company);
-            
+
             // Iterate through financial data and set the reportType field
             if ($dataGenerated > 0) {
                 foreach ($company->getFinancialData() as $financialData) {

@@ -36,10 +36,10 @@ class NewsApiClient extends AbstractApiClient
     {
         $endpoint = '/everything';
         if (!$from) $from = new \DateTime('30 days ago');
-        if (!$to) $to = new \DateTime();
+        if (!$to) $to = new \DateTime('tomorrow'); // Use tomorrow to ensure we get today's news
         $params = [
             'q' => $query,
-            'searchIn' => 'title',
+            'searchIn' => 'title,description', // Search in both title and description for better results
             'from' => $from->format('Y-m-d'),
             'to' => $to->format('Y-m-d'),
             'language' => 'en',
