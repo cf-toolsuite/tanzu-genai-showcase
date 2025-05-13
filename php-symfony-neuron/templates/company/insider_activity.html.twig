@@ -355,7 +355,7 @@
         <nav aria-label="breadcrumb" class="mb-4">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ path('company_show', {'id': company.id}) }}">Company Profile</a></li>
-                <li class="breadcrumb-item"><a href="{{ path('company_additional_metrics', {'id': company.id}) }}">Additional Metrics</a></li>
+                <li class="breadcrumb-item"><a href="{{ path('company_show', {'id': company.id}) }}">Company Overview</a></li>
                 <li class="breadcrumb-item active" aria-current="page">Insider Activity</li>
             </ol>
         </nav>
@@ -378,7 +378,7 @@
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link active" href="{{ path('company_insider_activity', {'id': company.id}) }}">
+                    <a class="nav-link active" href="{{ path('company_insider_trading', {'id': company.id}) }}">
                         <i class="fas fa-user-tie"></i> Insider Activity
                     </a>
                 </li>
@@ -408,8 +408,10 @@
                 <div class="key-figure-card">
                     {% set purchaseCount = 0 %}
                     {% for transaction in insiderTransactions %}
-                        {% if transaction.transactionType matches '/purchase/i' %}
-                            {% set purchaseCount = purchaseCount + 1 %}
+                        {% if transaction.transactions is defined and transaction.transactions|length > 0 %}
+                            {% if transaction.transactions[0].transactionType == 'P' %}
+                                {% set purchaseCount = purchaseCount + 1 %}
+                            {% endif %}
                         {% endif %}
                     {% endfor %}
                     <div class="key-figure-value key-figure-positive">{{ purchaseCount }}</div>
@@ -420,8 +422,10 @@
                 <div class="key-figure-card">
                     {% set saleCount = 0 %}
                     {% for transaction in insiderTransactions %}
-                        {% if transaction.transactionType matches '/sale/i' %}
-                            {% set saleCount = saleCount + 1 %}
+                        {% if transaction.transactions is defined and transaction.transactions|length > 0 %}
+                            {% if transaction.transactions[0].transactionType == 'S' %}
+                                {% set saleCount = saleCount + 1 %}
+                            {% endif %}
                         {% endif %}
                     {% endfor %}
                     <div class="key-figure-value key-figure-negative">{{ saleCount }}</div>
@@ -433,10 +437,13 @@
                     {% set purchaseValue = 0 %}
                     {% set saleValue = 0 %}
                     {% for transaction in insiderTransactions %}
-                        {% if transaction.transactionType matches '/purchase/i' %}
-                            {% set purchaseValue = purchaseValue + transaction.value %}
-                        {% elseif transaction.transactionType matches '/sale/i' %}
-                            {% set saleValue = saleValue + transaction.value %}
+                        {% if transaction.transactions is defined and transaction.transactions|length > 0 %}
+                            {% set txn = transaction.transactions[0] %}
+                            {% if txn.transactionType == 'P' %}
+                                {% set purchaseValue = purchaseValue + txn.totalValue|default(0) %}
+                            {% elseif txn.transactionType == 'S' %}
+                                {% set saleValue = saleValue + txn.totalValue|default(0) %}
+                            {% endif %}
                         {% endif %}
                     {% endfor %}
                     {% set netValue = purchaseValue - saleValue %}
@@ -532,38 +539,49 @@
                                     </thead>
                                     <tbody>
                                         {% for transaction in insiderTransactions %}
-                                            <tr>
-                                                <td>{{ transaction.transactionDate|date('M d, Y') }}</td>
-                                                <td class="insider-name" data-shares-owned="{{ transaction.sharesOwned|number_format }}">{{ transaction.insiderName }}</td>
-                                                <td>{{ transaction.title }}</td>
-                                                <td>
-                                                    {% if transaction.transactionType matches '/purchase/i' %}
-                                                        <span class="transaction-type-Purchase">{{ transaction.transactionType }}</span>
-                                                    {% elseif transaction.transactionType matches '/sale/i' %}
-                                                        <span class="transaction-type-Sale">{{ transaction.transactionType }}</span>
-                                                    {% else %}
-                                                        <span class="transaction-type-Option">{{ transaction.transactionType }}</span>
-                                                    {% endif %}
-                                                </td>
-                                                <td>{{ transaction.shares|number_format }}</td>
-                                                <td>
-                                                    {% if transaction.shares > 0 %}
-                                                        ${{ (transaction.value / transaction.shares)|number_format(2) }}
-                                                    {% else %}
-                                                        N/A
-                                                    {% endif %}
-                                                </td>
-                                                <td>
-                                                    {% if transaction.transactionType matches '/purchase/i' %}
-                                                        <span class="transaction-value-positive">${{ transaction.value|number_format }}</span>
-                                                    {% elseif transaction.transactionType matches '/sale/i' %}
-                                                        <span class="transaction-value-negative">${{ transaction.value|number_format }}</span>
-                                                    {% else %}
-                                                        ${{ transaction.value|number_format }}
-                                                    {% endif %}
-                                                </td>
-                                                <td>{{ transaction.sharesOwned|number_format }}</td>
-                                            </tr>
+                                            {% if transaction.transactions is defined and transaction.transactions|length > 0 %}
+                                                {% set txn = transaction.transactions[0] %}
+                                                <tr>
+                                                    <td>{{ transaction.transactionDate|date('M d, Y') }}</td>
+                                                    <td class="insider-name" data-shares-owned="{{ txn.sharesOwnedFollowing|default(0)|number_format }}">{{ transaction.ownerName }}</td>
+                                                    <td>{{ transaction.ownerTitle }}</td>
+                                                    <td>
+                                                        {% if txn.transactionType == 'P' %}
+                                                            <span class="transaction-type-Purchase">Purchase</span>
+                                                        {% elseif txn.transactionType == 'S' %}
+                                                            <span class="transaction-type-Sale">Sale</span>
+                                                        {% elseif txn.transactionType == 'A' %}
+                                                            <span class="transaction-type-Option">Award/Grant</span>
+                                                        {% elseif txn.transactionType == 'D' %}
+                                                            <span class="transaction-type-Option">Disposition</span>
+                                                        {% else %}
+                                                            <span class="transaction-type-Option">{{ txn.transactionType }}</span>
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>{{ txn.shares|default(0)|number_format }}</td>
+                                                    <td>
+                                                        {% if txn.shares|default(0) > 0 and txn.pricePerShare|default(0) > 0 %}
+                                                            ${{ txn.pricePerShare|default(0)|number_format(2) }}
+                                                        {% else %}
+                                                            N/A
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>
+                                                        {% if txn.totalValue|default(0) > 0 %}
+                                                            {% if txn.transactionType == 'P' %}
+                                                                <span class="transaction-value-positive">${{ txn.totalValue|number_format }}</span>
+                                                            {% elseif txn.transactionType == 'S' %}
+                                                                <span class="transaction-value-negative">${{ txn.totalValue|number_format }}</span>
+                                                            {% else %}
+                                                                ${{ txn.totalValue|number_format }}
+                                                            {% endif %}
+                                                        {% else %}
+                                                            N/A
+                                                        {% endif %}
+                                                    </td>
+                                                    <td>{{ txn.sharesOwnedFollowing|default(0)|number_format }}</td>
+                                                </tr>
+                                            {% endif %}
                                         {% endfor %}
                                     </tbody>
                                 </table>
@@ -612,18 +630,29 @@
                             <!-- Group transactions by insider and get top 3 by shares owned -->
                             {% set insiders = {} %}
                             {% for transaction in insiderTransactions %}
-                                {% set insiderName = transaction.insiderName %}
+                                {% set insiderName = transaction.ownerName|default('Unknown') %}
+                                {% set transactionType = '' %}
+                                {% set transactionValue = 0 %}
+                                {% set sharesOwned = 0 %}
+
+                                {% if transaction.transactions is defined and transaction.transactions|length > 0 %}
+                                    {% set txn = transaction.transactions[0] %}
+                                    {% set transactionType = txn.transactionType %}
+                                    {% set transactionValue = txn.totalValue|default(0) %}
+                                    {% set sharesOwned = txn.sharesOwnedFollowing|default(0) %}
+                                {% endif %}
+
                                 {% if insiders[insiderName] is not defined %}
                                     {% set insiders = insiders|merge({
                                         (insiderName): {
                                             'name': insiderName,
-                                            'title': transaction.title,
-                                            'sharesOwned': transaction.sharesOwned,
+                                            'title': transaction.ownerTitle|default(''),
+                                            'sharesOwned': sharesOwned,
                                             'transactions': 1,
-                                            'purchases': transaction.transactionType matches '/purchase/i' ? 1 : 0,
-                                            'sales': transaction.transactionType matches '/sale/i' ? 1 : 0,
-                                            'purchaseValue': transaction.transactionType matches '/purchase/i' ? transaction.value : 0,
-                                            'saleValue': transaction.transactionType matches '/sale/i' ? transaction.value : 0
+                                            'purchases': transactionType == 'P' ? 1 : 0,
+                                            'sales': transactionType == 'S' ? 1 : 0,
+                                            'purchaseValue': transactionType == 'P' ? transactionValue : 0,
+                                            'saleValue': transactionType == 'S' ? transactionValue : 0
                                         }
                                     }) %}
                                 {% else %}
@@ -631,13 +660,13 @@
                                     {% set insiders = insiders|merge({
                                         (insiderName): {
                                             'name': insiderName,
-                                            'title': transaction.title,
-                                            'sharesOwned': transaction.sharesOwned,
+                                            'title': transaction.ownerTitle|default(currentInsider.title),
+                                            'sharesOwned': sharesOwned > currentInsider.sharesOwned ? sharesOwned : currentInsider.sharesOwned,
                                             'transactions': currentInsider.transactions + 1,
-                                            'purchases': currentInsider.purchases + (transaction.transactionType matches '/purchase/i' ? 1 : 0),
-                                            'sales': currentInsider.sales + (transaction.transactionType matches '/sale/i' ? 1 : 0),
-                                            'purchaseValue': currentInsider.purchaseValue + (transaction.transactionType matches '/purchase/i' ? transaction.value : 0),
-                                            'saleValue': currentInsider.saleValue + (transaction.transactionType matches '/sale/i' ? transaction.value : 0)
+                                            'purchases': currentInsider.purchases + (transactionType == 'P' ? 1 : 0),
+                                            'sales': currentInsider.sales + (transactionType == 'S' ? 1 : 0),
+                                            'purchaseValue': currentInsider.purchaseValue + (transactionType == 'P' ? transactionValue : 0),
+                                            'saleValue': currentInsider.saleValue + (transactionType == 'S' ? transactionValue : 0)
                                         }
                                     }) %}
                                 {% endif %}
@@ -743,3 +772,9 @@
                             <h6 class="alert-heading"><i class="fas fa-info-circle me-2"></i>Insider Trading vs. Illegal Insider Trading</h6>
                             <p class="mb-0">All insider transactions shown here are legal and properly disclosed. Illegal insider trading occurs when insiders trade based on material, non-public information, which is prohibited by securities law.</p>
                         </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+{% endblock %}

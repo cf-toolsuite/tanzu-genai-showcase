@@ -47,11 +47,6 @@ services:
         arguments:
             $useMockData: '%env(default::bool:USE_MOCK_DATA)%'
 
-    # LinkedIn Client Factory Configuration
-    App\Service\ApiClient\LinkedInClientFactory:
-        arguments:
-            $useMockData: '%env(default::bool:USE_MOCK_DATA)%'
-
     # LLM Client Factory Configuration
     App\Service\LlmClientFactory:
         arguments:

@@ -300,24 +300,27 @@ class NeuronAiService
     }
 
     /**
-     * Generate a leadership profile for a company executive
+     * Generate financial data for a company
      *
-     * @param string $executiveName The name of the executive
-     * @param string $companyName The name of the company
-     * @param string $title The title of the executive (e.g., 'CEO', 'CFO')
-     * @return array The generated executive profile
+     * @param mixed $company The company name or Company object
+     * @return int Number of financial data points generated
      */
-    public function generateExecutiveProfile(string $executiveName, string $companyName, string $title): array
+    public function generateFinancialData($company): int
     {
-        $systemPrompt = "You are an AI assistant that specializes in executive leadership analysis. " .
-            "Provide detailed profiles of company executives based on publicly available information. " .
-            "Focus on professional background, leadership style, and achievements. " .
+        // Extract company name if an object is passed
+        $companyName = is_object($company) && method_exists($company, 'getName') ? $company->getName() : (string)$company;
+        
+        $systemPrompt = "You are an AI assistant that specializes in financial data analysis. " .
+            "Generate realistic financial data for a company based on its industry and size. " .
+            "The data should be realistic but not necessarily accurate for the specific company. " .
             "Your response must be valid JSON format without any additional text.";
 
-        $userPrompt = "Create a profile for {$executiveName}, {$title} of {$companyName}. " .
-            "Structure your analysis in JSON format with the following fields: " .
-            "name, title, biography, education, previousCompanies, achievements, leadership. " .
-            "Return only valid JSON, without any explanation or additional text.";
+        $userPrompt = "Generate quarterly financial data for {$companyName} for the last 8 quarters. " .
+            "Structure your data in JSON format as an array of quarterly results with the following fields for each quarter: " .
+            "fiscalYear, fiscalQuarter, revenue, netIncome, eps, grossMargin, operatingMargin, profitMargin, " .
+            "ebitda, totalAssets, totalLiabilities, shareholderEquity, cashAndEquivalents, longTermDebt, " .
+            "peRatio, dividendYield, roe, debtToEquity, currentRatio, marketCap. " .
+            "Return only valid JSON array without any explanation or additional text.";
 
         $messages = [
             ['role' => 'system', 'content' => $systemPrompt],
@@ -327,6 +330,150 @@ class NeuronAiService
         // Include response_format for models that support it, but don't depend on it
         $options = [
             'temperature' => 0.4,
+            'max_tokens' => 2000,
+            'response_format' => ['type' => 'json_object'] // Will be ignored by models that don't support it
+        ];
+
+        $response = $this->generateChatCompletion($messages, $options);
+
+        // Extract JSON in case there's additional text in the response
+        $jsonResponse = $this->extractJsonFromText($response);
+
+        try {
+            // Parse the JSON response
+            $data = json_decode($jsonResponse, true, 512, JSON_THROW_ON_ERROR);
+            
+            // If the response is not an array of quarters, check if it's wrapped in another object
+            if (!is_array($data) || !isset($data[0])) {
+                // Check if there's a 'quarters' or 'data' field that contains the array
+                if (isset($data['quarters']) && is_array($data['quarters'])) {
+                    $data = $data['quarters'];
+                } elseif (isset($data['data']) && is_array($data['data'])) {
+                    $data = $data['data'];
+                } else {
+                    // If we can't find an array, create a single-item array from the data
+                    $data = [$data];
+                }
+            }
+            
+            // If we have a Company object, save the financial data
+            if (is_object($company) && method_exists($company, 'addFinancialData')) {
+                $count = 0;
+                
+                // Get entity manager through reflection to avoid circular dependency
+                $reflection = new \ReflectionClass($company);
+                $property = $reflection->getProperty('id');
+                $property->setAccessible(true);
+                $companyId = $property->getValue($company);
+                
+                if ($companyId) {
+                    // Company is already persisted, so we can add financial data
+                    foreach ($data as $quarterData) {
+                        // Create and persist the financial data
+                        $financialData = new \App\Entity\FinancialData();
+                        $financialData->setCompany($company);
+                        $financialData->setReportType('Quarterly'); // Set a default report type
+                        $financialData->setFiscalYear($quarterData['fiscalYear'] ?? date('Y'));
+                        $financialData->setFiscalQuarter($quarterData['fiscalQuarter'] ?? 'Q'.rand(1,4));
+                        $financialData->setRevenue($quarterData['revenue'] ?? 0);
+                        $financialData->setNetIncome($quarterData['netIncome'] ?? 0);
+                        $financialData->setEps($quarterData['eps'] ?? 0);
+                        $financialData->setGrossMargin($quarterData['grossMargin'] ?? 0);
+                        $financialData->setOperatingMargin($quarterData['operatingMargin'] ?? 0);
+                        $financialData->setProfitMargin($quarterData['profitMargin'] ?? 0);
+                        $financialData->setEbitda($quarterData['ebitda'] ?? 0);
+                        $financialData->setTotalAssets($quarterData['totalAssets'] ?? 0);
+                        $financialData->setTotalLiabilities($quarterData['totalLiabilities'] ?? 0);
+                        $financialData->setShareholderEquity($quarterData['shareholderEquity'] ?? 0);
+                        $financialData->setCashAndEquivalents($quarterData['cashAndEquivalents'] ?? 0);
+                        $financialData->setLongTermDebt($quarterData['longTermDebt'] ?? 0);
+                        $financialData->setPeRatio($quarterData['peRatio'] ?? 0);
+                        $financialData->setDividendYield($quarterData['dividendYield'] ?? 0);
+                        $financialData->setRoe($quarterData['roe'] ?? 0);
+                        $financialData->setDebtToEquity($quarterData['debtToEquity'] ?? 0);
+                        $financialData->setCurrentRatio($quarterData['currentRatio'] ?? 0);
+                        $financialData->setMarketCap($quarterData['marketCap'] ?? 0);
+                        
+                        // Add the financial data to the company
+                        $company->addFinancialData($financialData);
+                        
+                        $count++;
+                    }
+                }
+                
+                return $count;
+            }
+            
+            // If we don't have a Company object or can't save the data, just return the count
+            return count($data);
+            
+        } catch (\Exception $e) {
+            // Log error but don't throw - we want to avoid transaction failures
+            error_log('Error generating financial data: ' . $e->getMessage());
+            return 0;
+        }
+    }
+
+    /**
+     * Generate a leadership profile for a company executive, focusing on filling in missing data
+     *
+     * @param string $executiveName The name of the executive
+     * @param string $companyName The name of the company
+     * @param string $title The title of the executive (e.g., 'CEO', 'CFO')
+     * @param array $completenessData Information about which fields are already complete (optional)
+     * @return array The generated executive profile, focused on missing data
+     */
+    public function generateExecutiveProfile(
+        string $executiveName,
+        string $companyName,
+        string $title,
+        array $completenessData = []
+    ): array {
+        // Determine which fields need to be researched
+        $fieldsNeeded = [];
+        foreach ($completenessData as $field => $isComplete) {
+            if (!$isComplete) {
+                $fieldsNeeded[] = $field;
+            }
+        }
+
+        // If no fields specified, assume we need all fields
+        if (empty($fieldsNeeded) && empty($completenessData)) {
+            $fieldsNeeded = ['biography', 'education', 'previousCompanies', 'achievements'];
+        } elseif (empty($fieldsNeeded) && !empty($completenessData)) {
+            // If all fields are complete, return an empty array
+            return [
+                'name' => $executiveName,
+                'title' => $title,
+                'source' => 'ai_not_needed'
+            ];
+        }
+
+        $fieldsList = implode(", ", $fieldsNeeded);
+
+        $systemPrompt = "You are an AI assistant that specializes in executive leadership research. " .
+            "Provide ONLY verifiable facts about company executives based on publicly available information. " .
+            "Focus on finding factual information about their professional background, education, and career history. " .
+            "DO NOT generate fictional content when information is not available - indicate that it's unknown instead. " .
+            "Your response must be valid JSON format without any additional text.";
+
+        $userPrompt = "Research the following information about {$executiveName}, {$title} of {$companyName}: {$fieldsList}. " .
+            "Search ONLY for verifiable facts from public sources. " .
+            "Structure your findings in JSON format with the following fields: " .
+            "name, title" . (!empty($fieldsNeeded) ? ", " . $fieldsList : "") . ". " .
+            "Include ONLY fields that you can find factual information for. " .
+            "If you cannot find information for a field, use an empty string or omit the field. " .
+            "For fields where you have partial information, provide what you have found but clearly indicate any uncertainties. " .
+            "Return only valid JSON, without any explanation or additional text.";
+
+        $messages = [
+            ['role' => 'system', 'content' => $systemPrompt],
+            ['role' => 'user', 'content' => $userPrompt]
+        ];
+
+        // Lower temperature for more factual responses
+        $options = [
+            'temperature' => 0.2,
             'max_tokens' => 1200,
             'response_format' => ['type' => 'json_object'] // Will be ignored by models that don't support it
         ];
@@ -339,17 +486,26 @@ class NeuronAiService
         try {
             // First try with the extracted JSON
             $data = json_decode($jsonResponse, true, 512, JSON_THROW_ON_ERROR);
+
+            // Add metadata about the data source
+            $data['source'] = 'ai';
+
             return $data;
         } catch (\Exception $e) {
             // If parsing fails, try once more with the full response
             try {
                 $data = json_decode($response, true, 512, JSON_THROW_ON_ERROR);
+
+                // Add metadata about the data source
+                $data['source'] = 'ai';
+
                 return $data;
             } catch (\Exception $innerE) {
                 // If JSON parsing fails, return a structured error response
                 return [
                     'name' => $executiveName,
                     'title' => $title,
+                    'source' => 'ai_error',
                     'error' => 'Could not generate executive profile: ' . $e->getMessage()
                 ];
             }
@@ -359,21 +515,27 @@ class NeuronAiService
     /**
      * Generate competitive analysis for a company
      *
-     * @param string $companyName The name of the company
-     * @param string $competitorName The name of the competitor
+     * @param string|object $company The company name or Company object
+     * @param string|null $competitorName The name of the competitor
      * @return array The generated competitive analysis
      */
-    public function generateCompetitorAnalysis(string $companyName, string $competitorName): array
+    public function generateCompetitorAnalysis($company, string $competitorName = null): array
     {
+        $companyName = is_object($company) && method_exists($company, 'getName') ? $company->getName() : (string)$company;
+        
         $systemPrompt = "You are an AI assistant that specializes in competitive analysis. " .
             "Provide detailed comparison between companies in the same industry or market. " .
             "Focus on strengths, weaknesses, market position, and strategic initiatives. " .
             "Your response must be valid JSON format without any additional text.";
 
-        $userPrompt = "Compare {$companyName} with its competitor {$competitorName}. " .
-            "Structure your analysis in JSON format with the following fields: " .
-            "competitorName, overview, strengths, weaknesses, marketShare, productComparison, " .
-            "financialComparison, strategicInitiatives. " .
+        $userPrompt = $competitorName ?
+            "Compare {$companyName} with its competitor {$competitorName}. " :
+            "Provide a competitive analysis for {$companyName} and its main competitors. ";
+            
+        $userPrompt .= "Structure your analysis in JSON format with the following fields: " .
+            "companyName, industryOverview, marketPosition, competitors (an array with each competitor having: " .
+            "name, marketShare, strengths, weaknesses, threatLevel), " .
+            "swotStrengths, swotWeaknesses, swotOpportunities, swotThreats. " .
             "Return only valid JSON, without any explanation or additional text.";
 
         $messages = [
@@ -396,6 +558,12 @@ class NeuronAiService
         try {
             // First try with the extracted JSON
             $data = json_decode($jsonResponse, true, 512, JSON_THROW_ON_ERROR);
+            
+            // Save to database if we have a Company object
+            if (is_object($company) && method_exists($company, 'addCompetitorAnalysis')) {
+                // Implementation for saving to database would go here
+            }
+            
             return $data;
         } catch (\Exception $e) {
             // If parsing fails, try once more with the full response
@@ -405,7 +573,7 @@ class NeuronAiService
             } catch (\Exception $innerE) {
                 // If JSON parsing fails, return a structured error response
                 return [
-                    'competitorName' => $competitorName,
+                    'companyName' => $companyName,
                     'error' => 'Could not generate competitor analysis: ' . $e->getMessage()
                 ];
             }
@@ -415,12 +583,14 @@ class NeuronAiService
     /**
      * Generate a complete research report for a company
      *
-     * @param string $companyName The name of the company
+     * @param string|object $company The company name or Company object
      * @param string $reportType The type of report (e.g., 'Comprehensive', 'Investment', 'Industry')
-     * @return array The generated research report
+     * @return int The number of reports generated
      */
-    public function generateResearchReport(string $companyName, string $reportType = 'Comprehensive'): array
+    public function generateResearchReports($company, string $reportType = 'Comprehensive'): int
     {
+        $companyName = is_object($company) && method_exists($company, 'getName') ? $company->getName() : (string)$company;
+        
         $systemPrompt = "You are an AI assistant that specializes in company research and analysis. " .
             "Provide detailed, structured research reports about companies. " .
             "Your reports should be factual, balanced, and informative, highlighting both " .
@@ -429,8 +599,7 @@ class NeuronAiService
 
         $userPrompt = "Create a {$reportType} research report for {$companyName}. " .
             "Structure your report in JSON format with the following sections: " .
-            "title, executiveSummary, companyOverview, industryAnalysis, financialAnalysis, " .
-            "competitiveAnalysis, swotAnalysis, investmentHighlights, risksAndChallenges, conclusion. " .
+            "title, summary, content, reportType, recommendation, priceTarget, analyst. " .
             "Each section should be detailed but concise. " .
             "Return only valid JSON, without any explanation or additional text.";
 
@@ -458,8 +627,14 @@ class NeuronAiService
             // Add metadata
             $data['reportType'] = $reportType;
             $data['generatedBy'] = 'Neuron AI';
-
-            return $data;
+            
+            // Save to database if we have a Company object
+            if (is_object($company) && method_exists($company, 'addResearchReport')) {
+                // Implementation for saving to database would go here
+                return 1; // Return count of reports generated
+            }
+            
+            return 1; // Just return 1 since we generated one report
         } catch (\Exception $e) {
             // If parsing fails, try once more with the full response
             try {
@@ -468,15 +643,12 @@ class NeuronAiService
                 // Add metadata
                 $data['reportType'] = $reportType;
                 $data['generatedBy'] = 'Neuron AI';
-
-                return $data;
+                
+                return 1; // Just return 1 since we generated one report
             } catch (\Exception $innerE) {
-                // If JSON parsing fails, return a structured error response
-                return [
-                    'title' => "{$reportType} Report for {$companyName}",
-                    'reportType' => $reportType,
-                    'error' => 'Could not generate research report: ' . $e->getMessage()
-                ];
+                // If JSON parsing fails, log the error
+                error_log('Error generating research report: ' . $e->getMessage());
+                return 0; // Return 0 to indicate failure
             }
         }
     }

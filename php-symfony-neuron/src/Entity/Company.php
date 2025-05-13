@@ -99,6 +99,14 @@ class Company
         $this->analystRatings = new ArrayCollection();
     }
 
+    /**
+     * @return string
+     */
+    public function __toString(): string
+    {
+        return $this->name ?? 'Company #' . $this->id;
+    }
+
     public function getId(): ?int
     {
         return $this->id;

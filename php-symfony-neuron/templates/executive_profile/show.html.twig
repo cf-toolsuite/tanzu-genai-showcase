@@ -1,0 +1,132 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{{ executive.name }} - {{ company.name }}{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+    <style>
+        .section-heading {
+            margin-bottom: 1rem;
+            padding-bottom: 0.5rem;
+            border-bottom: 1px solid #dee2e6;
+        }
+
+        .profile-placeholder {
+            width: 200px;
+            height: 200px;
+            border-radius: 50%;
+            background-color: #e9ecef;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 4rem;
+            font-weight: 300;
+            color: #6c757d;
+            margin-bottom: 1rem;
+        }
+
+        .detail-item {
+            margin-bottom: 1.5rem;
+        }
+
+        .detail-label {
+            font-weight: 600;
+            margin-bottom: 0.25rem;
+        }
+    </style>
+{% endblock %}
+
+{% block body %}
+<div class="container mt-5">
+    <nav aria-label="breadcrumb">
+        <ol class="breadcrumb">
+            <li class="breadcrumb-item"><a href="{{ path('company_index') }}">Companies</a></li>
+            <li class="breadcrumb-item"><a href="{{ path('company_show', {'id': company.id}) }}">{{ company.name }}</a></li>
+            <li class="breadcrumb-item"><a href="{{ path('company_leadership', {'id': company.id}) }}">Leadership</a></li>
+            <li class="breadcrumb-item active" aria-current="page">{{ executive.name }}</li>
+        </ol>
+    </nav>
+
+    <div class="row">
+        <div class="col-md-4 text-center">
+            <div class="card mb-4">
+                <div class="card-body">
+                    <div class="profile-placeholder mx-auto">
+                        {{ executive.name|first }}
+                    </div>
+
+                    <h2 class="mb-1">{{ executive.name }}</h2>
+                    <p class="text-muted mb-3">{{ executive.title }}</p>
+
+                    {% if executive.email %}
+                        <p class="mb-3">
+                            <i class="fas fa-envelope me-2"></i>
+                            <a href="mailto:{{ executive.email }}">{{ executive.email }}</a>
+                        </p>
+                    {% endif %}
+
+                    <div class="d-grid gap-2">
+                        <a href="{{ path('executive_profile_edit', {'id': executive.id}) }}" class="btn btn-primary">
+                            <i class="fas fa-edit me-1"></i> Edit Profile
+                        </a>
+
+                        {% if executive.linkedinProfileUrl %}
+                            <a href="{{ executive.linkedinProfileUrl }}" target="_blank" class="btn btn-outline-primary">
+                                <i class="fab fa-linkedin me-1"></i> View on LinkedIn
+                            </a>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-md-8">
+            <div class="card mb-4">
+                <div class="card-header">
+                    <h4 class="mb-0">Biography</h4>
+                </div>
+                <div class="card-body">
+                    {% if executive.biography %}
+                        <p>{{ executive.biography|nl2br }}</p>
+                    {% else %}
+                        <p class="text-muted">No biography available.</p>
+                    {% endif %}
+                </div>
+            </div>
+
+            <div class="row">
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4 class="mb-0">Education</h4>
+                        </div>
+                        <div class="card-body">
+                            {% if executive.education %}
+                                <p>{{ executive.education|nl2br }}</p>
+                            {% else %}
+                                <p class="text-muted">No education information available.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="col-md-6">
+                    <div class="card mb-4">
+                        <div class="card-header">
+                            <h4 class="mb-0">Previous Companies</h4>
+                        </div>
+                        <div class="card-body">
+                            {% if executive.previousCompanies %}
+                                <p>{{ executive.previousCompanies|nl2br }}</p>
+                            {% else %}
+                                <p class="text-muted">No previous companies information available.</p>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+{% endblock %}

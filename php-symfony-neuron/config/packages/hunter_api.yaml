@@ -1,0 +1,23 @@
+# This file contains the configuration for the Hunter.io API integration
+parameters:
+    hunter_api.api_key: '%env(resolve:HUNTER_API_KEY)%'
+
+services:
+    # Hunter API Client
+    App\Service\ApiClient\HunterApiClient:
+        arguments:
+            $httpClient: '@http_client'
+            $params: '@parameter_bag'
+            $logger: '@logger'
+
+    # Hunter API Client Interface
+    App\Service\ApiClient\HunterApiClientInterface:
+        alias: App\Service\ApiClient\HunterApiClient
+
+    # Hunter Service
+    App\Service\HunterService:
+        arguments:
+            $apiClient: '@App\Service\ApiClient\HunterApiClientInterface'
+            $entityManager: '@doctrine.orm.entity_manager'
+            $logger: '@logger'
+            $params: '@parameter_bag'

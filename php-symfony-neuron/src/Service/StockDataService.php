@@ -177,7 +177,7 @@ class StockDataService
             try {
                 $companyInfo = $this->getCompanyProfile($symbol);
                 $companyName = $companyInfo['name'] ?? '';
-                $searchTerm = $symbol . (!empty($companyName) ? ' ' . $companyName : '');
+                $searchTerm = !empty($companyName) ? $companyName : $symbol;
                 $news = $this->newsApiClient->getCompanyNews($searchTerm, $limit);
                 return $news;
             } catch (\Exception $e) {
@@ -301,12 +301,22 @@ class StockDataService
         $company->setWebsite($profile['website'] ?? null);
         $company->setUpdatedAt(new \DateTimeImmutable());
 
+        // First persist the company to ensure it has an ID before creating related entities
+        $this->entityManager->persist($company);
+        $this->entityManager->flush();
+        
+        // Now import related data
         $this->importFinancialData($company);
         $this->importExecutiveProfiles($company);
+        
+        // Persist these changes before moving to historical prices (which can be more numerous)
+        $this->entityManager->flush();
+        
+        // Import historical price data
         $this->importHistoricalPrices($company, 'daily', 100);
         $this->importHistoricalPrices($company, 'weekly', 52);
 
-        $this->entityManager->persist($company);
+        // Final flush to ensure all data is saved
         $this->entityManager->flush();
 
         return $company;
@@ -417,9 +427,6 @@ class StockDataService
             $profile->setBiography($executive['bio'] ?? null);
             $profile->setEducation($executive['education'] ?? null);
             $profile->setPreviousCompanies($executive['previousCompanies'] ?? null);
-            $profile->setAchievements($executive['achievements'] ?? null);
-            // $profile->setStartYear($executive['yearJoined'] ?? null);
-            // $profile->setPhotoUrl($executive['photoUrl'] ?? null);
             $profile->setUpdatedAt(new \DateTimeImmutable());
 
             $this->entityManager->persist($profile);
@@ -864,11 +871,15 @@ class StockDataService
 
             $price = $existingPrice ?? new StockPrice();
             if (!$existingPrice) {
+                // For new stock price entities, make sure to use the same company object that's already persisted
                 $price->setCompany($company);
                 $price->setDate($date);
                 $price->setPeriod($interval);
                 $price->setCreatedAt(new \DateTimeImmutable());
                 $this->logger->debug('Creating price data for ' . $company->getTickerSymbol() . ': ' . $priceData['date']);
+                
+                // Add this new price to the company's collection to ensure bidirectional relationship
+                $company->addStockPrice($price);
             } else {
                  $this->logger->debug('Updating price data for ' . $company->getTickerSymbol() . ': ' . $priceData['date']);
             }

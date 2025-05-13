@@ -14,7 +14,7 @@ class StockPrice
     #[ORM\Column]
     private ?int $id = null;
 
-    #[ORM\ManyToOne(inversedBy: 'stockPrices')]
+    #[ORM\ManyToOne(inversedBy: 'stockPrices', cascade: ['persist'])]
     #[ORM\JoinColumn(nullable: false)]
     private ?Company $company = null;
 

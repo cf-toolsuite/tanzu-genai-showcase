@@ -119,22 +119,22 @@
         <h1>{{ company.name }} Leadership</h1>
 
         <div class="d-flex">
-            <button id="generate-executives" class="btn btn-outline-primary me-2" data-bs-toggle="modal" data-bs-target="#generateModal">
+            <a href="{{ path('executive_profile_new', {'id': company.id}) }}" class="btn btn-outline-primary me-2">
+                <i class="fas fa-user-plus me-2"></i> Add Executive
+            </a>
+
+            <button id="generate-executives" class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#generateModal">
                 <i class="fas fa-magic me-2"></i> Generate Executives
             </button>
-
-            <a href="{{ path('linkedin_company_network', {'id': company.id}) }}" class="btn btn-primary">
-                <i class="fab fa-linkedin me-2"></i> LinkedIn Network Analysis
-            </a>
         </div>
     </div>
 
     {% if executives is empty %}
         <div class="alert alert-info">
             <h4 class="alert-heading">No Executive Profiles Found</h4>
-            <p>This company doesn't have any executive profiles yet. You can generate sample executive profiles or add them manually.</p>
+            <p>This company doesn't have any executive profiles yet. You can generate executive profiles automatically or add them manually.</p>
             <hr>
-            <p class="mb-0">Use the "Generate Executives" button to create sample executive profiles with AI-generated information.</p>
+            <p class="mb-0">Use the "Generate Executives" button to create profiles automatically, or "Add Executive" to create a profile manually.</p>
         </div>
     {% else %}
         <!-- Grid of executive cards -->
@@ -143,27 +143,16 @@
                 <div class="col-md-6 col-lg-4">
                     <div class="card executive-card">
                         <div class="card-body text-center">
-                            {% if executive.profilePictureUrl %}
-                                <img src="{{ executive.profilePictureUrl }}" alt="{{ executive.name }}" class="executive-image">
-                            {% else %}
-                                <div class="executive-placeholder mx-auto">
-                                    {{ executive.name|first }}
-                                </div>
-                            {% endif %}
+                            <div class="executive-placeholder mx-auto">
+                                {{ executive.name|first }}
+                            </div>
 
                             <h3 class="executive-name">{{ executive.name }}</h3>
                             <p class="executive-title">{{ executive.title }}</p>
 
-                            {% if executive.linkedinId %}
+                            {% if executive.linkedinProfileUrl %}
                                 <a href="{{ executive.linkedinProfileUrl }}" target="_blank" class="linkedin-badge d-inline-block">
                                     <i class="fab fa-linkedin linkedin-icon"></i> LinkedIn Profile
-                                </a>
-                                {% if executive.connectionCount %}
-                                    <span class="connection-count badge bg-secondary">{{ executive.connectionCount }} connections</span>
-                                {% endif %}
-                            {% else %}
-                                <a href="{{ path('linkedin_auth', {'executiveId': executive.id}) }}" class="btn btn-sm btn-outline-primary mb-3">
-                                    <i class="fab fa-linkedin me-1"></i> Link LinkedIn Profile
                                 </a>
                             {% endif %}
 
@@ -183,75 +172,13 @@
                                 {% endif %}
                             </div>
 
-                            <a href="#" class="btn btn-outline-secondary w-100 mt-2" data-bs-toggle="modal" data-bs-target="#executiveModal{{ executive.id }}">
-                                View Full Profile
-                            </a>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Modal for executive details -->
-                <div class="modal fade" id="executiveModal{{ executive.id }}" tabindex="-1" aria-labelledby="executiveModalLabel{{ executive.id }}" aria-hidden="true">
-                    <div class="modal-dialog modal-lg">
-                        <div class="modal-content">
-                            <div class="modal-header">
-                                <h5 class="modal-title" id="executiveModalLabel{{ executive.id }}">{{ executive.name }}</h5>
-                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                            </div>
-                            <div class="modal-body">
-                                <div class="row">
-                                    <div class="col-md-4 text-center mb-4 mb-md-0">
-                                        {% if executive.profilePictureUrl %}
-                                            <img src="{{ executive.profilePictureUrl }}" alt="{{ executive.name }}" class="img-fluid rounded-circle mb-3" style="max-width: 150px;">
-                                        {% else %}
-                                            <div class="executive-placeholder mx-auto" style="width: 150px; height: 150px; font-size: 3.5rem;">
-                                                {{ executive.name|first }}
-                                            </div>
-                                        {% endif %}
-
-                                        <h3 class="mb-2">{{ executive.name }}</h3>
-                                        <p class="text-muted mb-3">{{ executive.title }}</p>
-
-                                        {% if executive.linkedinId %}
-                                            <div class="d-grid gap-2">
-                                                <a href="{{ executive.linkedinProfileUrl }}" target="_blank" class="btn btn-primary">
-                                                    <i class="fab fa-linkedin me-2"></i> View on LinkedIn
-                                                </a>
-                                                <a href="{{ path('linkedin_executive_connections', {'id': executive.id}) }}" class="btn btn-outline-primary">
-                                                    <i class="fas fa-project-diagram me-2"></i> Network Analysis
-                                                </a>
-                                            </div>
-                                        {% else %}
-                                            <a href="{{ path('linkedin_auth', {'executiveId': executive.id}) }}" class="btn btn-outline-primary">
-                                                <i class="fab fa-linkedin me-1"></i> Link LinkedIn Profile
-                                            </a>
-                                        {% endif %}
-                                    </div>
-                                    <div class="col-md-8">
-                                        <h5 class="section-heading">Biography</h5>
-                                        <p>{{ executive.biography|nl2br }}</p>
-
-                                        <div class="row mt-4">
-                                            <div class="col-md-6">
-                                                <h5 class="section-heading">Education</h5>
-                                                <p>{{ executive.education|default('Not specified') }}</p>
-
-                                                <h5 class="section-heading">Previous Experience</h5>
-                                                <p>{{ executive.previousCompanies|default('Not specified') }}</p>
-                                            </div>
-                                            <div class="col-md-6">
-                                                <h5 class="section-heading">Achievements</h5>
-                                                <p>{{ executive.achievements|default('Not specified')|nl2br }}</p>
-
-                                                <h5 class="section-heading">Leadership Style</h5>
-                                                <p>{{ executive.leadership|default('Not specified')|nl2br }}</p>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="modal-footer">
-                                <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+                            <div class="d-flex justify-content-between mt-2">
+                                <a href="{{ path('executive_profile_show', {'id': executive.id}) }}" class="btn btn-outline-secondary">
+                                    <i class="fas fa-eye me-1"></i> View
+                                </a>
+                                <a href="{{ path('executive_profile_edit', {'id': executive.id}) }}" class="btn btn-outline-primary">
+                                    <i class="fas fa-edit me-1"></i> Edit
+                                </a>
                             </div>
                         </div>
                     </div>
@@ -269,8 +196,8 @@
                     <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
                 <div class="modal-body">
-                    <p>This will generate sample executive profiles for {{ company.name }} with AI-enhanced information.</p>
-                    <p class="text-muted">Note: This will create profiles for typical C-suite positions (CEO, CFO, CTO, CMO).</p>
+                    <p>This will search for and generate executive profiles for {{ company.name }} using Hunter.io API and AI enhancement.</p>
+                    <p class="text-muted">Note: This will try to find the company's C-level executives (CEO, CFO, CTO, CMO) and create profiles with available information.</p>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>

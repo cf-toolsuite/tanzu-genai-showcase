@@ -39,6 +39,7 @@ class NewsApiClient extends AbstractApiClient
         if (!$to) $to = new \DateTime();
         $params = [
             'q' => $query,
+            'searchIn' => 'title',
             'from' => $from->format('Y-m-d'),
             'to' => $to->format('Y-m-d'),
             'language' => 'en',

@@ -9,6 +9,7 @@ doctrine:
         identity_generation_preferences:
             Doctrine\DBAL\Platforms\PostgreSQLPlatform: identity
         auto_mapping: true
+        report_fields_where_declared: true
         mappings:
             App:
                 is_bundle: false

@@ -34,11 +34,6 @@ class ExecutiveProfile
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $previousCompanies = null;
 
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
-    private ?string $achievements = null;
-
-    #[ORM\Column(type: Types::TEXT, nullable: true)]
-    private ?string $leadership = null;
 
     #[ORM\Column(type: 'datetime_immutable')]
     private ?\DateTimeImmutable $createdAt = null;
@@ -49,23 +44,14 @@ class ExecutiveProfile
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $linkedinProfileUrl = null;
 
-    #[ORM\Column(length: 100, nullable: true)]
-    private ?string $linkedinId = null;
 
-    #[ORM\Column(type: Types::JSON, nullable: true)]
-    private ?array $linkedinData = null;
-
-    #[ORM\Column(nullable: true)]
-    private ?int $connectionCount = null;
-
-    #[ORM\Column(type: Types::JSON, nullable: true)]
-    private ?array $skills = null;
 
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $lastSynced = null;
 
+
     #[ORM\Column(length: 255, nullable: true)]
-    private ?string $profilePictureUrl = null;
+    private ?string $email = null;
 
     public function __construct()
     {
@@ -149,29 +135,6 @@ class ExecutiveProfile
         return $this;
     }
 
-    public function getAchievements(): ?string
-    {
-        return $this->achievements;
-    }
-
-    public function setAchievements(?string $achievements): static
-    {
-        $this->achievements = $achievements;
-
-        return $this;
-    }
-
-    public function getLeadership(): ?string
-    {
-        return $this->leadership;
-    }
-
-    public function setLeadership(?string $leadership): static
-    {
-        $this->leadership = $leadership;
-
-        return $this;
-    }
 
     public function getCreatedAt(): ?\DateTimeImmutable
     {
@@ -209,53 +172,7 @@ class ExecutiveProfile
         return $this;
     }
 
-    public function getLinkedinId(): ?string
-    {
-        return $this->linkedinId;
-    }
 
-    public function setLinkedinId(?string $linkedinId): static
-    {
-        $this->linkedinId = $linkedinId;
-
-        return $this;
-    }
-
-    public function getLinkedinData(): ?array
-    {
-        return $this->linkedinData;
-    }
-
-    public function setLinkedinData(?array $linkedinData): static
-    {
-        $this->linkedinData = $linkedinData;
-
-        return $this;
-    }
-
-    public function getConnectionCount(): ?int
-    {
-        return $this->connectionCount;
-    }
-
-    public function setConnectionCount(?int $connectionCount): static
-    {
-        $this->connectionCount = $connectionCount;
-
-        return $this;
-    }
-
-    public function getSkills(): ?array
-    {
-        return $this->skills;
-    }
-
-    public function setSkills(?array $skills): static
-    {
-        $this->skills = $skills;
-
-        return $this;
-    }
 
     public function getLastSynced(): ?\DateTimeImmutable
     {
@@ -269,14 +186,15 @@ class ExecutiveProfile
         return $this;
     }
 
-    public function getProfilePictureUrl(): ?string
+
+    public function getEmail(): ?string
     {
-        return $this->profilePictureUrl;
+        return $this->email;
     }
 
-    public function setProfilePictureUrl(?string $profilePictureUrl): static
+    public function setEmail(?string $email): static
     {
-        $this->profilePictureUrl = $profilePictureUrl;
+        $this->email = $email;
 
         return $this;
     }

@@ -41,6 +41,39 @@ class SecFiling
 
     #[ORM\Column(type: 'json', nullable: true)]
     private array $exhibits = [];
+    
+    #[ORM\Column(length: 30, nullable: true)]
+    private ?string $accessionNumber = null;
+    
+    #[ORM\Column(length: 30, nullable: true)]
+    private ?string $fileNumber = null;
+    
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $textUrl = null;
+    
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $content = null;
+    
+    #[ORM\Column(type: 'json', nullable: true)]
+    private array $sections = [];
+    
+    #[ORM\Column(type: 'text', nullable: true)]
+    private ?string $summary = null;
+    
+    #[ORM\Column(type: 'json', nullable: true)]
+    private array $keyFindings = [];
+    
+    #[ORM\Column(type: 'boolean', options: ['default' => false])]
+    private bool $isProcessed = false;
+    
+    #[ORM\Column(type: 'datetime_immutable', nullable: true)]
+    private ?\DateTimeImmutable $updatedAt = null;
+    
+    #[ORM\Column(type: 'datetime', nullable: true)]
+    private ?\DateTimeInterface $reportDate = null;
+    
+    #[ORM\Column(length: 10, nullable: true)]
+    private ?string $fiscalYear = null;
 
     public function getId(): ?int
     {
@@ -156,6 +189,143 @@ class SecFiling
     public function setHtmlUrl(?string $htmlUrl): static
     {
         $this->htmlUrl = $htmlUrl;
+
+        return $this;
+    }
+    
+    public function getAccessionNumber(): ?string
+    {
+        return $this->accessionNumber;
+    }
+
+    public function setAccessionNumber(?string $accessionNumber): static
+    {
+        $this->accessionNumber = $accessionNumber;
+
+        return $this;
+    }
+
+    public function getFileNumber(): ?string
+    {
+        return $this->fileNumber;
+    }
+
+    public function setFileNumber(?string $fileNumber): static
+    {
+        $this->fileNumber = $fileNumber;
+
+        return $this;
+    }
+
+    public function getTextUrl(): ?string
+    {
+        return $this->textUrl;
+    }
+
+    public function setTextUrl(?string $textUrl): static
+    {
+        $this->textUrl = $textUrl;
+
+        return $this;
+    }
+
+    public function getContent(): ?string
+    {
+        return $this->content;
+    }
+
+    public function setContent(?string $content): static
+    {
+        $this->content = $content;
+
+        return $this;
+    }
+
+    public function getSections(): array
+    {
+        return $this->sections;
+    }
+
+    public function setSections(array $sections): static
+    {
+        $this->sections = $sections;
+
+        return $this;
+    }
+    
+    public function getSection(string $key): ?string
+    {
+        return $this->sections[$key] ?? null;
+    }
+
+    public function getSummary(): ?string
+    {
+        return $this->summary;
+    }
+
+    public function setSummary(?string $summary): static
+    {
+        $this->summary = $summary;
+
+        return $this;
+    }
+
+    public function getKeyFindings(): array
+    {
+        return $this->keyFindings;
+    }
+
+    public function setKeyFindings(array $keyFindings): static
+    {
+        $this->keyFindings = $keyFindings;
+
+        return $this;
+    }
+
+    public function getIsProcessed(): bool
+    {
+        return $this->isProcessed;
+    }
+
+    public function setIsProcessed(bool $isProcessed): static
+    {
+        $this->isProcessed = $isProcessed;
+
+        return $this;
+    }
+
+    public function getUpdatedAt(): ?\DateTimeImmutable
+    {
+        return $this->updatedAt;
+    }
+
+    public function setUpdatedAt(?\DateTimeImmutable $updatedAt): static
+    {
+        $this->updatedAt = $updatedAt;
+
+        return $this;
+    }
+
+    public function getReportDate(): ?\DateTimeInterface
+    {
+        return $this->reportDate;
+    }
+
+    public function setReportDate(?\DateTimeInterface $reportDate): static
+    {
+        $this->reportDate = $reportDate;
+
+        return $this;
+    }
+
+    public function getFiscalYear(): ?string
+    {
+        return $this->fiscalYear;
+    }
+
+    public function setFiscalYear(?string $fiscalYear): static
+    {
+        $this->fiscalYear = $fiscalYear;
 
         return $this;
     }
