@@ -51,6 +51,18 @@ class SecFiling
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $textUrl = null;
     
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $pdfUrl = null;
+    
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $xbrlUrl = null;
+    
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $ixbrlUrl = null;
+    
+    #[ORM\Column(length: 255, nullable: true)]
+    private ?string $filer = null;
+    
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $content = null;
     
@@ -328,5 +340,74 @@ class SecFiling
         $this->fiscalYear = $fiscalYear;
 
         return $this;
+    }
+    
+    public function getPdfUrl(): ?string
+    {
+        return $this->pdfUrl;
+    }
+
+    public function setPdfUrl(?string $pdfUrl): static
+    {
+        $this->pdfUrl = $pdfUrl;
+
+        return $this;
+    }
+    
+    public function getXbrlUrl(): ?string
+    {
+        return $this->xbrlUrl;
+    }
+
+    public function setXbrlUrl(?string $xbrlUrl): static
+    {
+        $this->xbrlUrl = $xbrlUrl;
+
+        return $this;
+    }
+    
+    public function getIxbrlUrl(): ?string
+    {
+        return $this->ixbrlUrl;
+    }
+
+    public function setIxbrlUrl(?string $ixbrlUrl): static
+    {
+        $this->ixbrlUrl = $ixbrlUrl;
+
+        return $this;
+    }
+    
+    public function getFiler(): ?string
+    {
+        return $this->filer;
+    }
+
+    public function setFiler(?string $filer): static
+    {
+        $this->filer = $filer;
+
+        return $this;
+    }
+    
+    /**
+     * Get a formatted title for display in listings
+     * 
+     * @return string A formatted title for the filing
+     */
+    public function getFormattedTitle(): string
+    {
+        // Concatenate fiscal year and form type if available
+        if ($this->company && $this->fiscalYear) {
+            return "FY{$this->fiscalYear} {$this->formType}";
+        }
+        
+        // Fallback to just the form type and date if no fiscal year
+        if ($this->filingDate) {
+            return "{$this->formType} " . $this->filingDate->format('Y');
+        }
+        
+        // Simple fallback
+        return $this->formType ?? 'SEC Filing';
     }
 }

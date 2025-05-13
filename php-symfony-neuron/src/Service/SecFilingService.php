@@ -77,16 +77,57 @@ class SecFilingService
             $filing = new SecFiling();
             $filing->setCompany($company);
             $filing->setFormType($report['formType']);
-            try { $filing->setFilingDate(new \DateTime($report['filingDate'])); } catch (\Exception $e) {}
-            if (isset($report['reportDate']) && $report['reportDate']) {
-                try { $filing->setReportDate(new \DateTime($report['reportDate'])); } catch (\Exception $e) {}
+            // Set the type field (required by the entity)
+            $filing->setType($report['formType'] ?? 'UNKNOWN');
+            try { 
+                $filing->setFilingDate(new \DateTime($report['filingDate'])); 
+            } catch (\Exception $e) {
+                $this->logger->warning('Error setting filing date: ' . $e->getMessage());
+                $filing->setFilingDate(new \DateTime()); // Set current date as fallback
             }
-            $filing->setAccessionNumber($report['accessionNumber']);
+            if (isset($report['reportDate']) && $report['reportDate']) {
+                try { 
+                    $filing->setReportDate(new \DateTime($report['reportDate'])); 
+                } catch (\Exception $e) {
+                    $this->logger->warning('Error setting report date: ' . $e->getMessage());
+                    // Fallback to filing date if available
+                    $filing->setReportDate($filing->getFilingDate());
+                }
+            }
+            // Check if accessionNumber is set, otherwise generate a fallback
+            if (!empty($report['accessionNumber'])) {
+                $filing->setAccessionNumber($report['accessionNumber']);
+            } else {
+                // Generate a fallback accession number using company ticker symbol and current timestamp
+                $ticker = str_replace('^', '', $company->getTickerSymbol() ?? 'UNKNOWN');
+                $fallbackAcc = $ticker . '-' . date('Ymd') . '-' . uniqid();
+                $filing->setAccessionNumber($fallbackAcc);
+                $this->logger->warning('Generated fallback accession number: ' . $fallbackAcc);
+            }
             $filing->setFileNumber($report['fileNumber'] ?? null);
-            $filing->setDescription($report['description'] ?? null);
-            $filing->setDocumentUrl($report['documentUrl']);
+            $filing->setDescription($report['description'] ?? $report['formDescription'] ?? $report['formType'] . ' filing for ' . $company->getName());
+            
+            // Use different URL fields with fallbacks
+            $filing->setDocumentUrl($report['documentUrl'] ?? $report['htmlUrl'] ?? $report['pdfUrl'] ?? '');
             $filing->setHtmlUrl($report['htmlUrl'] ?? null);
+            $filing->setUrl($report['documentUrl'] ?? $report['htmlUrl'] ?? $report['pdfUrl'] ?? '');
             $filing->setTextUrl($report['textUrl'] ?? null);
+            
+            // Set additional URL fields
+            $filing->setPdfUrl($report['pdfUrl'] ?? null);
+            $filing->setXbrlUrl($report['xbrlUrl'] ?? null);
+            $filing->setIxbrlUrl($report['ixbrlUrl'] ?? null);
+            
+            // Save additional data from enhanced API response
+            if (isset($report['filer'])) {
+                // Store filer info in dedicated field
+                $filing->setFiler($report['filer']);
+                
+                // Also include it in the description if not the company name
+                if ($report['filer'] !== $company->getName()) {
+                    $filing->setDescription($filing->getDescription() . ' (Filed by: ' . $report['filer'] . ')');
+                }
+            }
             $filingDate = $filing->getFilingDate();
             $fiscalYear = $filingDate ? $filingDate->format('Y') : date('Y');
             if ($filingDate && $filingDate->format('m') <= 3) {

@@ -43,43 +43,55 @@ class CompanyController extends AbstractController
     #[Route('/search', name: 'company_search', methods: ['GET', 'POST'])]
     public function search(Request $request, CompanyRepository $companyRepository, StockDataService $stockDataService): Response
     {
-        $form = $this->createForm(CompanySearchType::class);
-        $form->handleRequest($request);
-
         $dbResults = [];
         $apiResults = [];
-        $searchTerm = '';
+        $searchTerm = $request->query->get('searchTerm');
 
-        if ($form->isSubmitted() && $form->isValid()) {
-            $searchTerm = $form->get('searchTerm')->getData();
-
+        if ($searchTerm) {
             // First search in local database
             $dbResults = $companyRepository->findBySearchCriteria($searchTerm);
 
-            // If no local results or explicitly searching by ticker
-            if (count($dbResults) === 0 || preg_match('/^[A-Za-z]{1,5}$/', $searchTerm)) {
-                try {
-                    // Search in external APIs
-                    $apiResults = $stockDataService->searchCompanies($searchTerm);
+            // If we have any database results, collect their ticker symbols
+            $existingSymbols = [];
+            foreach ($dbResults as $company) {
+                $existingSymbols[] = $company->getTickerSymbol();
+            }
 
-                    // Filter out companies that already exist in DB results
-                    $existingSymbols = array_map(function($company) {
-                        return $company->getTickerSymbol();
-                    }, $dbResults);
+            // Get external API results
+            $apiResults = [];
+            try {
+                // Search in external APIs
+                $allApiResults = $stockDataService->searchCompanies($searchTerm);
 
-                    $apiResults = array_filter($apiResults, function($result) use ($existingSymbols) {
-                        return !in_array($result['symbol'], $existingSymbols);
-                    });
+                // Filter out companies that already exist in DB results by ticker symbol
+                $filteredApiResults = array_filter($allApiResults, function($result) use ($existingSymbols) {
+                    return !in_array($result['symbol'], $existingSymbols);
+                });
 
-                } catch (\Exception $e) {
-                    // Log error but continue with DB results
-                    $this->addFlash('warning', 'Could not fetch additional results from external sources');
+                // Group results by provider
+                $resultsByProvider = [];
+                foreach ($filteredApiResults as $result) {
+                    $provider = $result['provider'] ?? 'Unknown';
+                    if (!isset($resultsByProvider[$provider])) {
+                        $resultsByProvider[$provider] = [];
+                    }
+                    $resultsByProvider[$provider][] = $result;
                 }
+
+                // Take only the first result from each provider
+                foreach ($resultsByProvider as $provider => $results) {
+                    if (!empty($results)) {
+                        $apiResults[] = $results[0]; // Add only the first result from each provider
+                    }
+                }
+
+            } catch (\Exception $e) {
+                // Log error but continue with DB results
+                $this->addFlash('warning', 'Could not fetch additional results from external sources');
             }
         }
 
         return $this->render('company/search.html.twig', [
-            'form' => $form->createView(),
             'dbResults' => $dbResults,
             'apiResults' => $apiResults,
             'searchTerm' => $searchTerm,

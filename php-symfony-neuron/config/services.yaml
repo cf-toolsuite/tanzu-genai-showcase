@@ -46,6 +46,11 @@ services:
     App\Service\ApiClient\StockClientsFactory:
         arguments:
             $useMockData: '%env(default::bool:USE_MOCK_DATA)%'
+            
+    # SEC API Client Factory Configuration
+    App\Service\ApiClient\SecApiClientFactory:
+        arguments:
+            $useMockData: '%env(default::bool:USE_MOCK_DATA)%'
 
     # LLM Client Factory Configuration
     App\Service\LlmClientFactory:

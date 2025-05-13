@@ -162,7 +162,11 @@
                             <div class="d-flex justify-content-between align-items-center mb-2">
                                 <h5 class="card-title mb-0">
                                     <span class="filing-type-badge filing-type-{{ filing.formType }}">{{ filing.formType }}</span>
-                                    {{ filing.formattedTitle }}
+                                    {% if filing.fiscalYear %}
+                                        FY{{ filing.fiscalYear }} {{ filing.formType }}
+                                    {% else %}
+                                        {{ filing.formType }} {{ filing.filingDate|date('Y') }}
+                                    {% endif %}
                                 </h5>
                                 <div class="filing-date">
                                     Filed: {{ filing.filingDate|date('M d, Y') }}
@@ -171,6 +175,12 @@
 
                             <p class="card-text text-muted">
                                 {{ filing.description|default('Annual report for the fiscal year ended ' ~ filing.reportDate|date('M d, Y')) }}
+                                {% if filing.description is defined and filing.description and filing.description matches '/(Filed by:)/' %}
+                                {% else %}
+                                    {% if filing.filer is defined and filing.filer and filing.filer != company.name %}
+                                        (Filed by: {{ filing.filer }})
+                                    {% endif %}
+                                {% endif %}
                             </p>
 
                             <div class="d-flex justify-content-between mt-3">

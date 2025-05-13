@@ -42,7 +42,7 @@ class CompanyRepository extends ServiceEntityRepository
     /**
      * Find companies by name, ticker symbol, industry, or sector
      */
-    public function findBySearchCriteria(string $searchTerm): array
+    public function findBySearchCriteria(string $searchTerm, int $limit = 25): array
     {
         $queryBuilder = $this->createQueryBuilder('c')
             ->where('c.name LIKE :searchTerm')
@@ -50,7 +50,8 @@ class CompanyRepository extends ServiceEntityRepository
             ->orWhere('c.industry LIKE :searchTerm')
             ->orWhere('c.sector LIKE :searchTerm')
             ->setParameter('searchTerm', '%' . $searchTerm . '%')
-            ->orderBy('c.name', 'ASC');
+            ->orderBy('c.name', 'ASC')
+            ->setMaxResults($limit);
 
         return $queryBuilder->getQuery()->getResult();
     }

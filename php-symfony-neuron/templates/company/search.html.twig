@@ -10,11 +10,13 @@
             background-color: #f8f9fa;
             border-radius: 0.5rem;
             margin-bottom: 2rem;
+            box-shadow: 0 0.125rem 0.25rem rgba(0, 0, 0, 0.075);
         }
 
         .result-item {
             position: relative;
-            transition: transform 0.2s;
+            transition: transform 0.3s, box-shadow 0.3s;
+            margin-bottom: 0.5rem;
         }
 
         .result-item:hover {
@@ -24,12 +26,13 @@
         }
 
         .stock-badge {
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             padding: 0.25rem 0.5rem;
             border-radius: 0.25rem;
             background-color: #e9ecef;
             color: #495057;
             margin-right: 0.5rem;
+            font-weight: 500;
         }
 
         .sector-badge {
@@ -47,11 +50,66 @@
         .db-result {
             border-left: 5px solid #28a745;
         }
+        
+        .data-source-label {
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 0.35rem;
+            color: #6c757d;
+        }
+        
+        .search-results-count {
+            color: #6c757d;
+            font-size: 0.9rem;
+            margin-bottom: 1rem;
+        }
+        
+        .search-results-container {
+            overflow-y: auto;
+            margin-bottom: 2rem;
+            padding-right: 0.25rem;
+            padding-left: 0.25rem;
+            overflow-x: hidden; /* Prevent horizontal scrolling */
+            width: 100%;
+        }
+        
+        .actions-container {
+            position: sticky;
+            bottom: 0;
+            background-color: #fff;
+            padding: 1rem 0;
+            border-top: 1px solid #eee;
+            margin-top: 1rem;
+            z-index: 10;
+        }
+        
+        .card {
+            height: 100%; /* Ensure consistent height */
+            margin-bottom: 0.5rem;
+            box-sizing: border-box; /* Include padding in width calculation */
+            width: 100%; /* Full width of container */
+        }
+        
+        /* Fix for Bootstrap row margins causing horizontal scroll */
+        .row {
+            margin-left: 0;
+            margin-right: 0;
+        }
+        
+        .card-body {
+            padding: 1rem;
+        }
+        
+        .card-footer {
+            padding: 0.75rem 1rem;
+            background-color: rgba(0, 0, 0, 0.02);
+        }
     </style>
 {% endblock %}
 
 {% block body %}
-<div class="container mt-5">
+<div class="container-fluid mt-5 px-4">
     <nav aria-label="breadcrumb">
         <ol class="breadcrumb">
             <li class="breadcrumb-item"><a href="{{ path('company_index') }}">Companies</a></li>
@@ -71,45 +129,58 @@
     <div class="search-header">
         <h1 class="mb-4">Company Search</h1>
 
-        {{ form_start(form, {'attr': {'class': 'row g-3'}}) }}
-            <div class="col-md-9">
-                {{ form_widget(form.searchTerm, {'attr': {'class': 'form-control form-control-lg', 'placeholder': 'Enter company name or ticker symbol...'}}) }}
-                {{ form_errors(form.searchTerm) }}
+        <div class="mt-3">
+            <p>Use the search bar in the navigation menu to find companies by name or ticker symbol.</p>
+            <p>Results include both companies in our database and companies from external financial data providers.</p>
+            <div class="mt-4">
+                <div class="alert alert-info">
+                    <h5><i class="bi bi-info-circle"></i> Search Tips</h5>
+                    <ul class="mb-0 mt-2">
+                        <li>Search for a company name like "Apple" or "Microsoft"</li>
+                        <li>Search for a ticker symbol like "AAPL" or "MSFT"</li>
+                        <li>Results from our database show complete company information</li>
+                        <li>Results from external sources can be imported with a single click</li>
+                    </ul>
+                </div>
             </div>
-            <div class="col-md-3">
-                <button type="submit" class="btn btn-primary btn-lg w-100">
-                    <i class="fas fa-search me-2"></i> Search
-                </button>
+            
+            {% if not searchTerm %}
+            <div class="mt-4">
+                <a href="{{ path('company_new') }}" class="btn btn-outline-primary">
+                    <i class="bi bi-plus"></i> Add New Company
+                </a>
             </div>
-        {{ form_end(form) }}
-
-        <div class="mt-3 text-muted">
-            <small>
-                Search for companies by name or ticker symbol. Results include both companies in our database
-                and companies found via external financial data providers.
-            </small>
+            {% endif %}
         </div>
     </div>
 
     {% if searchTerm %}
         <h2 class="mb-4">Search Results for "{{ searchTerm }}"</h2>
+        
+        {% set totalResults = dbResults|length + apiResults|length %}
+        <div class="search-results-count">
+            Found {{ totalResults }} result{% if totalResults != 1 %}s{% endif %}: {{ dbResults|length }} from internal database and {{ apiResults|length }} from external sources
+        </div>
 
         {% if dbResults is empty and apiResults is empty %}
             <div class="alert alert-info">
                 <h4 class="alert-heading">No results found</h4>
                 <p>Your search for "{{ searchTerm }}" did not match any companies in our database or external sources.</p>
                 <hr>
-                <p class="mb-0">
-                    Try searching for a different company name or ticker symbol. You can also
-                    <a href="{{ path('company_new') }}" class="alert-link">add a new company</a> to the database.
-                </p>
+                    <div class="mt-5 text-center">
+                        <p>Try searching for a different company name or ticker symbol.</p>
+                        <a href="{{ path('company_new') }}" class="btn btn-outline-primary">
+                            <i class="bi bi-plus"></i> Add New Company
+                        </a>
+                    </div>
             </div>
         {% else %}
-            <div class="row row-cols-1 row-cols-md-2 g-4">
+            <div class="search-results-container">
+                <div class="row g-4">
                 <!-- Database Results -->
                 {% for company in dbResults %}
-                    <div class="col">
-                        <div class="card h-100 shadow-sm result-item db-result">
+                    <div class="col-md-6 col-lg-6 mb-4">
+                        <div class="card shadow-sm result-item db-result h-100">
                             <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <h5 class="card-title mb-0">{{ company.name }}</h5>
@@ -117,21 +188,21 @@
                                 </div>
 
                                 <div class="mb-3">
-                                    <span class="sector-badge">{{ company.sector }}</span>
+                                    <span class="sector-badge">{{ company.sector|default('Sector: Unknown') }}</span>
                                 </div>
 
                                 <p class="card-text text-muted">{{ company.description|length > 100 ? company.description|slice(0, 100) ~ '...' : company.description }}</p>
 
                                 <div class="mt-3">
                                     <small class="text-muted">
-                                        <i class="fas fa-building me-1"></i> {{ company.headquarters }}
+                                        <i class="bi bi-building"></i> {{ company.headquarters }}
                                     </small>
                                 </div>
                             </div>
                             <div class="card-footer bg-transparent">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <small class="text-success">
-                                        <i class="fas fa-database me-1"></i> In Database
+                                    <small class="text-success data-source-label">
+                                        <i class="bi bi-database-fill"></i> Data Source: Company Research Platform Database
                                     </small>
                                     <a href="{{ path('company_show', {'id': company.id}) }}" class="btn btn-sm btn-outline-primary">
                                         View Details
@@ -144,34 +215,30 @@
 
                 <!-- API Results -->
                 {% for result in apiResults %}
-                    <div class="col">
-                        <div class="card h-100 shadow-sm result-item api-result">
-                            <div class="card-body">
+                    <div class="col-md-6 col-lg-6 mb-4">
+                        <div class="card shadow-sm result-item api-result h-100">
+                                <div class="card-body">
                                 <div class="d-flex justify-content-between align-items-center mb-2">
                                     <h5 class="card-title mb-0">{{ result.name }}</h5>
                                     <span class="stock-badge">{{ result.symbol }}</span>
                                 </div>
-
-                                <div class="mb-3">
-                                    <span class="sector-badge">{{ result.sector|default('Unknown') }}</span>
-                                </div>
-
-                                <p class="card-text text-muted">{{ result.description|default('No description available.')|length > 100 ? result.description|slice(0, 100) ~ '...' : result.description|default('No description available.') }}</p>
-
-                                <div class="mt-3">
+                                
+                                {% if result.exchange is defined and result.exchange and result.exchange != 'Unknown' %}
+                                <div class="mt-3 mb-3">
                                     <small class="text-muted">
-                                        <i class="fas fa-building me-1"></i> {{ result.exchange|default('Unknown Exchange') }}
+                                        <i class="bi bi-building"></i> Exchange: {{ result.exchange }}
                                     </small>
                                 </div>
+                                {% endif %}
                             </div>
                             <div class="card-footer bg-transparent">
                                 <div class="d-flex justify-content-between align-items-center">
-                                    <small class="text-secondary">
-                                        <i class="fas fa-cloud me-1"></i> External Source
+                                    <small class="text-secondary data-source-label">
+                                        <i class="bi bi-cloud"></i> Data Source: {{ result.provider is defined ? result.provider : 'External API' }}
                                     </small>
                                     <form method="post" action="{{ path('company_import', {'symbol': result.symbol}) }}">
                                         <button type="submit" class="btn btn-sm btn-outline-success">
-                                            <i class="fas fa-download me-1"></i> Import
+                                            <i class="bi bi-download me-1"></i> Import to Database
                                         </button>
                                     </form>
                                 </div>
@@ -179,14 +246,22 @@
                         </div>
                     </div>
                 {% endfor %}
+                </div>
+            </div>
+            
+            <div class="actions-container">
+                <div class="d-flex justify-content-between align-items-center">
+                    <a href="{{ path('company_new') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-plus"></i> Add New Company
+                    </a>
+                    {% if searchTerm %}
+                    <div class="text-muted">
+                        <small>Can't find what you're looking for? Try using a different search term in the navigation bar.</small>
+                    </div>
+                    {% endif %}
+                </div>
             </div>
         {% endif %}
     {% endif %}
-
-    <div class="mt-5 mb-4">
-        <a href="{{ path('company_new') }}" class="btn btn-outline-primary">
-            <i class="fas fa-plus me-2"></i> Add New Company
-        </a>
-    </div>
 </div>
 {% endblock %}

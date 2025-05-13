@@ -28,8 +28,12 @@
             </ul>
 
             <form class="d-flex" role="search" action="{{ path('company_search') }}" method="get">
-                <input class="form-control me-2" type="search" name="searchTerm" placeholder="Search companies..." aria-label="Search">
-                <button class="btn btn-light" type="submit">Search</button>
+                <div class="input-group">
+                    <input class="form-control" type="search" name="searchTerm" placeholder="Search by name or ticker symbol..." aria-label="Search companies">
+                    <button class="btn btn-light" type="submit">
+                        <i class="bi bi-search"></i>
+                    </button>
+                </div>
             </form>
         </div>
     </div>

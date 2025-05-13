@@ -52,23 +52,35 @@ class StockDataService
     /**
      * Search for companies by name or ticker symbol
      */
-    public function searchCompanies(string $term): array
+    public function searchCompanies(string $term, int $limit = 25): array
     {
         $cacheKey = 'company_search_' . md5($term);
-        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($term) {
+        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($term, $limit) {
             $item->expiresAfter(3600); // Cache for 1 hour
             $this->logger->info('Cache miss for company search', ['term' => $term]);
             try {
                 $results = $this->alphaVantageClient->searchCompanies($term);
+                // Add provider information to each result
+                foreach ($results as &$result) {
+                    $result['provider'] = 'Alpha Vantage API';
+                }
                 if (empty($results)) {
                     $this->logger->info('No results from Alpha Vantage, trying Yahoo Finance');
                     $results = $this->yahooFinanceClient->searchCompanies($term);
+                    // Add provider information to each result
+                    foreach ($results as &$result) {
+                        $result['provider'] = 'Yahoo Finance API';
+                    }
                 }
                 return $results;
             } catch (\Exception $e) {
                 $this->logger->error('Error searching companies: ' . $e->getMessage());
                 try {
                     $results = $this->yahooFinanceClient->searchCompanies($term);
+                    // Add provider information to each result
+                    foreach ($results as &$result) {
+                        $result['provider'] = 'Yahoo Finance API';
+                    }
                     return $results;
                 } catch (\Exception $e2) {
                     $this->logger->error('Error with fallback search: ' . $e2->getMessage());

@@ -44,7 +44,8 @@ class KaleidoscopeApiClient extends AbstractApiClient
     protected function getAuthParams(): array
     {
         return [
-            'key' => $this->apiKey
+            'key' => $this->apiKey,
+            'content' => 'sec'  // Required parameter
         ];
     }
 
@@ -119,11 +120,14 @@ class KaleidoscopeApiClient extends AbstractApiClient
             'companyName' => $filing['Company Name'] ?? '',
             'formType' => $filing['Form'] ?? '',
             'formDescription' => $filing['Form_Desc'] ?? '',
+            'formGroup' => $filing['Form_Group'] ?? '',  // Added form group
+            'filer' => $filing['Filer'] ?? '',  // Added filer
             'filingDate' => $date,
             'reportDate' => $date, // Use same date as filing date if report date not provided
             'accessionNumber' => $filing['acc'] ?? '',
             'fileNumber' => '', // Not provided by Kaleidoscope
             'htmlUrl' => $filing['html'] ?? '',
+            'ixbrlUrl' => $filing['ixbrl'] ?? '',  // Added IXBRL URL
             'pdfUrl' => $filing['pdf'] ?? '',
             'textUrl' => '', // Kaleidoscope doesn't provide a direct text URL
             'wordUrl' => $filing['word'] ?? '',
@@ -131,10 +135,37 @@ class KaleidoscopeApiClient extends AbstractApiClient
             'xlsUrl' => $filing['xls'] ?? '',
             'ticker' => $filing['ticker'] ?? '',
             'description' => $filing['Form_Desc'] ?? '',
-            'fiscalYear' => $date ? date('Y', strtotime($date)) : ''
+            'fiscalYear' => $date ? date('Y', strtotime($date)) : '',
+            // Add a documentUrl field using the HTML URL as fallback
+            'documentUrl' => $filing['html'] ?? $filing['pdf'] ?? ''
         ];
     }
 
+    /**
+     * Get paginated SEC filings with complete metadata
+     * 
+     * @param string $ticker Stock ticker symbol
+     * @param int $limit Maximum number of results to return
+     * @param int $offset Pagination offset
+     * @return array Array with 'data', 'total', 'start', and 'end' keys
+     */
+    public function searchFilingsWithPagination(string $ticker, int $limit = 10, int $offset = 0): array
+    {
+        $params = [
+            'limit' => $limit,
+            'start' => $offset
+        ];
+        
+        $result = $this->searchFilings($ticker, $params);
+        
+        return [
+            'data' => array_map([$this, 'normalizeFilingData'], $result['data'] ?? []),
+            'total' => $result['total'] ?? 0,
+            'start' => $result['start'] ?? 0,
+            'end' => $result['end'] ?? 0
+        ];
+    }
+    
     /**
      * Get 10-K reports for a company
      *
@@ -144,8 +175,26 @@ class KaleidoscopeApiClient extends AbstractApiClient
      */
     public function get10KReports(string $ticker, int $limit = 5): array
     {
-        $filings = $this->searchFilings($ticker);
-        return $this->filterFilingsByType($filings, '10-K', $limit);
+        // Using the API's built-in form filtering instead of client-side filtering
+        $params = [
+            'form' => '10-K',
+            'limit' => $limit
+        ];
+        
+        try {
+            $response = $this->searchFilings($ticker, $params);
+            if (empty($response['data'])) {
+                return [];
+            }
+            
+            // Still normalize the data to our expected format
+            return array_map([$this, 'normalizeFilingData'], array_slice($response['data'], 0, $limit));
+        } catch (\Exception $e) {
+            if ($this->logger) {
+                $this->logger->error("Failed to fetch 10-K reports: " . $e->getMessage());
+            }
+            return [];
+        }
     }
 
     /**
