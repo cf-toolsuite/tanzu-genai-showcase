@@ -1,0 +1,196 @@
+<style>
+    .stock-chart-container {
+        height: 500px;
+        position: relative;
+        margin-bottom: 30px;
+    }
+
+    .time-range-selector {
+        display: flex;
+        justify-content: center;
+        margin-bottom: 20px;
+    }
+
+    .time-range-selector .btn {
+        margin: 0 5px;
+        padding: 5px 15px;
+        border-radius: 20px;
+    }
+
+    .time-range-selector .btn.active { /* This style might be better handled by JS adding .btn-primary directly */
+        /* background-color: #007bff; */ /* Let Bootstrap .btn-primary handle this */
+        /* color: white; */
+    }
+
+    .stock-info {
+        display: flex;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .current-price {
+        font-size: 2rem;
+        font-weight: bold;
+        margin-right: 15px;
+    }
+
+    .price-change {
+        font-size: 1.2rem;
+        padding: 5px 10px;
+        border-radius: 5px;
+    }
+
+    .price-change.positive {
+        background-color: rgba(40, 167, 69, 0.2);
+        color: #28a745;
+    }
+
+    .price-change.negative {
+        background-color: rgba(220, 53, 69, 0.2);
+        color: #dc3545;
+    }
+
+    .chart-overlay { /* This seems unused, consider removing if chartOverlayInfo replaces it */
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        z-index: 10;
+    }
+
+    .chart-tooltip { /* This styles the Chart.js default tooltip, which is overridden */
+        /* background-color: rgba(255, 255, 255, 0.9); */
+        /* border: 1px solid #ddd; */
+        /* padding: 10px; */
+        /* border-radius: 5px; */
+        /* box-shadow: 0 0 10px rgba(0, 0, 0, 0.1); */
+    }
+
+    .interval-selector {
+        /* margin-bottom: 20px; */ /* Adjusted since it's now part of chart-controls */
+    }
+
+    .last-updated {
+        font-size: 0.8rem;
+        color: #6c757d;
+        margin-top: 10px; /* Or align-items: center on parent if preferred */
+    }
+
+    .refresh-btn {
+        margin-left: 10px;
+    }
+
+    .chart-loading {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background-color: rgba(255, 255, 255, 0.7);
+        display: flex; /* JS will toggle this to flex/none */
+        justify-content: center;
+        align-items: center;
+        z-index: 20;
+        display: none; /* Initially hidden */
+    }
+
+    /* New styles for enhanced chart */
+    .chart-controls {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 15px;
+    }
+
+    .chart-type-selector {
+        display: flex;
+        align-items: center;
+    }
+
+    .chart-type-selector .btn {
+        padding: 0.25rem 0.5rem;
+        font-size: 0.875rem;
+    }
+
+    .chart-indicators { /* This class seems unused in the provided HTML */
+        display: flex;
+        align-items: center;
+    }
+
+    .chart-indicators .dropdown { /* This class seems unused */
+        margin-left: 10px;
+    }
+
+    .volume-container {
+        height: 100px; /* Canvas for volume chart will take this height */
+        margin-top: 10px;
+        position: relative; /* For potential absolute positioned elements within if needed */
+    }
+
+    .crosshair {
+        position: absolute;
+        pointer-events: none;
+        z-index: 5;
+        display: none;
+    }
+
+    .crosshair-vertical {
+        top: 0;
+        bottom: 0;
+        width: 1px;
+        background-color: rgba(0, 0, 0, 0.3);
+    }
+
+    .crosshair-horizontal {
+        left: 0;
+        right: 0;
+        height: 1px;
+        background-color: rgba(0, 0, 0, 0.3);
+    }
+
+    .price-label {
+        position: absolute;
+        /* right: 0; Will be dynamically set by JS relative to chartArea */
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-size: 0.8rem;
+        transform: translateY(-50%);
+        display: none;
+    }
+
+    .date-label {
+        position: absolute;
+        /* bottom: -25px; Will be dynamically set by JS relative to chartArea */
+        background-color: rgba(0, 0, 0, 0.7);
+        color: white;
+        padding: 2px 5px;
+        border-radius: 3px;
+        font-size: 0.8rem;
+        transform: translateX(-50%);
+        display: none;
+    }
+
+    .chart-overlay-info {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background-color: rgba(255, 255, 255, 0.8);
+        padding: 10px;
+        border-radius: 5px;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        z-index: 10;
+        display: none;
+        font-size: 0.85rem;
+    }
+    .chart-overlay-info div {
+        margin-bottom: 3px;
+    }
+    .chart-overlay-info div span {
+        font-weight: normal;
+    }
+</style>

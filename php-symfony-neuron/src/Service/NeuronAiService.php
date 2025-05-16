@@ -519,7 +519,7 @@ class NeuronAiService
      * @param string|null $competitorName The name of the competitor
      * @return array The generated competitive analysis
      */
-    public function generateCompetitorAnalysis($company, string $competitorName = null): array
+    public function generateCompetitorAnalysis($company, ?string $competitorName = null): array
     {
         $companyName = is_object($company) && method_exists($company, 'getName') ? $company->getName() : (string)$company;
         

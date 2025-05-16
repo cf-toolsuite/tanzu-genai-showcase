@@ -1,392 +1,49 @@
 {% extends 'base.html.twig' %}
 
-{% block title %}{{ company.name }} - Stock Price History{% endblock %}
+{% block title %}{{ company.name }} - Stock Prices{% endblock %}
 
 {% block stylesheets %}
     {{ parent() }}
-    <style>
-        .price-chart-container {
-            width: 100%;
-            height: 400px;
-            margin-bottom: 2rem;
-        }
+    {% include 'company/_stock_chart_styles.html.twig' %}
+{% endblock %}
 
-        .metrics-card {
-            height: 100%;
-        }
+{% block body %}
+    <div class="container mt-5">
+        {% include 'company/_stock_info_header.html.twig' with {
+            'company': company,
+            'quote': quote,
+            'lastUpdated': lastUpdated,
+            'interval': interval,
+            'timeRange': timeRange
+        } %}
 
-        .table-responsive {
-            max-height: 500px;
-            overflow-y: auto;
-        }
+        {% include 'company/_stock_chart_controls.html.twig' with {
+            'company': company,
+            'interval': interval,
+            'timeRange': timeRange
+        } %}
 
-        .positive-change {
-            color: #28a745;
-        }
+        {% include 'company/_stock_chart_display.html.twig' %}
 
-        .negative-change {
-            color: #dc3545;
-        }
-
-        .period-selector .btn {
-            margin-right: 0.25rem;
-        }
-
-        .chart-controls {
-            margin-bottom: 1rem;
-        }
-    </style>
+        {% include 'company/_stock_data_tables.html.twig' with {
+            'quote': quote
+        } %}
+    </div>
 {% endblock %}
 
 {% block javascripts %}
     {{ parent() }}
+    {# Consider moving Chart.js and Luxon to base.html.twig if used on multiple pages #}
+    {# Or use Encore to manage JS assets #}
     <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
-    <script>
-        document.addEventListener('DOMContentLoaded', function() {
-            // Price chart
-            const priceChartCtx = document.getElementById('priceChart').getContext('2d');
+    <script src="https://cdn.jsdelivr.net/npm/luxon@3.3.0/build/global/luxon.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-luxon@1.3.1/dist/chartjs-adapter-luxon.min.js"></script>
 
-            // Convert dates to JavaScript dates
-            const dates = {{ chartData.dates|json_encode|raw }};
-
-            // Price dataset
-            const closePrices = {{ chartData.prices.close|json_encode|raw }};
-            const openPrices = {{ chartData.prices.open|json_encode|raw }};
-            const highPrices = {{ chartData.prices.high|json_encode|raw }};
-            const lowPrices = {{ chartData.prices.low|json_encode|raw }};
-
-            // Create gradient for price chart background
-            const priceGradient = priceChartCtx.createLinearGradient(0, 0, 0, 400);
-            priceGradient.addColorStop(0, 'rgba(0, 123, 255, 0.2)');
-            priceGradient.addColorStop(1, 'rgba(0, 123, 255, 0)');
-
-            // Create the price chart
-            const priceChart = new Chart(priceChartCtx, {
-                type: 'line',
-                data: {
-                    labels: dates,
-                    datasets: [{
-                        label: 'Close Price',
-                        data: closePrices,
-                        borderColor: 'rgba(0, 123, 255, 1)',
-                        backgroundColor: priceGradient,
-                        borderWidth: 2,
-                        pointRadius: 2,
-                        pointHoverRadius: 5,
-                        fill: true,
-                        tension: 0.1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    interaction: {
-                        mode: 'index',
-                        intersect: false,
-                    },
-                    plugins: {
-                        tooltip: {
-                            callbacks: {
-                                footer: function(tooltipItems) {
-                                    const index = tooltipItems[0].dataIndex;
-                                    return [
-                                        'Open: $' + openPrices[index].toFixed(2),
-                                        'High: $' + highPrices[index].toFixed(2),
-                                        'Low: $' + lowPrices[index].toFixed(2),
-                                        'Close: $' + closePrices[index].toFixed(2)
-                                    ];
-                                }
-                            }
-                        },
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        }
-                    },
-                    scales: {
-                        x: {
-                            ticks: {
-                                maxTicksLimit: 10
-                            }
-                        },
-                        y: {
-                            beginAtZero: false,
-                            ticks: {
-                                callback: function(value) {
-                                    return '$' + value.toFixed(2);
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-
-            // Volume chart
-            const volumeChartCtx = document.getElementById('volumeChart').getContext('2d');
-            const volumes = {{ chartData.volumes|json_encode|raw }};
-
-            // Create the volume chart
-            const volumeChart = new Chart(volumeChartCtx, {
-                type: 'bar',
-                data: {
-                    labels: dates,
-                    datasets: [{
-                        label: 'Volume',
-                        data: volumes,
-                        backgroundColor: 'rgba(108, 117, 125, 0.5)',
-                        borderColor: 'rgba(108, 117, 125, 1)',
-                        borderWidth: 1
-                    }]
-                },
-                options: {
-                    responsive: true,
-                    maintainAspectRatio: false,
-                    plugins: {
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        }
-                    },
-                    scales: {
-                        x: {
-                            ticks: {
-                                maxTicksLimit: 10
-                            }
-                        },
-                        y: {
-                            beginAtZero: true,
-                            ticks: {
-                                callback: function(value) {
-                                    return value >= 1000000
-                                        ? (value / 1000000).toFixed(1) + 'M'
-                                        : (value / 1000).toFixed(0) + 'K';
-                                }
-                            }
-                        }
-                    }
-                }
-            });
-
-            // Handle period selection
-            document.querySelectorAll('.period-select').forEach(button => {
-                button.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const period = this.dataset.period;
-                    const interval = this.dataset.interval || '{{ interval }}';
-                    window.location.href = `{{ path('company_stockprices', {'id': company.id}) }}?period=${period}&interval=${interval}`;
-                });
-            });
-
-            // Handle interval selection
-            document.querySelectorAll('.interval-select').forEach(button => {
-                button.addEventListener('click', function(e) {
-                    e.preventDefault();
-                    const interval = this.dataset.interval;
-                    window.location.href = `{{ path('company_stockprices', {'id': company.id}) }}?period={{ period }}&interval=${interval}`;
-                });
-            });
-        });
-    </script>
-{% endblock %}
-
-{% block body %}
-<div class="container mt-5">
-    <nav aria-label="breadcrumb">
-        <ol class="breadcrumb">
-            <li class="breadcrumb-item"><a href="{{ path('company_index') }}">Companies</a></li>
-            <li class="breadcrumb-item"><a href="{{ path('company_show', {'id': company.id}) }}">{{ company.name }}</a></li>
-            <li class="breadcrumb-item active" aria-current="page">Stock Prices</li>
-        </ol>
-    </nav>
-
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <h1>{{ company.name }} ({{ company.tickerSymbol }})</h1>
-
-    {% if metrics is defined and metrics is not empty and metrics.latestPrice is defined %}
-        <div class="price-display">
-            <h2 class="mb-0">${{ metrics.latestPrice|number_format(2) }}</h2>
-            <div class="{% if metrics.latestChangePercent is defined and metrics.latestChangePercent > 0 %}positive-change{% else %}negative-change{% endif %}">
-                {% if metrics.latestChange is defined %}
-                    {{ metrics.latestChange > 0 ? '+' : '' }}{{ metrics.latestChange|number_format(2) }}
-                {% endif %}
-                {% if metrics.latestChangePercent is defined %}
-                    ({{ metrics.latestChangePercent > 0 ? '+' : '' }}{{ metrics.latestChangePercent|number_format(2) }}%)
-                {% endif %}
-            </div>
-            {% if metrics.latestDate is defined %}
-                <small class="text-muted">As of {{ metrics.latestDate }}</small>
-            {% endif %}
-        </div>
-    {% endif %}
-    </div>
-
-    <div class="chart-controls">
-        <div class="card shadow-sm">
-            <div class="card-body">
-                <div class="row">
-                    <div class="col-md-6">
-                        <h5>Time Period</h5>
-                        <div class="period-selector mb-3">
-                            <button class="btn btn-sm {% if period == '1m' %}btn-primary{% else %}btn-outline-primary{% endif %} period-select" data-period="1m">1M</button>
-                            <button class="btn btn-sm {% if period == '3m' %}btn-primary{% else %}btn-outline-primary{% endif %} period-select" data-period="3m">3M</button>
-                            <button class="btn btn-sm {% if period == '6m' %}btn-primary{% else %}btn-outline-primary{% endif %} period-select" data-period="6m">6M</button>
-                            <button class="btn btn-sm {% if period == '1y' %}btn-primary{% else %}btn-outline-primary{% endif %} period-select" data-period="1y">1Y</button>
-                            <button class="btn btn-sm {% if period == '5y' %}btn-primary{% else %}btn-outline-primary{% endif %} period-select" data-period="5y">5Y</button>
-                        </div>
-                    </div>
-                    <div class="col-md-6">
-                        <h5>Interval</h5>
-                        <div class="interval-selector">
-                            <button class="btn btn-sm {% if interval == 'daily' %}btn-primary{% else %}btn-outline-primary{% endif %} interval-select" data-interval="daily">Daily</button>
-                            <button class="btn btn-sm {% if interval == 'weekly' %}btn-primary{% else %}btn-outline-primary{% endif %} interval-select" data-interval="weekly">Weekly</button>
-                            <button class="btn btn-sm {% if interval == 'monthly' %}btn-primary{% else %}btn-outline-primary{% endif %} interval-select" data-interval="monthly">Monthly</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    <h5 class="mb-0">Price History</h5>
-                </div>
-                <div class="card-body">
-                    <div class="price-chart-container">
-                        <canvas id="priceChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row mb-4">
-        <div class="col-12">
-            <div class="card shadow-sm">
-                <div class="card-header">
-                    <h5 class="mb-0">Volume</h5>
-                </div>
-                <div class="card-body">
-                    <div class="price-chart-container" style="height: 200px;">
-                        <canvas id="volumeChart"></canvas>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div class="row mb-4">
-        {% if metrics is defined %}
-            <div class="col-md-4 mb-4">
-                <div class="card shadow-sm metrics-card">
-                    <div class="card-header">
-                        <h5 class="mb-0">Price Metrics</h5>
-                    </div>
-                    <div class="card-body">
-                        <table class="table table-sm">
-                            {% if metrics.latestPrice is defined %}
-                            <tr>
-                                <th>Latest Price</th>
-                                <td>${{ metrics.latestPrice|number_format(2) }}</td>
-                            </tr>
-                            {% endif %}
-
-                            {% if metrics.periodHigh is defined %}
-                            <tr>
-                                <th>Period High</th>
-                                <td>${{ metrics.periodHigh|number_format(2) }}</td>
-                            </tr>
-                            {% endif %}
-
-                            {% if metrics.periodLow is defined %}
-                            <tr>
-                                <th>Period Low</th>
-                                <td>${{ metrics.periodLow|number_format(2) }}</td>
-                            </tr>
-                            {% endif %}
-
-                            {% if metrics.ma50 is defined %}
-                            <tr>
-                                <th>50-Day MA</th>
-                                <td>${{ metrics.ma50|number_format(2) }}</td>
-                            </tr>
-                            {% endif %}
-
-                            {% if metrics.ma200 is defined %}
-                            <tr>
-                                <th>200-Day MA</th>
-                                <td>${{ metrics.ma200|number_format(2) }}</td>
-                            </tr>
-                            {% endif %}
-
-                            {% if metrics.avgVolume is defined %}
-                            <tr>
-                                <th>Avg. Volume</th>
-                                <td>{{ (metrics.avgVolume / 1000000)|number_format(2) }}M</td>
-                            </tr>
-                            {% endif %}
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <div class="col-md-8 mb-4">
-                <div class="card shadow-sm">
-                    <div class="card-header">
-                        <h5 class="mb-0">Price Data</h5>
-                    </div>
-                    <div class="card-body p-0">
-                        <div class="table-responsive">
-                            <table class="table table-sm table-hover mb-0">
-                                <thead>
-                                    <tr>
-                                        <th>Date</th>
-                                        <th>Open</th>
-                                        <th>High</th>
-                                        <th>Low</th>
-                                        <th>Close</th>
-                                        <th>Change</th>
-                                        <th>Volume</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {% for price in prices|slice(0, 50) %}
-                                        <tr>
-                                            <td>{{ price.date|date('Y-m-d') }}</td>
-                                            <td>${{ price.open|number_format(2) }}</td>
-                                            <td>${{ price.high|number_format(2) }}</td>
-                                            <td>${{ price.low|number_format(2) }}</td>
-                                            <td>${{ price.close|number_format(2) }}</td>
-                                            <td class="{% if price.changePercent > 0 %}positive-change{% elseif price.changePercent < 0 %}negative-change{% endif %}">
-                                                {{ price.changePercent > 0 ? '+' : '' }}{{ price.changePercent|number_format(2) }}%
-                                            </td>
-                                            <td>{{ (price.volume / 1000000)|number_format(2) }}M</td>
-                                        </tr>
-                                    {% endfor %}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        {% else %}
-            <div class="col-12">
-                <div class="alert alert-info">
-                    No price data available for this company. Try importing data from the external APIs.
-                </div>
-            </div>
-        {% endif %}
-    </div>
-
-    <div class="d-flex justify-content-between mb-4">
-        <a href="{{ path('company_show', {'id': company.id}) }}" class="btn btn-secondary">
-            <i class="fas fa-arrow-left"></i> Back to Company
-        </a>
-        <a href="{{ path('company_financial', {'id': company.id}) }}" class="btn btn-primary">
-            View Financial Data <i class="fas fa-arrow-right"></i>
-        </a>
-    </div>
-</div>
+    {% include 'company/_stock_chart_js.html.twig' with {
+        'prices': prices,
+        'company': company,
+        'interval': interval,
+        'timeRange': timeRange,
+        'enableRealTimeUpdates': enableRealTimeUpdates
+    } %}
 {% endblock %}

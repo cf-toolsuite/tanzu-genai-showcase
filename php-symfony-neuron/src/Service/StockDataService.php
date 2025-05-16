@@ -542,11 +542,23 @@ class StockDataService
                     $this->logger->info('No valid historical price data from Alpha Vantage, trying Yahoo Finance');
                     $prices = $this->yahooFinanceClient->getHistoricalPrices($symbol, $interval, $outputSize);
                 }
+                
+                // Ensure consistent date ordering (oldest to newest) for all interval types
+                usort($prices, function($a, $b) {
+                    return strtotime($a['date']) - strtotime($b['date']);
+                });
+                
                 return $prices;
             } catch (\Exception $e) {
                 $this->logger->error('Error getting historical prices: ' . $e->getMessage());
                 try {
                     $prices = $this->yahooFinanceClient->getHistoricalPrices($symbol, $interval, $outputSize);
+                    
+                    // Ensure consistent date ordering (oldest to newest) for all interval types
+                    usort($prices, function($a, $b) {
+                        return strtotime($a['date']) - strtotime($b['date']);
+                    });
+                    
                     return $prices;
                 } catch (\Exception $e2) {
                     $this->logger->error('Error with fallback prices: ' . $e2->getMessage());

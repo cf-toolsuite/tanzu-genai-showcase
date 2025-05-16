@@ -1,0 +1,77 @@
+{# Required variables: quote #}
+<div class="row">
+    <div class="col-md-6 mb-3 mb-md-0"> {# Added mb-3 for spacing on small screens #}
+        <div class="card h-100"> {# Added h-100 for equal height cards #}
+            <div class="card-header">
+                <h5 class="card-title mb-0">Stock Information</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm table-borderless"> {# Added table-borderless for cleaner look #}
+                    <tbody>
+                        <tr>
+                            <th>Previous Close</th>
+                            <td>${{ quote.previousClose|number_format(2, '.', ',') }}</td>
+                        </tr>
+                        <tr>
+                            <th>Open</th>
+                            <td>${{ quote.open|number_format(2, '.', ',') }}</td>
+                        </tr>
+                        <tr>
+                            <th>Day's Range</th>
+                            <td>${{ quote.low|number_format(2, '.', ',') }} - ${{ quote.high|number_format(2, '.', ',') }}</td>
+                        </tr>
+                        <tr>
+                            <th>52 Week Range</th>
+                            <td>${{ quote.fiftyTwoWeekLow|default(0)|number_format(2, '.', ',') }} - ${{ quote.fiftyTwoWeekHigh|default(0)|number_format(2, '.', ',') }}</td>
+                        </tr>
+                        <tr>
+                            <th>Volume</th>
+                            <td>{{ quote.volume|number_format(0, '.', ',') }}</td>
+                        </tr>
+                        <tr>
+                            <th>Avg. Volume</th>
+                            <td>{{ quote.averageVolume|default(0)|number_format(0, '.', ',') }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-6">
+        <div class="card h-100"> {# Added h-100 for equal height cards #}
+            <div class="card-header">
+                <h5 class="card-title mb-0">Market Data</h5>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm table-borderless"> {# Added table-borderless for cleaner look #}
+                    <tbody>
+                        <tr>
+                            <th>Market Cap</th>
+                            <td>{{ (quote.marketCap / 1000000000)|default(0)|number_format(2, '.', ',') }} B</td>
+                        </tr>
+                        <tr>
+                            <th>P/E Ratio</th>
+                            <td>{{ quote.peRatio|default('N/A')|number_format(2, '.', ',') }}</td>
+                        </tr>
+                        <tr>
+                            <th>EPS (TTM)</th>
+                            <td>${{ quote.eps|default('N/A')|number_format(2, '.', ',') }}</td>
+                        </tr>
+                        <tr>
+                            <th>Dividend Yield</th>
+                            <td>{{ quote.dividendYield|default('N/A')|number_format(2, '.', ',') }}%</td>
+                        </tr>
+                        <tr>
+                            <th>Beta</th>
+                            <td>{{ quote.beta|default('N/A')|number_format(2, '.', ',') }}</td>
+                        </tr>
+                        <tr>
+                            <th>Shares Outstanding</th>
+                            <td>{{ (quote.sharesOutstanding / 1000000)|default('N/A')|number_format(2, '.', ',') }} M</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>

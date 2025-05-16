@@ -1,0 +1,730 @@
+{#
+  Required variables:
+  - prices (array)
+  - company (object with id, tickerSymbol)
+  - interval (string)
+  - timeRange (string)
+  - enableRealTimeUpdates (boolean)
+#}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    let priceData = {{ prices|json_encode|raw }};
+    const companyId = {{ company.id }};
+    const companySymbol = "{{ company.tickerSymbol|e('js') }}"; // Ensure ticker is JS escaped
+    let currentInterval = "{{ interval|e('js') }}";
+    let currentTimeRange = "{{ timeRange|e('js') }}";
+    const enableRealTimeUpdates = {{ enableRealTimeUpdates ? 'true' : 'false' }};
+
+    // ... (rest of your JavaScript code from the original file, starting from the priceData.length check) ...
+    // Make sure to include the ENTIRE JS logic here.
+    // For brevity, I'm not pasting all 400+ lines again, but you should.
+
+    // Example of where to start copying from your previous JS:
+    if (!Array.isArray(priceData) || priceData.length === 0) {
+        console.warn("No price data available to display chart.");
+        // Optionally display a message to the user on the chart canvas
+        const chartContainer = document.querySelector('.stock-chart-container');
+        if (chartContainer) {
+            const noDataMsg = document.createElement('p');
+            noDataMsg.className = 'text-center m-5';
+            noDataMsg.textContent = 'No historical price data available for the selected range.';
+            // Clear previous content (like loading spinner) before adding message
+            while (chartContainer.firstChild) {
+                chartContainer.removeChild(chartContainer.firstChild);
+            }
+            chartContainer.appendChild(noDataMsg);
+
+             // Ensure main chart canvas is hidden or removed if it was created before this check
+            const stockPriceCanvas = document.getElementById('stockPriceChart');
+            if (stockPriceCanvas) stockPriceCanvas.style.display = 'none';
+        }
+        // Hide volume chart if main chart has no data
+        const volumeCanvas = document.getElementById('volumeChart');
+        if (volumeCanvas) volumeCanvas.style.display = 'none';
+        return; // Exit if no data
+    }
+
+    priceData.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+    let labels = priceData.map(item => item.date);
+    let prices = priceData.map(item => item.close);
+    let volumes = priceData.map(item => item.volume);
+    // This ohlcData is used by candlestick/OHLC plugin and tooltips
+    let ohlcData = priceData.map(item => ({
+        x: new Date(item.date).getTime(), // For time scale if ever used
+        date: item.date, // For category scale and easier reference
+        o: item.open, h: item.high, l: item.low, c: item.close, v: item.volume
+    }));
+
+
+    let startPrice = prices[0];
+    let endPrice = prices[prices.length - 1];
+    let percentChange = ((endPrice - startPrice) / startPrice) * 100;
+    if (isNaN(percentChange) || !isFinite(percentChange)) percentChange = 0;
+
+
+    let lineColor = percentChange >= 0 ? '#28a745' : '#dc3545';
+    let fillColor = percentChange >= 0 ? 'rgba(40, 167, 69, 0.1)' : 'rgba(220, 53, 69, 0.1)';
+    let volumeBarColor = percentChange >= 0 ? 'rgba(40, 167, 69, 0.5)' : 'rgba(220, 53, 69, 0.5)';
+
+
+    const ctx = document.getElementById('stockPriceChart').getContext('2d');
+    let stockChart = new Chart(ctx, { // Use let for stockChart as it will be reassigned
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: companySymbol,
+                data: prices,
+                borderColor: lineColor,
+                backgroundColor: fillColor,
+                borderWidth: 2,
+                fill: true,
+                tension: 0.1,
+                pointRadius: 0,
+                pointHoverRadius: 5,
+                pointHoverBackgroundColor: lineColor,
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false, axis: 'x' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
+                    titleColor: '#000', bodyColor: '#000', borderColor: '#ddd', borderWidth: 1, padding: 10, displayColors: false,
+                    callbacks: {
+                        title: (tooltipItems) => {
+                            // priceData might be empty if API returned no data for range
+                            if (!tooltipItems || tooltipItems.length === 0 || !priceData[tooltipItems[0].dataIndex]) return '';
+                             const dataIndex = tooltipItems[0].dataIndex;
+                             return new Date(priceData[dataIndex].date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+                        },
+                        label: (context) => {
+                            const dataPoint = priceData[context.dataIndex];
+                            if (!dataPoint) return '';
+                            return [
+                                `Open: $${dataPoint.o.toFixed(2)}`, `High: $${dataPoint.h.toFixed(2)}`,
+                                `Low: $${dataPoint.l.toFixed(2)}`, `Close: $${dataPoint.c.toFixed(2)}`,
+                                `Volume: ${dataPoint.v.toLocaleString()}`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'category', // Explicitly set for date strings as labels
+                    grid: { display: false },
+                    ticks: {
+                        maxTicksLimit: 10,
+                        autoSkip: true,
+                        callback: function(value, index) { // value is index for category scale
+                            if (labels.length === 0) return '';
+                            if (labels.length <= 10 || index % Math.ceil(labels.length / 10) === 0) {
+                                return new Date(labels[index]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            }
+                            return '';
+                        }
+                    }
+                },
+                y: {
+                    position: 'right', grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                    ticks: { callback: (value) => '$' + value.toFixed(2) }
+                }
+            }
+        }
+    });
+
+    const volumeCtx = document.getElementById('volumeChart').getContext('2d');
+    let volumeChart = new Chart(volumeCtx, { // Use let for volumeChart
+        type: 'bar',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Volume', data: volumes, backgroundColor: volumeBarColor,
+                borderColor: 'transparent', barThickness: 'flex', maxBarThickness: 15, // Increased for visibility
+                categoryPercentage: 0.8, // Default is 0.8
+                barPercentage: 0.9,      // Default is 0.9
+            }]
+        },
+        options: {
+            responsive: true, maintainAspectRatio: false,
+            plugins: { legend: { display: false }, tooltip: { enabled: false } }, // Tooltip disabled for volume
+            interaction: { mode: 'index', intersect: false, axis: 'x' }, // Sync with main chart
+            scales: {
+                x: { type: 'category', display: false, grid: { display: false } }, // Synced with main chart's x-axis
+                y: {
+                    position: 'right', grid: { display: false },
+                    ticks: {
+                        maxTicksLimit: 4, // Fewer ticks for volume
+                        callback: function(value) {
+                            if (value >= 1000000000) return (value / 1000000000).toFixed(1) + 'B';
+                            if (value >= 1000000) return (value / 1000000).toFixed(1) + 'M';
+                            if (value >= 1000) return (value / 1000).toFixed(1) + 'K';
+                            return value;
+                        }
+                    }
+                }
+            }
+        }
+    });
+
+
+    function updateChartColorsAndData(chartInstance = stockChart) {
+        if (prices.length === 0) { // Handle no data case for colors
+            lineColor = '#868e96'; // Neutral gray
+            fillColor = 'rgba(134, 142, 150, 0.1)';
+            volumeBarColor = 'rgba(134, 142, 150, 0.5)';
+        } else {
+            startPrice = prices[0];
+            endPrice = prices[prices.length - 1];
+            percentChange = ((endPrice - startPrice) / startPrice) * 100;
+            if (isNaN(percentChange) || !isFinite(percentChange)) percentChange = 0;
+
+            lineColor = percentChange >= 0 ? '#28a745' : '#dc3545';
+            fillColor = percentChange >= 0 ? 'rgba(40, 167, 69, 0.1)' : 'rgba(220, 53, 69, 0.1)';
+            volumeBarColor = percentChange >= 0 ? 'rgba(40, 167, 69, 0.5)' : 'rgba(220, 53, 69, 0.5)';
+        }
+
+
+        if (chartInstance.config.type === 'line' && chartInstance.data.datasets[0]) {
+            chartInstance.data.datasets[0].borderColor = lineColor;
+            chartInstance.data.datasets[0].backgroundColor = fillColor;
+            chartInstance.data.datasets[0].pointHoverBackgroundColor = lineColor;
+        }
+        // For candlestick/OHLC, the colors are set in the plugin during drawing.
+        // However, if you have an invisible line dataset for scales, its colors don't matter.
+
+        if (volumeChart.data.datasets[0]) {
+             volumeChart.data.datasets[0].backgroundColor = volumeBarColor;
+        }
+    }
+
+
+    function updateChartType(type) {
+        console.log(`Changing chart type to: ${type}`);
+        stockChart.destroy(); // Destroy the old chart instance
+
+        let newConfig;
+        const currentChartCtx = document.getElementById('stockPriceChart').getContext('2d');
+
+        updateChartColorsAndData(); // Ensure colors are up-to-date with current data
+
+        const commonOptions = {
+            responsive: true, maintainAspectRatio: false,
+            interaction: { mode: 'index', intersect: false, axis: 'x' },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)', titleColor: '#000', bodyColor: '#000',
+                    borderColor: '#ddd', borderWidth: 1, padding: 10, displayColors: false,
+                    callbacks: {
+                        title: (tooltipItems) => {
+                            if (!tooltipItems || tooltipItems.length === 0 || !priceData[tooltipItems[0].dataIndex]) return '';
+                             const dataIndex = tooltipItems[0].dataIndex;
+                             return new Date(priceData[dataIndex].date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+                        },
+                        label: (context) => {
+                            const dataPoint = priceData[context.dataIndex]; // Use full priceData for OHLCV details
+                            if (!dataPoint) return '';
+                            return [
+                                `Open: $${dataPoint.o.toFixed(2)}`, `High: $${dataPoint.h.toFixed(2)}`,
+                                `Low: $${dataPoint.l.toFixed(2)}`, `Close: $${dataPoint.c.toFixed(2)}`,
+                                `Volume: ${dataPoint.v.toLocaleString()}`
+                            ];
+                        }
+                    }
+                }
+            },
+            scales: {
+                x: {
+                    type: 'category', grid: { display: false },
+                    labels: labels, // Important for category scale
+                    ticks: {
+                        maxTicksLimit: 10,
+                        autoSkip: true,
+                        callback: function(value, index) {
+                            if (labels.length === 0) return '';
+                            if (labels.length <= 10 || index % Math.ceil(labels.length / 10) === 0) {
+                                return new Date(labels[index]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                            }
+                            return '';
+                        }
+                    }
+                },
+                y: {
+                    position: 'right', grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                    ticks: { callback: (value) => '$' + value.toFixed(2) }
+                }
+            }
+        };
+
+        if (type === 'line') {
+            newConfig = {
+                type: 'line',
+                data: {
+                    // labels: labels, // labels are now in scales.x.labels for category scale
+                    datasets: [{
+                        label: companySymbol, data: prices, borderColor: lineColor, backgroundColor: fillColor,
+                        borderWidth: 2, fill: true, tension: 0.1, pointRadius: 0, pointHoverRadius: 5,
+                        pointHoverBackgroundColor: lineColor, pointHoverBorderColor: '#fff', pointHoverBorderWidth: 2
+                    }]
+                },
+                options: commonOptions
+            };
+        } else if (type === 'candlestick' || type === 'ohlc') {
+             // Data for candlestick/OHLC should be the ohlcData itself if using a specialized library
+            // For custom drawing, we still base it on a 'line' chart with an invisible dataset
+            // The actual drawing happens in the plugin.
+            newConfig = {
+                type: 'line', // Base type, actual drawing is custom via plugin
+                data: {
+                    // labels: labels,
+                    // The dataset provides data points for the tooltip to find the index.
+                    // The y value can be the close price.
+                    datasets: [{
+                        label: companySymbol,
+                        data: priceData.map(d => d.c), // Use close prices for the invisible line
+                        borderColor: 'rgba(0,0,0,0)', // Invisible line
+                        backgroundColor: 'rgba(0,0,0,0)', // Invisible fill
+                        pointRadius: 0,
+                        fill: false
+                    }]
+                },
+                options: commonOptions, // Use common options
+                plugins: [...(commonOptions.plugins || []), { // Add custom drawing plugin
+                    id: 'financialChartPlugin',
+                    afterDatasetsDraw: function(chartInstance) {
+                        const { ctx, data, chartArea, scales: { x: xScale, y: yScale } } = chartInstance;
+                        if (!priceData || priceData.length === 0 || !chartArea) return;
+
+                        ctx.save();
+                        const barCount = priceData.length;
+                        // Calculate bar width more robustly for category scale
+                        let barPixelWidth;
+                        if (barCount > 1) {
+                            // Get pixel for category index 0 and 1
+                            const x0 = xScale.getPixelForValue(0); // xScale.getPixelForValue(labels[0]) if labels are direct dates
+                            const x1 = xScale.getPixelForValue(1); // xScale.getPixelForValue(labels[1])
+                            barPixelWidth = (x1 - x0) * 0.7; // 70% of the available space
+                        } else if (barCount === 1) {
+                            barPixelWidth = (xScale.getPixelForValue(0) - xScale.left) * 0.7; // if only one bar
+                            if (isNaN(barPixelWidth) || barPixelWidth <=0) barPixelWidth = Math.max(5, (xScale.right - xScale.left) * 0.1); // fallback
+                        } else {
+                            return; // No data to draw
+                        }
+                        barPixelWidth = Math.max(1, Math.floor(barPixelWidth));
+
+
+                        priceData.forEach((item, index) => {
+                            // For category scale, getPixelForValue takes the index
+                            const x = xScale.getPixelForValue(index);
+                            const openPx = yScale.getPixelForValue(item.o);
+                            const highPx = yScale.getPixelForValue(item.h);
+                            const lowPx = yScale.getPixelForValue(item.l);
+                            const closePx = yScale.getPixelForValue(item.c);
+
+                            const barColor = item.c >= item.o ? '#28a745' : '#dc3545'; // Green for up, Red for down
+                            ctx.strokeStyle = barColor;
+                            ctx.lineWidth = 1;
+
+                            // High-low wick (thin line)
+                            ctx.beginPath();
+                            ctx.moveTo(x, highPx);
+                            ctx.lineTo(x, lowPx);
+                            ctx.stroke();
+
+                            if (type === 'candlestick') {
+                                ctx.fillStyle = barColor;
+                                const bodyTop = Math.min(openPx, closePx);
+                                const bodyHeight = Math.abs(openPx - closePx);
+                                ctx.fillRect(x - barPixelWidth / 2, bodyTop, barPixelWidth, bodyHeight);
+                                // Optional: Add border to candlestick body
+                                // ctx.strokeRect(x - barPixelWidth / 2, bodyTop, barPixelWidth, bodyHeight);
+                            } else if (type === 'ohlc') {
+                                const tickPixelWidth = Math.max(2, barPixelWidth * 0.25);
+                                // Open tick (left)
+                                ctx.beginPath();
+                                ctx.moveTo(x - barPixelWidth / 2, openPx); // Start from edge of where candle body would be
+                                ctx.lineTo(x, openPx);
+                                ctx.stroke();
+                                // Close tick (right)
+                                ctx.beginPath();
+                                ctx.moveTo(x, closePx);
+                                ctx.lineTo(x + barPixelWidth / 2, closePx); // End at edge of where candle body would be
+                                ctx.stroke();
+                            }
+                        });
+                        ctx.restore();
+                    }
+                }]
+            };
+        }
+        stockChart = new Chart(currentChartCtx, newConfig);
+        console.log(`Chart type updated to: ${type}`);
+    }
+
+    // Chart type switching functionality
+    const chartTypeButtons = document.querySelectorAll('[data-chart-type]');
+    chartTypeButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            chartTypeButtons.forEach(btn => btn.classList.remove('active'));
+            this.classList.add('active');
+            const chartType = this.getAttribute('data-chart-type');
+            updateChartType(chartType);
+        });
+    });
+
+    // Volume toggle functionality
+    const volumeSwitch = document.getElementById('showVolumeSwitch');
+    const volumeCanvasEl = document.getElementById('volumeChart');
+    const volumeContainer = document.querySelector('.volume-container');
+
+    volumeSwitch.addEventListener('change', function() {
+        if (this.checked) {
+            volumeContainer.style.height = '100px'; // Or original height
+            volumeCanvasEl.style.display = 'block';
+            if(volumeChart) volumeChart.resize();
+        } else {
+            volumeContainer.style.height = '0px';
+            volumeCanvasEl.style.display = 'none';
+        }
+    });
+    // Initial state based on checkbox
+    if (!volumeSwitch.checked) {
+        volumeContainer.style.height = '0px';
+        volumeCanvasEl.style.display = 'none';
+    }
+
+
+    // Crosshair functionality
+    const chartContainerEl = document.querySelector('.stock-chart-container'); // The main div
+    const crosshairVertical = document.querySelector('.crosshair-vertical');
+    const crosshairHorizontal = document.querySelector('.crosshair-horizontal');
+    const priceLabel = document.querySelector('.price-label');
+    const dateLabel = document.querySelector('.date-label');
+    const chartOverlayInfo = document.querySelector('.chart-overlay-info');
+    const mainChartCanvas = document.getElementById('stockPriceChart'); // The canvas itself
+
+    mainChartCanvas.addEventListener('mousemove', function(e) {
+        if (!stockChart || !stockChart.chartArea || priceData.length === 0) {
+            // Hide all crosshair elements if chart is not ready or no data
+            crosshairVertical.style.display = 'none';
+            crosshairHorizontal.style.display = 'none';
+            priceLabel.style.display = 'none';
+            dateLabel.style.display = 'none';
+            chartOverlayInfo.style.display = 'none';
+            return;
+        }
+
+        const rect = mainChartCanvas.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+
+        if (y <= stockChart.chartArea.bottom && y >= stockChart.chartArea.top &&
+            x >= stockChart.chartArea.left && x <= stockChart.chartArea.right) {
+
+            crosshairVertical.style.display = 'block';
+            crosshairHorizontal.style.display = 'block';
+            crosshairVertical.style.left = x + 'px';
+            crosshairHorizontal.style.top = y + 'px';
+
+            const yValue = stockChart.scales.y.getValueForPixel(y);
+            priceLabel.style.display = 'block';
+            priceLabel.style.top = y + 'px';
+            priceLabel.style.right = (mainChartCanvas.width - stockChart.chartArea.right + 5) + 'px'; // +5 for padding
+            priceLabel.textContent = '$' + yValue.toFixed(2);
+
+            // For category scale, get data index using Chart.js helper
+            const points = stockChart.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
+            if (points.length > 0) {
+                const dataIndex = points[0].index;
+                if (dataIndex >= 0 && dataIndex < priceData.length) {
+                    const dataPoint = priceData[dataIndex]; // Use full priceData for OHLCV
+                    const pointDate = new Date(dataPoint.date);
+
+                    dateLabel.style.display = 'block';
+                    dateLabel.style.left = x + 'px';
+                    dateLabel.style.bottom = (mainChartCanvas.height - stockChart.chartArea.bottom - 25) + 'px'; // Adjust for label height
+                    dateLabel.textContent = pointDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+
+                    chartOverlayInfo.style.display = 'block';
+                    chartOverlayInfo.querySelector('.date span').textContent = pointDate.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' });
+                    chartOverlayInfo.querySelector('.open span').textContent = '$' + dataPoint.o.toFixed(2);
+                    chartOverlayInfo.querySelector('.high span').textContent = '$' + dataPoint.h.toFixed(2);
+                    chartOverlayInfo.querySelector('.low span').textContent = '$' + dataPoint.l.toFixed(2);
+                    chartOverlayInfo.querySelector('.close span').textContent = '$' + dataPoint.c.toFixed(2);
+                    chartOverlayInfo.querySelector('.volume span').textContent = dataPoint.v.toLocaleString();
+                }
+            } else {
+                dateLabel.style.display = 'none';
+                chartOverlayInfo.style.display = 'none';
+            }
+        } else {
+            crosshairVertical.style.display = 'none';
+            crosshairHorizontal.style.display = 'none';
+            priceLabel.style.display = 'none';
+            dateLabel.style.display = 'none';
+            chartOverlayInfo.style.display = 'none';
+        }
+    });
+
+    mainChartCanvas.addEventListener('mouseleave', function() {
+        crosshairVertical.style.display = 'none';
+        crosshairHorizontal.style.display = 'none';
+        priceLabel.style.display = 'none';
+        dateLabel.style.display = 'none';
+        chartOverlayInfo.style.display = 'none';
+    });
+
+
+    // Real-time updates for stock price
+    if (enableRealTimeUpdates && priceData.length > 0) { // Only run if there's initial data
+        const updateIntervalMs = 60000;
+        const currentPriceElement = document.querySelector('.current-price');
+        const priceChangeElement = document.querySelector('.price-change');
+        const lastUpdatedElement = document.querySelector('.last-updated');
+        const loadingIndicator = document.querySelector('.chart-loading');
+
+        function updateLatestPrice() {
+            if (document.hidden) return; // Don't fetch if tab is not visible
+
+            loadingIndicator.style.display = 'flex';
+            fetch(`/company/api/company/${companyId}/latest-price`)
+                .then(response => {
+                    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                    return response.json();
+                })
+                .then(data => {
+                    if (data.success && data.price) {
+                        const priceInfo = data.price;
+                        currentPriceElement.textContent = '$' + parseFloat(priceInfo.price).toFixed(2);
+                        const changeText = (priceInfo.change >= 0 ? '+' : '') +
+                            `$${parseFloat(priceInfo.change).toFixed(2)} (${parseFloat(priceInfo.changePercent).toFixed(2)}%)`;
+                        priceChangeElement.textContent = changeText;
+                        priceChangeElement.className = 'price-change ' + (priceInfo.change >= 0 ? 'positive' : 'negative');
+                        // Assuming timestamp is in seconds, convert to milliseconds for JS Date
+                        lastUpdatedElement.textContent = 'Last updated: ' + new Date(priceInfo.timestamp * 1000).toLocaleString();
+
+                        const latestDateObj = new Date(priceInfo.timestamp * 1000);
+                        const latestDateStr = latestDateObj.toISOString().split('T')[0];
+                        const lastChartDateStr = labels.length > 0 ? new Date(labels[labels.length - 1]).toISOString().split('T')[0] : null;
+
+                        let dataUpdated = false;
+                        // Make sure all necessary fields are present in priceInfo
+                        const newOhlcv = {
+                            date: latestDateStr,
+                            o: parseFloat(priceInfo.open || priceInfo.price), // Fallback if open not present
+                            h: parseFloat(priceInfo.high || priceInfo.price), // Fallback
+                            l: parseFloat(priceInfo.low || priceInfo.price),   // Fallback
+                            c: parseFloat(priceInfo.price),
+                            v: parseInt(priceInfo.volume || 0)           // Fallback
+                        };
+
+
+                        if (labels.length === 0 || latestDateStr !== lastChartDateStr || currentInterval === 'intraday') { // Add new point
+                            priceData.push(newOhlcv);
+                            labels.push(latestDateStr);
+                            prices.push(newOhlcv.c);
+                            volumes.push(newOhlcv.v);
+                            // ohlcData is already covered by priceData being updated
+                            dataUpdated = true;
+                        } else { // Update last point for the current day
+                            const lastIdx = priceData.length - 1;
+                            priceData[lastIdx].h = Math.max(priceData[lastIdx].h, newOhlcv.h);
+                            priceData[lastIdx].l = Math.min(priceData[lastIdx].l, newOhlcv.l);
+                            priceData[lastIdx].c = newOhlcv.c;
+                            priceData[lastIdx].v = newOhlcv.v; // Or += if volume is incremental
+
+                            prices[lastIdx] = newOhlcv.c;
+                            volumes[lastIdx] = newOhlcv.v;
+                            dataUpdated = true;
+                        }
+
+                        if (dataUpdated) {
+                            updateChartColorsAndData(stockChart); // Recalculate trend colors for the main chart
+                            stockChart.data.labels = labels; // For category scale
+                            stockChart.data.datasets[0].data = (stockChart.config.type === 'line') ? prices : priceData.map(d=>d.c);
+
+                            volumeChart.data.labels = labels; // For category scale
+                            volumeChart.data.datasets[0].data = volumes;
+
+                            stockChart.update('none'); // 'none' for no animation
+                            volumeChart.update('none');
+                        }
+                    } else {
+                        console.warn("Latest price update failed or no price data:", data.message);
+                    }
+                })
+                .catch(error => console.error('Error fetching latest price:', error))
+                .finally(() => loadingIndicator.style.display = 'none');
+        }
+        // Initial update after a short delay, then interval
+        // setTimeout(updateLatestPrice, 5000); // This might be too soon if page is still loading fully
+        const realTimeUpdateIntervalId = setInterval(updateLatestPrice, updateIntervalMs);
+        // Optional: clear interval when page is hidden and restart when visible
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) {
+                // clearInterval(realTimeUpdateIntervalId); // Or just skip fetch in updateLatestPrice
+            } else {
+                updateLatestPrice(); // Fetch immediately when tab becomes visible
+                // realTimeUpdateIntervalId = setInterval(updateLatestPrice, updateIntervalMs);
+            }
+        });
+
+    }
+
+
+    function loadHistoricalData(interval, range) {
+        currentInterval = interval;
+        currentTimeRange = range;
+
+        const loadingIndicator = document.querySelector('.chart-loading');
+        loadingIndicator.style.display = 'flex';
+        // Hide chart canvases while loading new data to prevent visual glitches
+        document.getElementById('stockPriceChart').style.visibility = 'hidden';
+        document.getElementById('volumeChart').style.visibility = 'hidden';
+
+
+        fetch(`/company/api/company/${companyId}/historical-prices?interval=${encodeURIComponent(interval)}&range=${encodeURIComponent(range)}`)
+            .then(response => {
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+                return response.json();
+            })
+            .then(data => {
+                if (data.success && data.prices) {
+                    if (data.prices.length > 0) {
+                        priceData = data.prices.sort((a, b) => new Date(a.date) - new Date(b.date))
+                                           .map(p => ({ // Ensure consistent structure and types
+                                                date: p.date,
+                                                o: parseFloat(p.open), h: parseFloat(p.high),
+                                                l: parseFloat(p.low), c: parseFloat(p.close),
+                                                v: parseInt(p.volume)
+                                            }));
+                        labels = priceData.map(item => item.date);
+                        prices = priceData.map(item => item.c); // Use consistent 'c' for close
+                        volumes = priceData.map(item => item.v); // Use consistent 'v' for volume
+                        // ohlcData is covered by priceData
+                    } else { // API returned success but no data points for the range
+                        priceData = []; labels = []; prices = []; volumes = [];
+                        console.warn("No historical data points returned for range:", range, "interval:", interval);
+                    }
+
+                    updateChartColorsAndData(stockChart);
+
+                    stockChart.data.labels = labels; // For category scale
+                    stockChart.data.datasets[0].data = (stockChart.config.type === 'line') ? prices : priceData.map(d=>d.c);
+
+                    volumeChart.data.labels = labels; // For category scale
+                    volumeChart.data.datasets[0].data = volumes;
+
+                    stockChart.update();
+                    volumeChart.update();
+                    document.querySelector('.last-updated').textContent = 'Last updated: ' + new Date(data.lastUpdated).toLocaleString();
+                } else {
+                    console.error('Failed to load historical data or invalid format:', data.message || 'Unknown error');
+                     // Optionally, clear the chart or show an error message on the chart
+                    priceData = []; labels = []; prices = []; volumes = [];
+                    updateChartColorsAndData(stockChart);
+                    stockChart.data.labels = []; stockChart.data.datasets[0].data = [];
+                    volumeChart.data.labels = []; volumeChart.data.datasets[0].data = [];
+                    stockChart.update(); volumeChart.update();
+                    document.querySelector('.last-updated').textContent = 'Last updated: Error loading data.';
+                }
+            })
+            .catch(error => {
+                console.error('Error fetching historical data:', error);
+                priceData = []; labels = []; prices = []; volumes = []; // Clear data on error
+                updateChartColorsAndData(stockChart);
+                stockChart.data.labels = []; stockChart.data.datasets[0].data = [];
+                volumeChart.data.labels = []; volumeChart.data.datasets[0].data = [];
+                stockChart.update(); volumeChart.update();
+                document.querySelector('.last-updated').textContent = 'Last updated: Network error.';
+            })
+            .finally(() => {
+                loadingIndicator.style.display = 'none';
+                document.getElementById('stockPriceChart').style.visibility = 'visible';
+                document.getElementById('volumeChart').style.visibility = 'visible';
+            });
+    }
+
+    document.querySelectorAll('.time-range-selector .btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const newRange = this.getAttribute('href').match(/range=([^&]+)/)[1];
+            if (newRange === currentTimeRange && this.classList.contains('active')) return;
+
+            document.querySelectorAll('.time-range-selector .btn').forEach(btn => {
+                btn.classList.remove('active', 'btn-primary');
+                btn.classList.add('btn-outline-secondary');
+            });
+            this.classList.add('active', 'btn-primary');
+            this.classList.remove('btn-outline-secondary');
+
+            loadHistoricalData(currentInterval, newRange);
+            window.history.pushState({interval: currentInterval, range: newRange}, '', this.href);
+        });
+    });
+
+    document.querySelectorAll('.interval-selector .btn').forEach(button => {
+        button.addEventListener('click', function(e) {
+            e.preventDefault();
+            const newInterval = this.getAttribute('href').match(/interval=([^&]+)/)[1];
+             if (newInterval === currentInterval && this.classList.contains('btn-primary')) return;
+
+
+            document.querySelectorAll('.interval-selector .btn').forEach(btn => {
+                btn.classList.remove('btn-primary');
+                btn.classList.add('btn-outline-primary');
+            });
+            this.classList.add('btn-primary');
+            this.classList.remove('btn-outline-primary');
+
+            loadHistoricalData(newInterval, currentTimeRange);
+            window.history.pushState({interval: newInterval, range: currentTimeRange}, '', this.href);
+        });
+    });
+
+    // Handle back/forward browser navigation for chart state
+    window.addEventListener('popstate', (event) => {
+        if (event.state && event.state.interval && event.state.range) {
+            // Update UI for interval buttons
+            document.querySelectorAll('.interval-selector .btn').forEach(btn => {
+                const btnInterval = btn.getAttribute('href').match(/interval=([^&]+)/)[1];
+                if (btnInterval === event.state.interval) {
+                    btn.classList.add('btn-primary');
+                    btn.classList.remove('btn-outline-primary');
+                } else {
+                    btn.classList.remove('btn-primary');
+                    btn.classList.add('btn-outline-primary');
+                }
+            });
+            // Update UI for time range buttons
+            document.querySelectorAll('.time-range-selector .btn').forEach(btn => {
+                const btnRange = btn.getAttribute('href').match(/range=([^&]+)/)[1];
+                 if (btnRange === event.state.range) {
+                    btn.classList.add('active', 'btn-primary');
+                    btn.classList.remove('btn-outline-secondary');
+                } else {
+                    btn.classList.remove('active', 'btn-primary');
+                    btn.classList.add('btn-outline-secondary');
+                }
+            });
+            loadHistoricalData(event.state.interval, event.state.range);
+        } else {
+            // Fallback if state is not set, maybe reload from initial params
+            // Or parse URL:
+            const params = new URLSearchParams(window.location.search);
+            const urlInterval = params.get('interval') || '{{ interval|e('js') }}';
+            const urlRange = params.get('range') || '{{ timeRange|e('js') }}';
+            loadHistoricalData(urlInterval, urlRange);
+        }
+    });
+
+});
+</script>
