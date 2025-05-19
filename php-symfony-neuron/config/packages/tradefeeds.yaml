@@ -11,11 +11,3 @@ services:
             $params: '@parameter_bag'
             $logger: '@logger'
         tags: ['app.api_client']
-
-    # Configure the MockTradeFeedsApiClient service for development/testing
-    App\Service\ApiClient\MockTradeFeedsApiClient:
-        arguments:
-            $client: '@http_client'
-            $params: '@parameter_bag'
-            $logger: '@logger'
-        tags: ['app.api_client']

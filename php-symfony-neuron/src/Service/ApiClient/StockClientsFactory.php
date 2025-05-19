@@ -5,91 +5,77 @@ namespace App\Service\ApiClient;
 
 use Psr\Container\ContainerInterface;
 use Symfony\Contracts\Service\ServiceSubscriberInterface;
+use App\Service\ApiClient\StockMarketDataApiClientInterface;
+use App\Service\ApiClient\NewsApiClientInterface;
+use App\Service\ApiClient\SecFilingsApiClientInterface;
+use App\Service\ApiClient\AnalystRatingsApiClientInterface;
 
 class StockClientsFactory implements ServiceSubscriberInterface
 {
     private ContainerInterface $locator;
-    private bool $useMockData;
 
     /**
      * Constructor.
      *
      * @param ContainerInterface $locator     The service locator to get client instances.
-     * @param bool               $useMockData Flag indicating whether to use mock data.
      */
-    public function __construct(ContainerInterface $locator, bool $useMockData)
+    public function __construct(ContainerInterface $locator)
     {
         $this->locator = $locator;
-        $this->useMockData = $useMockData;
     }
 
     /**
      * Gets the appropriate Alpha Vantage client instance.
      *
-     * @return ApiClientInterface The Alpha Vantage client instance.
+     * @return StockMarketDataApiClientInterface The Alpha Vantage client instance.
      */
-    public function getAlphaVantageClient(): ApiClientInterface
+    public function getAlphaVantageClient(): StockMarketDataApiClientInterface
     {
-        $serviceId = $this->useMockData
-            ? 'App\Service\ApiClient\MockAlphaVantageClient'
-            : 'App\Service\ApiClient\AlphaVantageClient';
-
+        $serviceId = 'App\Service\ApiClient\AlphaVantageClient';
         return $this->locator->get($serviceId);
     }
 
     /**
      * Gets the appropriate Yahoo Finance client instance.
      *
-     * @return ApiClientInterface The Yahoo Finance client instance.
+     * @return StockMarketDataApiClientInterface The Yahoo Finance client instance.
      */
-    public function getYahooFinanceClient(): ApiClientInterface
+    public function getYahooFinanceClient(): StockMarketDataApiClientInterface
     {
-         $serviceId = $this->useMockData
-            ? 'App\Service\ApiClient\MockYahooFinanceClient'
-            : 'App\Service\ApiClient\YahooFinanceClient';
-
+         $serviceId = 'App\Service\ApiClient\YahooFinanceClient';
          return $this->locator->get($serviceId);
     }
 
     /**
      * Gets the appropriate News API client instance.
      *
-     * @return ApiClientInterface The News API client instance.
+     * @return NewsApiClientInterface The News API client instance.
      */
-     public function getNewsApiClient(): ApiClientInterface
+     public function getNewsApiClient(): NewsApiClientInterface
     {
-         $serviceId = $this->useMockData
-            ? 'App\Service\ApiClient\MockNewsApiClient'
-            : 'App\Service\ApiClient\NewsApiClient';
-
+         $serviceId = 'App\Service\ApiClient\NewsApiClient';
          return $this->locator->get($serviceId);
     }
 
     /**
-     * Gets the appropriate SEC API client instance.
+     * Gets the appropriate Kaleidoscope API client instance.
      *
-     * @return ApiClientInterface The SEC API client instance.
+     * @return SecFilingsApiClientInterface The Kaleidoscope API client instance.
      */
-     public function getSecApiClient(): ApiClientInterface
+     public function getKaleidoscopeApiClient(): SecFilingsApiClientInterface
     {
-         $serviceId = $this->useMockData
-            ? 'App\Service\ApiClient\MockSecApiClient'
-            : 'App\Service\ApiClient\SecApiClient';
-
+         $serviceId = 'App\Service\ApiClient\KaleidoscopeApiClient';
          return $this->locator->get($serviceId);
     }
 
     /**
      * Gets the appropriate TradeFeeds API client instance.
      *
-     * @return ApiClientInterface The TradeFeeds API client instance.
+     * @return AnalystRatingsApiClientInterface The TradeFeeds API client instance.
      */
-     public function getTradeFeedsClient(): ApiClientInterface
+     public function getTradeFeedsClient(): AnalystRatingsApiClientInterface
     {
-         $serviceId = $this->useMockData
-            ? 'App\Service\ApiClient\MockTradeFeedsApiClient'
-            : 'App\Service\ApiClient\TradeFeedsApiClient';
-
+         $serviceId = 'App\Service\ApiClient\TradeFeedsApiClient';
          return $this->locator->get($serviceId);
     }
 
@@ -101,17 +87,12 @@ class StockClientsFactory implements ServiceSubscriberInterface
     public static function getSubscribedServices(): array
     {
         return [
-            // Define all real and mock services this factory might need with fully qualified names
+            // Define all services this factory might need with fully qualified names
             'App\Service\ApiClient\AlphaVantageClient',
-            'App\Service\ApiClient\MockAlphaVantageClient',
             'App\Service\ApiClient\YahooFinanceClient',
-            'App\Service\ApiClient\MockYahooFinanceClient',
             'App\Service\ApiClient\NewsApiClient',
-            'App\Service\ApiClient\MockNewsApiClient',
-            'App\Service\ApiClient\SecApiClient',
-            'App\Service\ApiClient\MockSecApiClient',
-            'App\Service\ApiClient\TradeFeedsApiClient',
-            'App\Service\ApiClient\MockTradeFeedsApiClient',
+            'App\Service\ApiClient\KaleidoscopeApiClient',
+            'App\Service\ApiClient\TradeFeedsApiClient'
         ];
     }
 }

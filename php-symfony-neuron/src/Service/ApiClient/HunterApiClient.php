@@ -6,24 +6,33 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Symfony\Contracts\HttpClient\HttpClientInterface;
 use Psr\Log\LoggerInterface;
 
-class HunterApiClient implements HunterApiClientInterface
+/**
+ * Hunter.io API client for finding company executives and email addresses
+ * Refactored to align with the pattern used by other API clients
+ */
+class HunterApiClient extends AbstractApiClient implements HunterApiClientInterface, ExecutiveDataApiClientInterface
 {
     private const API_BASE_URL = 'https://api.hunter.io/v2';
-    private string $apiKey;
-    private HttpClientInterface $httpClient;
-    private LoggerInterface $logger;
 
     /**
-     * Constructor
+     * {@inheritdoc}
      */
-    public function __construct(
-        HttpClientInterface $httpClient,
-        ParameterBagInterface $params,
-        LoggerInterface $logger
-    ) {
-        $this->httpClient = $httpClient;
-        $this->apiKey = $params->get('hunter_api.api_key', '');
-        $this->logger = $logger;
+    protected function initialize(): void
+    {
+        $this->baseUrl = self::API_BASE_URL;
+        $this->apiKey = $this->params->get('hunter_api.api_key', '');
+
+        if (empty($this->apiKey)) {
+            $this->logger->warning('HunterApiClient initialized without API key');
+        }
+    }
+
+    /**
+     * {@inheritdoc}
+     */
+    protected function getAuthParams(): array
+    {
+        return ['api_key' => $this->apiKey];
     }
 
     /**
@@ -34,11 +43,10 @@ class HunterApiClient implements HunterApiClientInterface
         // Merge options with required parameters
         $params = array_merge([
             'domain' => $domain,
-            'api_key' => $this->apiKey,
         ], $options);
 
         try {
-            return $this->makeRequest('GET', '/domain-search', $params);
+            return $this->request('GET', '/domain-search', $params);
         } catch (\Exception $e) {
             $this->logger->error('Hunter API domain search error', [
                 'domain' => $domain,
@@ -54,14 +62,15 @@ class HunterApiClient implements HunterApiClientInterface
     public function companySearch(string $companyName, array $options = []): array
     {
         $this->logger->info('Searching for company by name', ['company' => $companyName]);
-        
+
         // First try to find the domain by company name
         try {
-            $companyResponse = $this->makeRequest('GET', '/domain-search', [
+            $companyParams = array_merge([
                 'company' => $companyName,
-                'api_key' => $this->apiKey,
                 'limit' => 1
-            ]);
+            ], $this->getAuthParams());
+
+            $companyResponse = $this->request('GET', '/domain-search', $companyParams);
 
             if (isset($companyResponse['data']['domain'])) {
                 $domain = $companyResponse['data']['domain'];
@@ -69,7 +78,7 @@ class HunterApiClient implements HunterApiClientInterface
                     'company' => $companyName,
                     'domain' => $domain
                 ]);
-                
+
                 // Now search for executives using the found domain
                 return $this->domainSearch($domain, $options);
             } else {
@@ -86,30 +95,68 @@ class HunterApiClient implements HunterApiClientInterface
     }
 
     /**
-     * Make a request to the Hunter API
+     * Get company executive/leadership data
      *
-     * @param string $method HTTP method (GET, POST, etc)
-     * @param string $endpoint API endpoint (e.g., /domain-search)
-     * @param array $params Request parameters
-     * @return array Response data
+     * @param string $symbol Company ticker symbol
+     * @return array Executive data
      */
-    private function makeRequest(string $method, string $endpoint, array $params = []): array
+    public function getExecutives(string $symbol): array
     {
-        $url = self::API_BASE_URL . $endpoint;
-        
+        $this->logger->info('Getting executives for company', ['symbol' => $symbol]);
+
         try {
-            $options = ['query' => $params];
-            
-            $response = $this->httpClient->request($method, $url, $options);
-            $content = $response->getContent();
-            
-            return json_decode($content, true);
+            // First, try to get company profile to find the company name
+            $companyName = $symbol; // Default to using the symbol as company name
+
+            // Try to get a better company name if possible
+            try {
+                // This would ideally use a service to get the company name from the symbol
+                // For now, we'll just use the symbol as the company name
+            } catch (\Exception $e) {
+                $this->logger->warning('Could not get company name for symbol, using symbol as fallback', [
+                    'symbol' => $symbol,
+                    'error' => $e->getMessage()
+                ]);
+            }
+
+            // Search for executives by company name
+            $result = $this->companySearch($companyName);
+
+            if (isset($result['error'])) {
+                return [];
+            }
+
+            // Transform Hunter API response to the expected format
+            $executives = [];
+            if (isset($result['data']['emails']) && is_array($result['data']['emails'])) {
+                foreach ($result['data']['emails'] as $email) {
+                    if (!isset($email['first_name']) || !isset($email['last_name'])) {
+                        continue;
+                    }
+
+                    $executives[] = [
+                        'name' => $email['first_name'] . ' ' . $email['last_name'],
+                        'title' => $email['position'] ?? 'Unknown',
+                        'age' => null, // Not provided by Hunter
+                        'yearJoined' => null, // Not provided by Hunter
+                        'bio' => '', // Not provided by Hunter
+                        'compensation' => 0, // Not provided by Hunter
+                        'education' => '', // Not provided by Hunter
+                        'previousCompanies' => '', // Not provided by Hunter
+                        'email' => $email['value'] ?? '',
+                        'confidence' => $email['confidence'] ?? 0,
+                    ];
+                }
+            }
+
+            return $executives;
         } catch (\Exception $e) {
-            $this->logger->error('Hunter API request error', [
-                'endpoint' => $endpoint,
+            $this->logger->error('Error getting executives', [
+                'symbol' => $symbol,
                 'error' => $e->getMessage()
             ]);
-            throw $e;
+            return [];
         }
     }
+
 }

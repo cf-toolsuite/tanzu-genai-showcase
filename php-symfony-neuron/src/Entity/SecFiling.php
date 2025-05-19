@@ -41,49 +41,49 @@ class SecFiling
 
     #[ORM\Column(type: 'json', nullable: true)]
     private array $exhibits = [];
-    
+
     #[ORM\Column(length: 30, nullable: true)]
     private ?string $accessionNumber = null;
-    
+
     #[ORM\Column(length: 30, nullable: true)]
     private ?string $fileNumber = null;
-    
+
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $textUrl = null;
-    
+
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $pdfUrl = null;
-    
+
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $xbrlUrl = null;
-    
+
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $ixbrlUrl = null;
-    
+
     #[ORM\Column(length: 255, nullable: true)]
     private ?string $filer = null;
-    
+
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $content = null;
-    
+
     #[ORM\Column(type: 'json', nullable: true)]
     private array $sections = [];
-    
+
     #[ORM\Column(type: 'text', nullable: true)]
     private ?string $summary = null;
-    
+
     #[ORM\Column(type: 'json', nullable: true)]
     private array $keyFindings = [];
-    
+
     #[ORM\Column(type: 'boolean', options: ['default' => false])]
     private bool $isProcessed = false;
-    
+
     #[ORM\Column(type: 'datetime_immutable', nullable: true)]
     private ?\DateTimeImmutable $updatedAt = null;
-    
+
     #[ORM\Column(type: 'datetime', nullable: true)]
     private ?\DateTimeInterface $reportDate = null;
-    
+
     #[ORM\Column(length: 10, nullable: true)]
     private ?string $fiscalYear = null;
 
@@ -204,7 +204,7 @@ class SecFiling
 
         return $this;
     }
-    
+
     public function getAccessionNumber(): ?string
     {
         return $this->accessionNumber;
@@ -264,7 +264,7 @@ class SecFiling
 
         return $this;
     }
-    
+
     public function getSection(string $key): ?string
     {
         return $this->sections[$key] ?? null;
@@ -341,7 +341,7 @@ class SecFiling
 
         return $this;
     }
-    
+
     public function getPdfUrl(): ?string
     {
         return $this->pdfUrl;
@@ -353,7 +353,7 @@ class SecFiling
 
         return $this;
     }
-    
+
     public function getXbrlUrl(): ?string
     {
         return $this->xbrlUrl;
@@ -365,7 +365,7 @@ class SecFiling
 
         return $this;
     }
-    
+
     public function getIxbrlUrl(): ?string
     {
         return $this->ixbrlUrl;
@@ -377,7 +377,7 @@ class SecFiling
 
         return $this;
     }
-    
+
     public function getFiler(): ?string
     {
         return $this->filer;
@@ -389,10 +389,10 @@ class SecFiling
 
         return $this;
     }
-    
+
     /**
      * Get a formatted title for display in listings
-     * 
+     *
      * @return string A formatted title for the filing
      */
     public function getFormattedTitle(): string
@@ -401,12 +401,12 @@ class SecFiling
         if ($this->company && $this->fiscalYear) {
             return "FY{$this->fiscalYear} {$this->formType}";
         }
-        
+
         // Fallback to just the form type and date if no fiscal year
         if ($this->filingDate) {
             return "{$this->formType} " . $this->filingDate->format('Y');
         }
-        
+
         // Simple fallback
         return $this->formType ?? 'SEC Filing';
     }

@@ -309,7 +309,7 @@ class NeuronAiService
     {
         // Extract company name if an object is passed
         $companyName = is_object($company) && method_exists($company, 'getName') ? $company->getName() : (string)$company;
-        
+
         $systemPrompt = "You are an AI assistant that specializes in financial data analysis. " .
             "Generate realistic financial data for a company based on its industry and size. " .
             "The data should be realistic but not necessarily accurate for the specific company. " .
@@ -342,7 +342,7 @@ class NeuronAiService
         try {
             // Parse the JSON response
             $data = json_decode($jsonResponse, true, 512, JSON_THROW_ON_ERROR);
-            
+
             // If the response is not an array of quarters, check if it's wrapped in another object
             if (!is_array($data) || !isset($data[0])) {
                 // Check if there's a 'quarters' or 'data' field that contains the array
@@ -355,17 +355,17 @@ class NeuronAiService
                     $data = [$data];
                 }
             }
-            
+
             // If we have a Company object, save the financial data
             if (is_object($company) && method_exists($company, 'addFinancialData')) {
                 $count = 0;
-                
+
                 // Get entity manager through reflection to avoid circular dependency
                 $reflection = new \ReflectionClass($company);
                 $property = $reflection->getProperty('id');
                 $property->setAccessible(true);
                 $companyId = $property->getValue($company);
-                
+
                 if ($companyId) {
                     // Company is already persisted, so we can add financial data
                     foreach ($data as $quarterData) {
@@ -393,20 +393,20 @@ class NeuronAiService
                         $financialData->setDebtToEquity($quarterData['debtToEquity'] ?? 0);
                         $financialData->setCurrentRatio($quarterData['currentRatio'] ?? 0);
                         $financialData->setMarketCap($quarterData['marketCap'] ?? 0);
-                        
+
                         // Add the financial data to the company
                         $company->addFinancialData($financialData);
-                        
+
                         $count++;
                     }
                 }
-                
+
                 return $count;
             }
-            
+
             // If we don't have a Company object or can't save the data, just return the count
             return count($data);
-            
+
         } catch (\Exception $e) {
             // Log error but don't throw - we want to avoid transaction failures
             error_log('Error generating financial data: ' . $e->getMessage());
@@ -522,7 +522,7 @@ class NeuronAiService
     public function generateCompetitorAnalysis($company, ?string $competitorName = null): array
     {
         $companyName = is_object($company) && method_exists($company, 'getName') ? $company->getName() : (string)$company;
-        
+
         $systemPrompt = "You are an AI assistant that specializes in competitive analysis. " .
             "Provide detailed comparison between companies in the same industry or market. " .
             "Focus on strengths, weaknesses, market position, and strategic initiatives. " .
@@ -531,7 +531,7 @@ class NeuronAiService
         $userPrompt = $competitorName ?
             "Compare {$companyName} with its competitor {$competitorName}. " :
             "Provide a competitive analysis for {$companyName} and its main competitors. ";
-            
+
         $userPrompt .= "Structure your analysis in JSON format with the following fields: " .
             "companyName, industryOverview, marketPosition, competitors (an array with each competitor having: " .
             "name, marketShare, strengths, weaknesses, threatLevel), " .
@@ -558,12 +558,12 @@ class NeuronAiService
         try {
             // First try with the extracted JSON
             $data = json_decode($jsonResponse, true, 512, JSON_THROW_ON_ERROR);
-            
+
             // Save to database if we have a Company object
             if (is_object($company) && method_exists($company, 'addCompetitorAnalysis')) {
                 // Implementation for saving to database would go here
             }
-            
+
             return $data;
         } catch (\Exception $e) {
             // If parsing fails, try once more with the full response
@@ -590,7 +590,7 @@ class NeuronAiService
     public function generateResearchReports($company, string $reportType = 'Comprehensive'): int
     {
         $companyName = is_object($company) && method_exists($company, 'getName') ? $company->getName() : (string)$company;
-        
+
         $systemPrompt = "You are an AI assistant that specializes in company research and analysis. " .
             "Provide detailed, structured research reports about companies. " .
             "Your reports should be factual, balanced, and informative, highlighting both " .
@@ -627,13 +627,13 @@ class NeuronAiService
             // Add metadata
             $data['reportType'] = $reportType;
             $data['generatedBy'] = 'Neuron AI';
-            
+
             // Save to database if we have a Company object
             if (is_object($company) && method_exists($company, 'addResearchReport')) {
                 // Implementation for saving to database would go here
                 return 1; // Return count of reports generated
             }
-            
+
             return 1; // Just return 1 since we generated one report
         } catch (\Exception $e) {
             // If parsing fails, try once more with the full response
@@ -643,7 +643,7 @@ class NeuronAiService
                 // Add metadata
                 $data['reportType'] = $reportType;
                 $data['generatedBy'] = 'Neuron AI';
-                
+
                 return 1; // Just return 1 since we generated one report
             } catch (\Exception $innerE) {
                 // If JSON parsing fails, log the error

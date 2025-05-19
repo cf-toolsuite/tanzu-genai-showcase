@@ -9,16 +9,37 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface; //
 
 /**
  * Yahoo Finance API client (via RapidAPI) - REAL Implementation
+ * Implements all domain-specific interfaces as it has the most complete implementation
  */
-class YahooFinanceClient extends AbstractApiClient
+class YahooFinanceClient extends AbstractApiClient implements
+    StockMarketDataApiClientInterface,
+    NewsApiClientInterface,
+    SecFilingsApiClientInterface,
+    AnalystRatingsApiClientInterface,
+    EsgDataApiClientInterface,
+    ExecutiveDataApiClientInterface
 {
     /**
      * {@inheritdoc}
      */
     protected function initialize(): void
     {
-        $this->baseUrl = 'https://yahoo-finance-real-time1.p.rapidapi.com';
-        $this->apiKey = $this->params->get('yahoo_finance.api_key', '');
+        // Updated API endpoint URL to match current RapidAPI Yahoo Finance endpoint
+        $this->baseUrl = 'https://yahoo-finance15.p.rapidapi.com';
+        $apiKey = $this->params->get('yahoo_finance.api_key', '');
+
+        // Log a warning if the API key is missing or appears to be a placeholder
+        if (empty($apiKey) || $apiKey === 'your-api-key-here') {
+            $this->logger->warning('Yahoo Finance API key is missing or invalid. Please check your configuration.');
+        }
+
+        $this->apiKey = $apiKey;
+
+        // Log the API configuration
+        $this->logger->info('Yahoo Finance client initialized', [
+            'baseUrl' => $this->baseUrl,
+            'hasApiKey' => !empty($this->apiKey) ? 'yes' : 'no'
+        ]);
     }
 
     /**
@@ -37,20 +58,67 @@ class YahooFinanceClient extends AbstractApiClient
     {
         // Ensure RapidAPI headers are added for real calls
         if (empty($this->apiKey)) {
+            $this->logger->error("Yahoo Finance (RapidAPI) Key is required but missing.");
             throw new \LogicException("Yahoo Finance (RapidAPI) Key is required but missing.");
         }
         $rapidApiHeaders = [
             'headers' => [
                 'X-RapidAPI-Key' => $this->apiKey,
-                'X-RapidAPI-Host' => 'yahoo-finance-real-time1.p.rapidapi.com'
+                'X-RapidAPI-Host' => 'yahoo-finance15.p.rapidapi.com'
             ]
         ];
         // Merge RapidAPI headers with any other options provided
         $options = array_merge_recursive($options, $rapidApiHeaders);
 
-        // Call parent request, passing the combined options
-        // Parent request handles base URL, method, parameters, and final execution
-        return parent::request($method, $endpoint, $params, $options);
+        try {
+            // Log the request we're about to make
+            $this->logger->info('Making API request to Yahoo Finance', [
+                'endpoint' => $endpoint,
+                'method' => $method,
+                'params_keys' => array_keys($params)
+            ]);
+
+            // Set a shorter timeout to avoid long-running requests
+            if (!isset($options['timeout'])) {
+                $options['timeout'] = 3.0; // 3 seconds timeout - even shorter than the default 5 seconds
+            }
+
+            // Call parent request, passing the combined options
+            // Parent request handles base URL, method, parameters, and final execution
+            $response = parent::request($method, $endpoint, $params, $options);
+
+            // Log success
+            $this->logger->info('Yahoo Finance API request successful', [
+                'endpoint' => $endpoint,
+                'response_keys' => is_array($response) ? array_keys($response) : 'not_array'
+            ]);
+
+            return $response;
+        } catch (\Symfony\Component\HttpClient\Exception\TimeoutException $e) {
+            $this->logger->error('Yahoo Finance API request timed out', [
+                'endpoint' => $endpoint,
+                'method' => $method,
+                'exception' => get_class($e),
+                'params' => json_encode($params)
+            ]);
+            throw new \RuntimeException('Yahoo Finance API request timed out. The service might be temporarily unavailable.', 0, $e);
+        } catch (\Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface $e) {
+            $this->logger->error('Yahoo Finance API transport error', [
+                'endpoint' => $endpoint,
+                'method' => $method,
+                'exception' => get_class($e),
+                'params' => json_encode($params)
+            ]);
+            throw new \RuntimeException('Unable to connect to Yahoo Finance API. The service might be temporarily unavailable.', 0, $e);
+        } catch (\Exception $e) {
+            $this->logger->error('Yahoo Finance API request failed: ' . $e->getMessage(), [
+                'endpoint' => $endpoint,
+                'method' => $method,
+                'exception' => get_class($e),
+                'params' => json_encode($params)
+            ]);
+            throw $e;
+        }
     }
 
     /**
@@ -58,34 +126,94 @@ class YahooFinanceClient extends AbstractApiClient
      */
     public function searchCompanies(string $term): array
     {
-        $endpoint = '/search';
+        $endpoint = '/api/v1/market/auto-complete';
         $params = ['query' => $term, 'region' => 'US'];
+        $fullUrl = rtrim($this->baseUrl, '/') . '/' . ltrim($endpoint, '/');
 
-        // Real API call
-        $data = $this->request('GET', $endpoint, $params);
+        try {
+            // Log the search attempt with detailed information
+            $this->logger->info('Searching for companies via Yahoo Finance API', [
+                'term' => $term,
+                'endpoint' => $endpoint,
+                'full_url' => $fullUrl,
+                'params' => $params,
+                'baseUrl' => $this->baseUrl,
+                'has_api_key' => !empty($this->apiKey) ? 'yes' : 'no'
+            ]);
 
-        // Processing
-        $results = [];
-        if (isset($data['quotes']) && is_array($data['quotes'])) {
-            foreach ($data['quotes'] as $quote) {
-                if (isset($quote['quoteType']) && $quote['quoteType'] === 'EQUITY') {
-                    // Ensure all fields expected by the standard format are present
-                    $results[] = [
-                        'symbol' => $quote['symbol'] ?? '',
-                        'name' => $quote['shortname'] ?? $quote['longname'] ?? '',
-                        'type' => $quote['quoteType'] ?? '',
-                        'exchange' => $quote['exchange'] ?? '',
-                        // Include additional fields if available in new API
-                        'region' => $quote['region'] ?? '',
-                        'currency' => $quote['currency'] ?? '',
-                        'description' => '',
-                        'sector' => $quote['sector'] ?? '',
-                        'industry' => $quote['industry'] ?? '',
-                    ];
+            // Real API call
+            $data = $this->request('GET', $endpoint, $params);
+
+            // Log the raw response
+            $this->logger->debug('Yahoo Finance API search raw response', [
+                'term' => $term,
+                'response_keys' => is_array($data) ? array_keys($data) : 'not_array',
+                'response_data' => json_encode(array_slice($data, 0, 500)) // Limit to 500 chars to avoid huge logs
+            ]);
+
+            // Processing
+            $results = [];
+            if (isset($data['quotes']) && is_array($data['quotes'])) {
+                $this->logger->debug('Found quotes in Yahoo Finance response', [
+                    'count' => count($data['quotes'])
+                ]);
+
+                foreach ($data['quotes'] as $quote) {
+                    $this->logger->debug('Processing quote item', [
+                        'quote_type' => $quote['quoteType'] ?? 'unknown',
+                        'symbol' => $quote['symbol'] ?? 'unknown',
+                        'name' => $quote['shortname'] ?? $quote['longname'] ?? 'unknown'
+                    ]);
+
+                    if (isset($quote['quoteType']) && $quote['quoteType'] === 'EQUITY') {
+                        // Ensure all fields expected by the standard format are present
+                        $results[] = [
+                            'symbol' => $quote['symbol'] ?? '',
+                            'name' => $quote['shortname'] ?? $quote['longname'] ?? '',
+                            'type' => $quote['quoteType'] ?? '',
+                            'exchange' => $quote['exchange'] ?? '',
+                            // Include additional fields if available in new API
+                            'region' => $quote['region'] ?? '',
+                            'currency' => $quote['currency'] ?? '',
+                            'description' => '',
+                            'sector' => $quote['sector'] ?? '',
+                            'industry' => $quote['industry'] ?? '',
+                        ];
+                    }
                 }
+            } else {
+                // Log when the expected structure is missing
+                $this->logger->warning('Yahoo Finance API response missing expected "quotes" array', [
+                    'term' => $term,
+                    'response_structure' => json_encode(array_keys($data))
+                ]);
             }
+
+            // Log the search results
+            $this->logger->info('Yahoo Finance API search results', [
+                'term' => $term,
+                'count' => count($results),
+                'results' => count($results) > 0 ? json_encode(array_slice($results, 0, 3)) : 'empty' // Show up to 3 results
+            ]);
+
+            return $results;
+        } catch (\Exception $e) {
+            $this->logger->error('Yahoo Finance API search failed', [
+                'term' => $term,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'endpoint' => $endpoint,
+                'full_url' => $fullUrl,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            // Re-throw with more context to aid debugging
+            throw new \RuntimeException(
+                "Yahoo Finance API search failed for term '{$term}' at URL '{$fullUrl}': " . $e->getMessage(),
+                $e->getCode(),
+                $e
+            );
         }
-        return $results;
     }
 
     /**
@@ -94,11 +222,11 @@ class YahooFinanceClient extends AbstractApiClient
     public function getCompanyProfile(string $symbol): array
     {
         // Get basic company profile data
-        $profileEndpoint = '/stock/get-profile';
+        $profileEndpoint = '/api/v1/market/get-profile';
         $profileParams = ['symbol' => $symbol, 'region' => 'US'];
 
         // Get financial summary data
-        $summaryEndpoint = '/stock/get-summary';
+        $summaryEndpoint = '/api/v1/market/get-summary';
         $summaryParams = ['symbol' => $symbol, 'region' => 'US'];
 
         try {
@@ -172,7 +300,7 @@ class YahooFinanceClient extends AbstractApiClient
      */
     public function getQuote(string $symbol): array
     {
-        $endpoint = '/stock/get-summary';
+        $endpoint = '/api/v1/market/get-summary';
         $params = ['symbol' => $symbol, 'region' => 'US'];
 
         // Real API call
@@ -218,7 +346,7 @@ class YahooFinanceClient extends AbstractApiClient
      */
     public function getFinancials(string $symbol, string $period = 'quarterly'): array
     {
-        $endpoint = '/stock/get-financials';
+        $endpoint = '/api/v1/market/get-financials';
         $params = ['symbol' => $symbol, 'region' => 'US'];
 
         // Real API call
@@ -283,7 +411,7 @@ class YahooFinanceClient extends AbstractApiClient
      */
     public function getCompanyNews(string $symbol, int $limit = 5): array
     {
-        $endpoint = '/news/get-list';
+        $endpoint = '/api/v1/news/list';
         $params = [
             'query' => $symbol,
             'region' => 'US',
@@ -322,7 +450,7 @@ class YahooFinanceClient extends AbstractApiClient
      */
     public function getExecutives(string $symbol): array
     {
-        $endpoint = '/stock/get-insider-roster';
+        $endpoint = '/api/v1/market/get-insider-roster';
         $params = ['symbol' => $symbol, 'region' => 'US'];
 
         try {
@@ -364,7 +492,7 @@ class YahooFinanceClient extends AbstractApiClient
     public function getAnalystRatings(string $symbol): array
     {
         // Get the data from the summary endpoint which includes recommendations
-        $endpoint = '/stock/get-summary';
+        $endpoint = '/api/v1/market/get-summary';
         $params = ['symbol' => $symbol, 'region' => 'US'];
 
         try {
@@ -421,7 +549,7 @@ class YahooFinanceClient extends AbstractApiClient
 
             // Get individual analyst ratings if available using the insights endpoint
             try {
-                $insightsEndpoint = '/stock/get-insights';
+                $insightsEndpoint = '/api/v1/market/get-insights';
                 $insightsParams = ['symbol' => $symbol, 'region' => 'US'];
                 $insightsData = $this->request('GET', $insightsEndpoint, $insightsParams);
 
@@ -463,8 +591,8 @@ class YahooFinanceClient extends AbstractApiClient
      */
     public function getInsiderTrading(string $symbol, int $limit = 20): array
     {
-        $transactionsEndpoint = '/stock/get-insider-transactions';
-        $rosterEndpoint = '/stock/get-insider-roster';
+        $transactionsEndpoint = '/api/v1/market/get-insider-transactions';
+        $rosterEndpoint = '/api/v1/market/get-insider-roster';
         $params = ['symbol' => $symbol, 'region' => 'US'];
 
         try {
@@ -573,7 +701,7 @@ class YahooFinanceClient extends AbstractApiClient
      */
     public function getInstitutionalOwnership(string $symbol, int $limit = 20): array
     {
-        $endpoint = '/stock/get-holders';
+        $endpoint = '/api/v1/market/get-holders';
         $params = ['symbol' => $symbol, 'region' => 'US'];
 
         try {
@@ -642,7 +770,7 @@ class YahooFinanceClient extends AbstractApiClient
      */
     public function getESGData(string $symbol): array
     {
-        $endpoint = '/stock/get-esg-chart';
+        $endpoint = '/api/v1/market/get-esg-chart';
         $params = ['symbol' => $symbol, 'region' => 'US'];
 
         try {
@@ -692,7 +820,7 @@ class YahooFinanceClient extends AbstractApiClient
      */
     public function getRecentSecFilings(string $symbol, int $limit = 5): array
     {
-        $endpoint = '/stock/get-sec-filings';
+        $endpoint = '/api/v1/market/get-sec-filings';
         $params = ['symbol' => $symbol, 'region' => 'US'];
 
         try {
@@ -726,108 +854,130 @@ class YahooFinanceClient extends AbstractApiClient
 
     public function getHistoricalPrices(string $symbol, string $interval = 'daily', string $outputSize = 'compact'): array
     {
-        $endpoint = '/stock/get-chart';
-        $yahooInterval = match ($interval) {
-            'daily' => '1d',
-            'weekly' => '1wk',
-            'monthly' => '1mo',
-            default => '1d'
-        };
-        $range = match ($outputSize) {
-            'compact' => '3mo',
-            'full' => 'max',
-            default => '1y'
-        };
-        if ($outputSize === 'full') {
-            if ($interval === 'weekly') $range = '10y';
-            if ($interval === 'monthly') $range = 'max';
-        }
-        $params = [
-            'symbol' => $symbol,
-            'range' => $range,
-            'region' => 'US',
-            'interval' => $yahooInterval,
-            'includePrePost' => 'false',
-            'events' => 'div,split',
-            'includeAdjustedClose' => 'true'
-        ];
-
-        // Real API call
-        $data = $this->request('GET', $endpoint, $params);
-
-        // Processing
-        $prices = [];
-        if (isset($data['chart']['result'][0])) {
-            $result = $data['chart']['result'][0];
-            $timestamps = $result['timestamp'] ?? [];
-            $indicators = $result['indicators'] ?? [];
-            $quoteData = $indicators['quote'][0] ?? [];
-            $adjCloseData = $indicators['adjclose'][0]['adjclose'] ?? [];
-            $count = count($timestamps);
-
-            if (empty($timestamps) || !isset($quoteData['open']) || count($quoteData['open']) !== $count) {
-                $this->logger->error("Inconsistent data arrays in Yahoo Finance chart response.", ['symbol' => $symbol]);
-                return [];
+        try {
+            $endpoint = '/api/v1/market/get-chart';
+            $yahooInterval = match ($interval) {
+                'daily' => '1d',
+                'weekly' => '1wk',
+                'monthly' => '1mo',
+                default => '1d'
+            };
+            $range = match ($outputSize) {
+                'compact' => '3mo',
+                'full' => 'max',
+                default => '1y'
+            };
+            if ($outputSize === 'full') {
+                if ($interval === 'weekly') $range = '10y';
+                if ($interval === 'monthly') $range = 'max';
             }
+            $params = [
+                'symbol' => $symbol,
+                'range' => $range,
+                'region' => 'US',
+                'interval' => $yahooInterval,
+                'includePrePost' => 'false',
+                'events' => 'div,split',
+                'includeAdjustedClose' => 'true'
+            ];
 
-            $timeZone = new \DateTimeZone('UTC');
-            if (!empty($result['meta']['exchangeTimezoneName'])) {
-                try {
-                    $timeZone = new \DateTimeZone($result['meta']['exchangeTimezoneName']);
-                } catch (\Exception $e) {
-                    // Use default UTC timezone if exchange timezone is invalid
-                }
-            }
+            // Real API call
+            $this->logger->info('Making historical prices API request', ['symbol' => $symbol, 'interval' => $interval, 'range' => $range]);
+            $data = $this->request('GET', $endpoint, $params);
 
-            $previousClose = null;
-            for ($i = 0; $i < $count; $i++) {
-                if ($quoteData['open'][$i] === null || $quoteData['close'][$i] === null) continue;
+            // Processing
+            $prices = [];
+            if (isset($data['chart']['result'][0])) {
+                $result = $data['chart']['result'][0];
+                $timestamps = $result['timestamp'] ?? [];
+                $indicators = $result['indicators'] ?? [];
+                $quoteData = $indicators['quote'][0] ?? [];
+                $adjCloseData = $indicators['adjclose'][0]['adjclose'] ?? [];
+                $count = count($timestamps);
 
-                $date = new \DateTime();
-                $date->setTimestamp($timestamps[$i]);
-                $date->setTimezone($timeZone);
-
-                $currentClose = (float)($quoteData['close'][$i] ?? 0);
-                $change = null;
-                $changePercent = null;
-
-                if ($previousClose !== null) {
-                    $change = $currentClose - $previousClose;
-                    $changePercent = ($previousClose != 0) ? ($change / $previousClose) * 100 : 0;
+                if (empty($timestamps) || !isset($quoteData['open']) || count($quoteData['open']) !== $count) {
+                    $this->logger->error("Inconsistent data arrays in Yahoo Finance chart response.", ['symbol' => $symbol]);
+                    return [];
                 }
 
-                // Process dividend and split events if available
-                $dividend = 0;
-                $split = 1;
-                if (isset($result['events'])) {
-                    if (isset($result['events']['dividends'][$timestamps[$i]])) {
-                        $dividend = (float)($result['events']['dividends'][$timestamps[$i]]['amount'] ?? 0);
-                    }
-                    if (isset($result['events']['splits'][$timestamps[$i]])) {
-                        $split = (float)($result['events']['splits'][$timestamps[$i]]['splitRatio'] ?? 1);
+                $timeZone = new \DateTimeZone('UTC');
+                if (!empty($result['meta']['exchangeTimezoneName'])) {
+                    try {
+                        $timeZone = new \DateTimeZone($result['meta']['exchangeTimezoneName']);
+                    } catch (\Exception $e) {
+                        // Use default UTC timezone if exchange timezone is invalid
                     }
                 }
 
-                $prices[] = [
-                    'date' => $date->format('Y-m-d'),
-                    'open' => (float)($quoteData['open'][$i] ?? 0),
-                    'high' => (float)($quoteData['high'][$i] ?? 0),
-                    'low' => (float)($quoteData['low'][$i] ?? 0),
-                    'close' => $currentClose,
-                    'adjustedClose' => (float)($adjCloseData[$i] ?? $currentClose),
-                    'volume' => (int)($quoteData['volume'][$i] ?? 0),
-                    'change' => $change,
-                    'changePercent' => $changePercent,
-                    'dividend' => $dividend,
-                    'split' => $split
-                ];
+                $previousClose = null;
+                for ($i = 0; $i < $count; $i++) {
+                    if ($quoteData['open'][$i] === null || $quoteData['close'][$i] === null) continue;
 
-                $previousClose = $currentClose;
+                    $date = new \DateTime();
+                    $date->setTimestamp($timestamps[$i]);
+                    $date->setTimezone($timeZone);
+
+                    $currentClose = (float)($quoteData['close'][$i] ?? 0);
+                    $change = null;
+                    $changePercent = null;
+
+                    if ($previousClose !== null) {
+                        $change = $currentClose - $previousClose;
+                        $changePercent = ($previousClose != 0) ? ($change / $previousClose) * 100 : 0;
+                    }
+
+                    // Process dividend and split events if available
+                    $dividend = 0;
+                    $split = 1;
+                    if (isset($result['events'])) {
+                        if (isset($result['events']['dividends'][$timestamps[$i]])) {
+                            $dividend = (float)($result['events']['dividends'][$timestamps[$i]]['amount'] ?? 0);
+                        }
+                        if (isset($result['events']['splits'][$timestamps[$i]])) {
+                            $split = (float)($result['events']['splits'][$timestamps[$i]]['splitRatio'] ?? 1);
+                        }
+                    }
+
+                    $prices[] = [
+                        'date' => $date->format('Y-m-d'),
+                        'open' => (float)($quoteData['open'][$i] ?? 0),
+                        'high' => (float)($quoteData['high'][$i] ?? 0),
+                        'low' => (float)($quoteData['low'][$i] ?? 0),
+                        'close' => $currentClose,
+                        'adjustedClose' => (float)($adjCloseData[$i] ?? $currentClose),
+                        'volume' => (int)($quoteData['volume'][$i] ?? 0),
+                        'change' => $change,
+                        'changePercent' => $changePercent,
+                        'dividend' => $dividend,
+                        'split' => $split
+                    ];
+
+                    $previousClose = $currentClose;
+                }
+
+                $this->logger->info('Successfully processed historical prices', [
+                    'symbol' => $symbol,
+                    'interval' => $interval,
+                    'count' => count($prices)
+                ]);
+            } else {
+                $this->logger->warning("No chart results found in Yahoo Finance response.", [
+                    'symbol' => $symbol,
+                    'interval' => $interval,
+                    'response_data' => json_encode(array_keys($data))
+                ]);
             }
-        } else {
-            $this->logger->warning("No chart results found in Yahoo Finance response.", ['symbol' => $symbol, 'interval' => $interval]);
-        }
 
-        return $prices;
+            return $prices;
+        } catch (\Exception $e) {
+            $this->logger->error("Error getting historical prices: " . $e->getMessage(), [
+                'symbol' => $symbol,
+                'interval' => $interval,
+                'exception' => get_class($e)
+            ]);
+
+            // Return empty array on error instead of throwing exception
+            return [];
+        }
     }
 }

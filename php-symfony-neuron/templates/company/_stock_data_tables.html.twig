@@ -10,15 +10,15 @@
                     <tbody>
                         <tr>
                             <th>Previous Close</th>
-                            <td>${{ quote.previousClose|number_format(2, '.', ',') }}</td>
+                            <td>${{ quote.previousClose|default(0)|number_format(2, '.', ',') }}</td>
                         </tr>
                         <tr>
                             <th>Open</th>
-                            <td>${{ quote.open|number_format(2, '.', ',') }}</td>
+                            <td>${{ quote.open|default(0)|number_format(2, '.', ',') }}</td>
                         </tr>
                         <tr>
                             <th>Day's Range</th>
-                            <td>${{ quote.low|number_format(2, '.', ',') }} - ${{ quote.high|number_format(2, '.', ',') }}</td>
+                            <td>${{ quote.low|default(0)|number_format(2, '.', ',') }} - ${{ quote.high|default(0)|number_format(2, '.', ',') }}</td>
                         </tr>
                         <tr>
                             <th>52 Week Range</th>
@@ -26,7 +26,7 @@
                         </tr>
                         <tr>
                             <th>Volume</th>
-                            <td>{{ quote.volume|number_format(0, '.', ',') }}</td>
+                            <td>{{ quote.volume|default(0)|number_format(0, '.', ',') }}</td>
                         </tr>
                         <tr>
                             <th>Avg. Volume</th>

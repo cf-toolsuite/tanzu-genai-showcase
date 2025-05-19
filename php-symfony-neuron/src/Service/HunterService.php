@@ -295,28 +295,28 @@ class HunterService
         try {
             // Get company name and prepare required data
             $companyName = $company->getName();
-            
+
             // Use the existing method to find executives by company name
             $executivesData = $this->findExecutivesByCompany($companyName);
-            
+
             if (!$executivesData['success'] || empty($executivesData['executives'])) {
                 return 0; // No executives found
             }
-            
+
             // Process executives data and create profiles
             $count = 0;
             foreach ($executivesData['executives'] as $executiveData) {
                 if (empty($executiveData['first_name']) || empty($executiveData['last_name'])) {
                     continue; // Skip if no name available
                 }
-                
+
                 // Check if executive already exists
                 $existingProfile = $this->entityManager->getRepository(ExecutiveProfile::class)
                     ->findOneBy([
                         'company' => $company,
                         'name' => $executiveData['first_name'] . ' ' . $executiveData['last_name']
                     ]);
-                    
+
                 if ($existingProfile) {
                     // Update existing profile
                     $this->updateExecutiveWithHunterData($existingProfile, [
@@ -335,15 +335,15 @@ class HunterService
                     $profile->setLinkedinProfileUrl($executiveData['linkedin'] ?? null);
                     $profile->setCreatedAt(new \DateTimeImmutable());
                     $profile->setUpdatedAt(new \DateTimeImmutable());
-                    
+
                     $this->entityManager->persist($profile);
                     $count++;
                 }
             }
-            
+
             $this->entityManager->flush();
             return $count;
-            
+
         } catch (\Exception $e) {
             $this->logger->error('Error finding company executives', [
                 'company' => $company->getName(),

@@ -9,8 +9,11 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface; //
 
 /**
  * Alpha Vantage API client - REAL Implementation
+ * Implements stock market data and news interfaces
  */
-class AlphaVantageClient extends AbstractApiClient
+class AlphaVantageClient extends AbstractApiClient implements
+    StockMarketDataApiClientInterface,
+    NewsApiClientInterface
 {
     /**
      * {@inheritdoc}
@@ -43,29 +46,103 @@ class AlphaVantageClient extends AbstractApiClient
             'function' => 'SYMBOL_SEARCH',
             'keywords' => $term
         ];
+        $fullUrl = rtrim($this->baseUrl, '/') . '/' . ltrim($endpoint, '/');
 
-        // Real API call - throws exception on failure
-        $data = $this->request('GET', $endpoint, $params);
+        try {
+            // Log the search attempt with detailed information
+            $this->logger->info('Searching for companies via AlphaVantage API', [
+                'term' => $term,
+                'endpoint' => $endpoint,
+                'full_url' => $fullUrl,
+                'params' => $params,
+                'baseUrl' => $this->baseUrl,
+                'has_api_key' => !empty($this->apiKey) ? 'yes' : 'no',
+                'api_key_param' => $this->getAuthParams()
+            ]);
 
-        // Processing
-        $results = [];
-        if (isset($data['bestMatches']) && is_array($data['bestMatches'])) {
-            foreach ($data['bestMatches'] as $match) {
-                $results[] = [
-                    'symbol' => $match['1. symbol'] ?? '',
-                    'name' => $match['2. name'] ?? '',
-                    'type' => $match['3. type'] ?? '',
-                    'region' => $match['4. region'] ?? '',
-                    'currency' => $match['8. currency'] ?? '',
-                    'matchScore' => $match['9. matchScore'] ?? '',
-                    // Add required fields from interface/standardized format even if null/empty
-                    'description' => '',
-                    'sector' => '',
-                    'industry' => '',
-                ];
+            // Real API call
+            $data = $this->request('GET', $endpoint, $params);
+
+            // Log the raw response
+            $this->logger->debug('AlphaVantage API search raw response', [
+                'term' => $term,
+                'response_keys' => is_array($data) ? array_keys($data) : 'not_array',
+                'response_data' => json_encode(array_slice($data, 0, 500)) // Limit to 500 chars to avoid huge logs
+            ]);
+
+            // Processing
+            $results = [];
+            if (isset($data['bestMatches']) && is_array($data['bestMatches'])) {
+                $this->logger->debug('Found bestMatches in AlphaVantage response', [
+                    'count' => count($data['bestMatches'])
+                ]);
+
+                foreach ($data['bestMatches'] as $match) {
+                    $this->logger->debug('Processing match item', [
+                        'symbol' => $match['1. symbol'] ?? 'unknown',
+                        'name' => $match['2. name'] ?? 'unknown'
+                    ]);
+
+                    $results[] = [
+                        'symbol' => $match['1. symbol'] ?? '',
+                        'name' => $match['2. name'] ?? '',
+                        'type' => $match['3. type'] ?? '',
+                        'region' => $match['4. region'] ?? '',
+                        'currency' => $match['8. currency'] ?? '',
+                        'matchScore' => $match['9. matchScore'] ?? '',
+                        // Add required fields from interface/standardized format even if null/empty
+                        'description' => '',
+                        'sector' => '',
+                        'industry' => '',
+                        'provider' => 'Alpha Vantage', // Add provider information
+                    ];
+                }
+            } else {
+                // Log when the expected structure is missing
+                $this->logger->warning('AlphaVantage API response missing expected "bestMatches" array', [
+                    'term' => $term,
+                    'response_structure' => json_encode(array_keys($data))
+                ]);
+
+                // Check if there's an error message in the response
+                if (isset($data['Error Message'])) {
+                    $this->logger->error('AlphaVantage API returned an error message', [
+                        'term' => $term,
+                        'error_message' => $data['Error Message']
+                    ]);
+                }
+
+                // Check if there's a note about API call frequency
+                if (isset($data['Note'])) {
+                    $this->logger->warning('AlphaVantage API returned a note', [
+                        'term' => $term,
+                        'note' => $data['Note']
+                    ]);
+                }
             }
+
+            // Log the search results
+            $this->logger->info('AlphaVantage API search results', [
+                'term' => $term,
+                'count' => count($results),
+                'results' => count($results) > 0 ? json_encode(array_slice($results, 0, 3)) : 'empty' // Show up to 3 results
+            ]);
+
+            return $results;
+        } catch (\Exception $e) {
+            $this->logger->error('AlphaVantage API search failed', [
+                'term' => $term,
+                'error' => $e->getMessage(),
+                'exception' => get_class($e),
+                'endpoint' => $endpoint,
+                'full_url' => $fullUrl,
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            // Return empty array instead of throwing exception
+            // This allows other API clients to be tried and prevents errors from breaking the UI
+            return [];
         }
-        return $results;
     }
 
     /**

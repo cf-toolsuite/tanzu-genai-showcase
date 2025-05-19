@@ -41,17 +41,48 @@ class CompanyRepository extends ServiceEntityRepository
 
     /**
      * Find companies by name, ticker symbol, industry, or sector
-     * Uses case-insensitive contains search logic
+     * Uses case-insensitive contains search logic with more flexible matching
      */
     public function findBySearchCriteria(string $searchTerm, int $limit = 25): array
     {
-        $queryBuilder = $this->createQueryBuilder('c')
-            ->where('LOWER(c.name) LIKE LOWER(:searchTerm)')
-            ->orWhere('LOWER(c.tickerSymbol) LIKE LOWER(:searchTerm)')
-            ->orWhere('LOWER(c.industry) LIKE LOWER(:searchTerm)')
-            ->orWhere('LOWER(c.sector) LIKE LOWER(:searchTerm)')
-            ->setParameter('searchTerm', '%' . strtolower($searchTerm) . '%')
-            ->orderBy('c.name', 'ASC')
+        // Normalize the search term
+        $searchTerm = trim($searchTerm);
+
+        // Check if it's empty after trimming
+        if (empty($searchTerm)) {
+            return [];
+        }
+
+        $queryBuilder = $this->createQueryBuilder('c');
+
+        // If the search term looks like a stock symbol (all uppercase, 1-5 characters)
+        if (strlen($searchTerm) <= 5 && strtoupper($searchTerm) === $searchTerm) {
+            // Give higher priority to exact symbol matches
+            $queryBuilder->where('c.tickerSymbol = :exactSymbol')
+                ->orWhere('LOWER(c.tickerSymbol) LIKE LOWER(:partialSymbol)')
+                ->orWhere('LOWER(c.name) LIKE LOWER(:nameTerm)')
+                ->orWhere('LOWER(c.industry) LIKE LOWER(:searchTerm)')
+                ->orWhere('LOWER(c.sector) LIKE LOWER(:searchTerm)')
+                ->setParameter('exactSymbol', $searchTerm)
+                ->setParameter('partialSymbol', $searchTerm . '%')
+                ->setParameter('nameTerm', '%' . strtolower($searchTerm) . '%')
+                ->setParameter('searchTerm', '%' . strtolower($searchTerm) . '%');
+        } else {
+            // Regular search with priority for name matches
+            $queryBuilder->where('LOWER(c.name) LIKE LOWER(:exactName)')
+                ->orWhere('LOWER(c.name) LIKE LOWER(:startName)')
+                ->orWhere('LOWER(c.name) LIKE LOWER(:nameTerm)')
+                ->orWhere('LOWER(c.tickerSymbol) LIKE LOWER(:symbolTerm)')
+                ->orWhere('LOWER(c.industry) LIKE LOWER(:searchTerm)')
+                ->orWhere('LOWER(c.sector) LIKE LOWER(:searchTerm)')
+                ->setParameter('exactName', strtolower($searchTerm))
+                ->setParameter('startName', strtolower($searchTerm) . '%')
+                ->setParameter('nameTerm', '%' . strtolower($searchTerm) . '%')
+                ->setParameter('symbolTerm', strtolower($searchTerm) . '%')
+                ->setParameter('searchTerm', '%' . strtolower($searchTerm) . '%');
+        }
+
+        $queryBuilder->orderBy('c.name', 'ASC')
             ->setMaxResults($limit);
 
         return $queryBuilder->getQuery()->getResult();

@@ -1,0 +1,44 @@
+# API Clients Service Configuration
+
+services:
+    # Default configuration for API client services
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        public: false
+
+    # Register API clients by their domain-specific interfaces
+
+    # News API Clients
+    App\Service\ApiClient\NewsApiClientInterface: '@App\Service\ApiClient\NewsApiClient'
+    App\Service\ApiClient\NewsApiClient: ~
+
+    # SEC Filings API Clients
+    App\Service\ApiClient\SecFilingsApiClientInterface: '@App\Service\SecFilingService'
+    App\Service\SecFilingService:
+        tags: ['app.sec_filings_client']
+
+    # Analyst Ratings API Clients
+    App\Service\ApiClient\AnalystRatingsApiClientInterface: '@App\Service\ApiClient\TradeFeedsApiClient'
+
+    # ESG Data API Clients
+    App\Service\ApiClient\EsgDataApiClientInterface: '@App\Service\ApiClient\EsgDataApiClient'
+    App\Service\ApiClient\EsgDataApiClient: ~
+
+    # Executive Data API Clients
+    App\Service\ApiClient\ExecutiveDataApiClientInterface: '@App\Service\FinancialDataAggregatorService'
+
+    # Stock Market Data Clients
+    App\Service\ApiClient\AlphaVantageClient:
+        tags: ['app.stock_market_data_client']
+    App\Service\ApiClient\YahooFinanceClient:
+        tags: ['app.stock_market_data_client']
+
+    # Financial Data Aggregator Service
+    App\Service\FinancialDataAggregatorService:
+        # Make this service available as the FinancialDataServiceInterface
+        tags: ['app.financial_data_service', 'app.executive_data_client']
+        # We'll use autowiring and compiler passes to inject the tagged services
+
+    # Register the FinancialDataAggregatorService as the implementation of FinancialDataServiceInterface
+    App\Service\FinancialDataServiceInterface: '@App\Service\FinancialDataAggregatorService'

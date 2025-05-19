@@ -3,6 +3,33 @@
         height: 500px;
         position: relative;
         margin-bottom: 30px;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        padding: 10px;
+        background-color: #fff;
+    }
+
+    .no-data-message {
+        background-color: #fff3cd;
+        border: 1px solid #ffeeba;
+        border-radius: 8px;
+        margin-top: 20px;
+        padding: 20px;
+        box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    }
+
+    .no-data-message h5 {
+        color: #856404;
+        font-weight: 600;
+    }
+
+    .no-data-message ul {
+        margin-bottom: 15px;
+    }
+
+    .no-data-message .text-muted {
+        font-size: 0.85rem;
+        color: #6c757d;
     }
 
     .time-range-selector {
@@ -103,6 +130,9 @@
         justify-content: space-between;
         align-items: center;
         margin-bottom: 15px;
+        padding: 10px;
+        background-color: #f8f9fa;
+        border-radius: 8px;
     }
 
     .chart-type-selector {
@@ -122,12 +152,6 @@
 
     .chart-indicators .dropdown { /* This class seems unused */
         margin-left: 10px;
-    }
-
-    .volume-container {
-        height: 100px; /* Canvas for volume chart will take this height */
-        margin-top: 10px;
-        position: relative; /* For potential absolute positioned elements within if needed */
     }
 
     .crosshair {

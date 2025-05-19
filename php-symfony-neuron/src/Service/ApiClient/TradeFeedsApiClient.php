@@ -10,7 +10,7 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
  * TradeFeeds API client - REAL Implementation
  * Provides access to company analyst ratings data
  */
-class TradeFeedsApiClient extends AbstractApiClient
+class TradeFeedsApiClient extends AbstractApiClient implements AnalystRatingsApiClientInterface
 {
     /**
      * {@inheritdoc}
@@ -44,115 +44,6 @@ class TradeFeedsApiClient extends AbstractApiClient
         return ['key' => $this->apiKey];
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function searchCompanies(string $term): array
-    {
-        // Not implemented for TradeFeeds
-        $this->logger->warning('searchCompanies not supported by TradeFeeds API');
-        return [];
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getCompanyProfile(string $symbol): array
-    {
-        // Not implemented for TradeFeeds
-        $this->logger->warning('getCompanyProfile not supported by TradeFeeds API');
-        return [];
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getQuote(string $symbol): array
-    {
-        // Not implemented for TradeFeeds
-        $this->logger->warning('getQuote not supported by TradeFeeds API');
-        return [];
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getFinancials(string $symbol, string $period = 'quarterly'): array
-    {
-        // Not implemented for TradeFeeds
-        $this->logger->warning('getFinancials not supported by TradeFeeds API');
-        return [];
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getCompanyNews(string $symbol, int $limit = 5): array
-    {
-        // Not implemented for TradeFeeds
-        $this->logger->warning('getCompanyNews not supported by TradeFeeds API');
-        return [];
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getExecutives(string $symbol): array
-    {
-        // Not implemented for TradeFeeds
-        $this->logger->warning('getExecutives not supported by TradeFeeds API');
-        return [];
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getHistoricalPrices(string $symbol, string $interval = 'daily', string $outputSize = 'compact'): array
-    {
-        // Not implemented for TradeFeeds
-        $this->logger->warning('getHistoricalPrices not supported by TradeFeeds API');
-        return [];
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getInsiderTrading(string $symbol, int $limit = 20): array
-    {
-        // Not implemented for TradeFeeds
-        $this->logger->warning('getInsiderTrading not supported by TradeFeeds API');
-        return [];
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getInstitutionalOwnership(string $symbol, int $limit = 20): array
-    {
-        // Not implemented for TradeFeeds
-        $this->logger->warning('getInstitutionalOwnership not supported by TradeFeeds API');
-        return [];
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getESGData(string $symbol): array
-    {
-        // Not implemented for TradeFeeds
-        $this->logger->warning('getESGData not supported by TradeFeeds API');
-        return [];
-    }
-
-    /**
-     * {@inheritdoc}
-     */
-    public function getRecentSecFilings(string $symbol, int $limit = 5): array
-    {
-        // Not implemented for TradeFeeds
-        $this->logger->warning('getRecentSecFilings not supported by TradeFeeds API');
-        return [];
-    }
 
     /**
      * Get analyst ratings for a company
@@ -270,6 +161,26 @@ class TradeFeedsApiClient extends AbstractApiClient
             $this->logger->error("Error getting analyst ratings from TradeFeeds API: " . $e->getMessage(), ['symbol' => $symbol]);
             return $this->getEmptyRatingsStructure();
         }
+    }
+
+    /**
+     * Get institutional ownership data for a company
+     *
+     * TradeFeeds API does not provide institutional ownership data, so this method returns an empty structure
+     *
+     * @param string $symbol The company symbol
+     * @return array Empty institutional ownership data structure
+     */
+    public function getInstitutionalOwnership(string $symbol): array
+    {
+        $this->logger->info("TradeFeeds API does not provide institutional ownership data", ['symbol' => $symbol]);
+
+        return [
+            'message' => 'Institutional ownership data is not available through TradeFeeds API. Please use another data provider for this information.',
+            'holders' => [],
+            'totalPercentHeld' => 0,
+            'totalHolders' => 0
+        ];
     }
 
     /**

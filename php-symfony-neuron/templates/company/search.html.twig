@@ -50,7 +50,7 @@
         .db-result {
             border-left: 5px solid #28a745;
         }
-        
+
         .data-source-label {
             font-size: 0.75rem;
             display: flex;
@@ -58,13 +58,13 @@
             gap: 0.35rem;
             color: #6c757d;
         }
-        
+
         .search-results-count {
             color: #6c757d;
             font-size: 0.9rem;
             margin-bottom: 1rem;
         }
-        
+
         .search-results-container {
             overflow-y: auto;
             margin-bottom: 2rem;
@@ -73,7 +73,7 @@
             overflow-x: hidden; /* Prevent horizontal scrolling */
             width: 100%;
         }
-        
+
         .actions-container {
             position: sticky;
             bottom: 0;
@@ -83,24 +83,24 @@
             margin-top: 1rem;
             z-index: 10;
         }
-        
+
         .card {
             height: 100%; /* Ensure consistent height */
             margin-bottom: 0.5rem;
             box-sizing: border-box; /* Include padding in width calculation */
             width: 100%; /* Full width of container */
         }
-        
+
         /* Fix for Bootstrap row margins causing horizontal scroll */
         .row {
             margin-left: 0;
             margin-right: 0;
         }
-        
+
         .card-body {
             padding: 1rem;
         }
-        
+
         .card-footer {
             padding: 0.75rem 1rem;
             background-color: rgba(0, 0, 0, 0.02);
@@ -143,7 +143,7 @@
                     </ul>
                 </div>
             </div>
-            
+
             {% if not searchTerm %}
             <div class="mt-4">
                 <a href="{{ path('company_new') }}" class="btn btn-outline-primary">
@@ -156,10 +156,13 @@
 
     {% if searchTerm %}
         <h2 class="mb-4">Search Results for "{{ searchTerm }}"</h2>
-        
+
         {% set totalResults = dbResults|length + apiResults|length %}
         <div class="search-results-count">
             Found {{ totalResults }} result{% if totalResults != 1 %}s{% endif %}: {{ dbResults|length }} from internal database and {{ apiResults|length }} from external sources
+            {% if apiError is defined and apiError %}
+                <span class="text-warning">(External search services unavailable)</span>
+            {% endif %}
         </div>
 
         {% if dbResults is empty and apiResults is empty %}
@@ -167,12 +170,20 @@
                 <h4 class="alert-heading">No results found</h4>
                 <p>Your search for "{{ searchTerm }}" did not match any companies in our database or external sources.</p>
                 <hr>
-                    <div class="mt-5 text-center">
-                        <p>Try searching for a different company name or ticker symbol.</p>
-                        <a href="{{ path('company_new') }}" class="btn btn-outline-primary">
-                            <i class="bi bi-plus"></i> Add New Company
-                        </a>
-                    </div>
+                <div class="mt-3 mb-3">
+                    <h5>Troubleshooting:</h5>
+                    <ul>
+                        <li>For company names: Try using a shorter, more general term (e.g., "Google" instead of "Alphabet Inc.")</li>
+                        <li>For ticker symbols: Make sure the symbol is correct (e.g., "GOOG" for Google)</li>
+                        <li>Try searching by industry (e.g., "Technology") or sector (e.g., "Healthcare")</li>
+                    </ul>
+                </div>
+                <div class="mt-5 text-center">
+                    <p>Can't find what you're looking for? You can add it to our database.</p>
+                    <a href="{{ path('company_new') }}" class="btn btn-outline-primary">
+                        <i class="bi bi-plus"></i> Add New Company
+                    </a>
+                </div>
             </div>
         {% else %}
             <div class="search-results-container">
@@ -222,7 +233,7 @@
                                     <h5 class="card-title mb-0">{{ result.name }}</h5>
                                     <span class="stock-badge">{{ result.symbol }}</span>
                                 </div>
-                                
+
                                 {% if result.exchange is defined and result.exchange and result.exchange != 'Unknown' %}
                                 <div class="mt-3 mb-3">
                                     <small class="text-muted">
@@ -248,7 +259,7 @@
                 {% endfor %}
                 </div>
             </div>
-            
+
             <div class="actions-container">
                 <div class="d-flex justify-content-between align-items-center">
                     <a href="{{ path('company_new') }}" class="btn btn-outline-primary">

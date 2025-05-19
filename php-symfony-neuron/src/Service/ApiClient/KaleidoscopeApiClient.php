@@ -13,7 +13,9 @@ use Symfony\Component\HttpClient\HttpClient;
  * This client accesses the Kaleidoscope API for retrieving SEC filings data.
  * It requires an API key for authentication.
  */
-class KaleidoscopeApiClient extends AbstractApiClient
+class KaleidoscopeApiClient extends AbstractApiClient implements
+    SecFilingsApiClientInterface,
+    ExecutiveDataApiClientInterface
 {
     private const KSCOPE_BASE_URL = 'https://api.kscope.io/v2';
     private const SEC_SEARCH_ENDPOINT = '/sec/search';
@@ -143,7 +145,7 @@ class KaleidoscopeApiClient extends AbstractApiClient
 
     /**
      * Get paginated SEC filings with complete metadata
-     * 
+     *
      * @param string $ticker Stock ticker symbol
      * @param int $limit Maximum number of results to return
      * @param int $offset Pagination offset
@@ -155,9 +157,9 @@ class KaleidoscopeApiClient extends AbstractApiClient
             'limit' => $limit,
             'start' => $offset
         ];
-        
+
         $result = $this->searchFilings($ticker, $params);
-        
+
         return [
             'data' => array_map([$this, 'normalizeFilingData'], $result['data'] ?? []),
             'total' => $result['total'] ?? 0,
@@ -165,7 +167,7 @@ class KaleidoscopeApiClient extends AbstractApiClient
             'end' => $result['end'] ?? 0
         ];
     }
-    
+
     /**
      * Get 10-K reports for a company
      *
@@ -180,13 +182,13 @@ class KaleidoscopeApiClient extends AbstractApiClient
             'form' => '10-K',
             'limit' => $limit
         ];
-        
+
         try {
             $response = $this->searchFilings($ticker, $params);
             if (empty($response['data'])) {
                 return [];
             }
-            
+
             // Still normalize the data to our expected format
             return array_map([$this, 'normalizeFilingData'], array_slice($response['data'], 0, $limit));
         } catch (\Exception $e) {
@@ -459,30 +461,6 @@ class KaleidoscopeApiClient extends AbstractApiClient
     /**
      * {@inheritdoc}
      */
-    public function getAnalystRatings(string $symbol): array
-    {
-        if ($this->logger) {
-            $this->logger->warning('KaleidoscopeApiClient does not support analyst ratings.', ['symbol' => $symbol]);
-        }
-
-        return [
-            'ratings' => [],
-            'consensus' => [
-                'consensusRating' => 'N/A',
-                'averagePriceTarget' => 0,
-                'lowPriceTarget' => 0,
-                'highPriceTarget' => 0,
-                'buy' => 0,
-                'hold' => 0,
-                'sell' => 0,
-                'upside' => 0
-            ]
-        ];
-    }
-
-    /**
-     * {@inheritdoc}
-     */
     public function getInsiderTrading(string $symbol, int $limit = 20): array
     {
         if ($this->logger) {
@@ -505,25 +483,4 @@ class KaleidoscopeApiClient extends AbstractApiClient
         }
     }
 
-    /**
-     * {@inheritdoc}
-     */
-    public function getInstitutionalOwnership(string $symbol, int $limit = 20): array
-    {
-        if ($this->logger) {
-            $this->logger->warning('KaleidoscopeApiClient does not support institutional ownership data.', ['symbol' => $symbol]);
-        }
-
-        // Could potentially extract from 13F filings, but that's complex
-        // Just return empty array for now
-        return [];
-    }
-
-    /**
-     * Get mock data for testing (not used in real implementation)
-     */
-    protected function getMockData(string $endpoint, array $params): array
-    {
-        return [];
-    }
 }

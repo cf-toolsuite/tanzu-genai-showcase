@@ -82,7 +82,7 @@ class SecFilingRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
-    
+
     /**
      * Find recent SEC filings for a company by form type
      *
@@ -96,23 +96,23 @@ class SecFilingRepository extends ServiceEntityRepository
         $queryBuilder = $this->createQueryBuilder('f')
             ->andWhere('f.company = :company')
             ->setParameter('company', $company);
-            
+
         if ($formType) {
             $queryBuilder
                 ->andWhere('f.formType = :formType')
                 ->setParameter('formType', $formType);
         }
-        
+
         return $queryBuilder
             ->orderBy('f.filingDate', 'DESC')
             ->setMaxResults($limit)
             ->getQuery()
             ->getResult();
     }
-    
+
     /**
      * Find SEC filing by accession number
-     * 
+     *
      * @param string $accessionNumber
      * @return SecFiling|null
      */
@@ -124,10 +124,10 @@ class SecFilingRepository extends ServiceEntityRepository
             ->getQuery()
             ->getOneOrNullResult();
     }
-    
+
     /**
      * Find unprocessed SEC filings
-     * 
+     *
      * @param int $limit
      * @return SecFiling[]
      */
@@ -141,10 +141,10 @@ class SecFilingRepository extends ServiceEntityRepository
             ->getQuery()
             ->getResult();
     }
-    
+
     /**
      * Find latest 10-K filing for a company
-     * 
+     *
      * @param Company $company
      * @return SecFiling|null
      */

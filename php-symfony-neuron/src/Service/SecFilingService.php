@@ -9,7 +9,6 @@ use App\Repository\SecFilingRepository;
 use App\Service\ApiClient\SecApiClientFactory;
 use App\Service\ApiClient\ApiClientInterface;
 use App\Service\ApiClient\KaleidoscopeApiClient;
-use App\Service\ApiClient\MockKaleidoscopeApiClient;
 use App\Service\NeuronAiService;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
@@ -54,8 +53,7 @@ class SecFilingService
             return [];
         }
         // Ensure we have the correct client type for SEC API specific methods
-        if (!($this->secApiClient instanceof KaleidoscopeApiClient ||
-              $this->secApiClient instanceof MockKaleidoscopeApiClient)) {
+        if (!($this->secApiClient instanceof KaleidoscopeApiClient)) {
              $this->logger->error('Cannot import 10-K reports: Invalid SEC API client type.');
              return [];
         }
@@ -79,15 +77,15 @@ class SecFilingService
             $filing->setFormType($report['formType']);
             // Set the type field (required by the entity)
             $filing->setType($report['formType'] ?? 'UNKNOWN');
-            try { 
-                $filing->setFilingDate(new \DateTime($report['filingDate'])); 
+            try {
+                $filing->setFilingDate(new \DateTime($report['filingDate']));
             } catch (\Exception $e) {
                 $this->logger->warning('Error setting filing date: ' . $e->getMessage());
                 $filing->setFilingDate(new \DateTime()); // Set current date as fallback
             }
             if (isset($report['reportDate']) && $report['reportDate']) {
-                try { 
-                    $filing->setReportDate(new \DateTime($report['reportDate'])); 
+                try {
+                    $filing->setReportDate(new \DateTime($report['reportDate']));
                 } catch (\Exception $e) {
                     $this->logger->warning('Error setting report date: ' . $e->getMessage());
                     // Fallback to filing date if available
@@ -106,23 +104,23 @@ class SecFilingService
             }
             $filing->setFileNumber($report['fileNumber'] ?? null);
             $filing->setDescription($report['description'] ?? $report['formDescription'] ?? $report['formType'] . ' filing for ' . $company->getName());
-            
+
             // Use different URL fields with fallbacks
             $filing->setDocumentUrl($report['documentUrl'] ?? $report['htmlUrl'] ?? $report['pdfUrl'] ?? '');
             $filing->setHtmlUrl($report['htmlUrl'] ?? null);
             $filing->setUrl($report['documentUrl'] ?? $report['htmlUrl'] ?? $report['pdfUrl'] ?? '');
             $filing->setTextUrl($report['textUrl'] ?? null);
-            
+
             // Set additional URL fields
             $filing->setPdfUrl($report['pdfUrl'] ?? null);
             $filing->setXbrlUrl($report['xbrlUrl'] ?? null);
             $filing->setIxbrlUrl($report['ixbrlUrl'] ?? null);
-            
+
             // Save additional data from enhanced API response
             if (isset($report['filer'])) {
                 // Store filer info in dedicated field
                 $filing->setFiler($report['filer']);
-                
+
                 // Also include it in the description if not the company name
                 if ($report['filer'] !== $company->getName()) {
                     $filing->setDescription($filing->getDescription() . ' (Filed by: ' . $report['filer'] . ')');
@@ -156,8 +154,7 @@ class SecFilingService
     public function processSecFiling(SecFiling $filing): bool
     {
         // Ensure we have the correct client type for SEC API specific methods
-        if (!($this->secApiClient instanceof KaleidoscopeApiClient ||
-              $this->secApiClient instanceof MockKaleidoscopeApiClient)) {
+        if (!($this->secApiClient instanceof KaleidoscopeApiClient)) {
              $this->logger->error('Cannot process filing: Invalid SEC API client type.');
              return false;
         }

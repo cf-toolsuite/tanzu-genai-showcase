@@ -1,0 +1,94 @@
+@startuml API Client Architecture
+
+' Interfaces
+interface "FinancialDataServiceInterface" as FDSI
+interface "ApiClientInterface" as ACI
+interface "StockMarketDataApiClientInterface" as SMDAI
+interface "NewsApiClientInterface" as NAI
+interface "SecFilingsApiClientInterface" as SFAI
+interface "AnalystRatingsApiClientInterface" as ARAI
+interface "EsgDataApiClientInterface" as EDAI
+interface "ExecutiveDataApiClientInterface" as EXDAI
+interface "HunterApiClientInterface" as HAI
+
+' Abstract classes
+abstract "AbstractApiClient" as AAC
+
+' Implementations
+class "YahooFinanceClient" as YFC
+class "AlphaVantageClient" as AVC
+class "NewsApiClient" as NC
+class "KaleidoscopeApiClient" as KC
+class "TradeFeedsApiClient" as TFC
+class "HunterApiClient" as HC
+class "FinancialDataAggregatorService" as FDAS
+
+' Relationships - Inheritance
+AAC <|-- YFC
+AAC <|-- AVC
+AAC <|-- NC
+AAC <|-- KC
+AAC <|-- TFC
+AAC <|-- HC
+
+' Relationships - Implementation
+SMDAI <|.. YFC
+SMDAI <|.. AVC
+NAI <|.. YFC
+NAI <|.. AVC
+NAI <|.. NC
+SFAI <|.. YFC
+SFAI <|.. KC
+ARAI <|.. YFC
+ARAI <|.. TFC
+EDAI <|.. YFC
+EXDAI <|.. YFC
+EXDAI <|.. HC
+EXDAI <|.. KC
+HAI <|.. HC
+FDSI <|.. FDAS
+
+' Relationships - Aggregation
+FDAS o-- SMDAI : aggregates >
+FDAS o-- NAI : aggregates >
+FDAS o-- SFAI : aggregates >
+FDAS o-- ARAI : aggregates >
+FDAS o-- EDAI : aggregates >
+FDAS o-- EXDAI : aggregates >
+
+' Notes
+note right of FDAS
+  Aggregates multiple API clients
+  by their domain-specific interfaces
+  and provides a unified interface
+  for accessing financial data
+end note
+
+note right of YFC
+  Implements all domain-specific interfaces
+  as it has the most complete implementation
+end note
+
+note right of TFC
+  Specialized for analyst ratings only
+end note
+
+note right of NC
+  Specialized for news only
+end note
+
+note right of KC
+  Specialized for SEC filings
+  and insider trading
+end note
+
+note right of HC
+  Specialized for executive data
+end note
+
+note right of AVC
+  Implements core financial data
+  and news interfaces
+end note
+
+@enduml

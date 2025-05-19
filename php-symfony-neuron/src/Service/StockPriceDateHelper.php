@@ -7,7 +7,7 @@ class StockPriceDateHelper
     public function calculateStartDate(\DateTime $endDate, string $timeRange): \DateTime
     {
         $startDate = clone $endDate;
-        switch ($timeRange) {
+        switch (strtoupper($timeRange)) {
             case '1D': $startDate->modify('-1 day'); break;
             case '5D': $startDate->modify('-5 days'); break;
             case '1M': $startDate->modify('-1 month'); break;

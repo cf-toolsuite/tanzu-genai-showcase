@@ -1,0 +1,28 @@
+# News Services Configuration
+
+services:
+    # Default configuration for news services
+    _defaults:
+        autowire: true
+        autoconfigure: true
+        public: false
+
+    # News API Client Adapter
+    App\Service\News\NewsApiClientAdapter:
+        arguments:
+            $client: '@App\Service\ApiClient\NewsApiClient'
+        tags: ['app.news_api_client']
+
+    # Yahoo Finance News Adapter
+    App\Service\News\YahooFinanceNewsAdapter:
+        arguments:
+            $client: '@App\Service\ApiClient\YahooFinanceClient'
+        tags: ['app.news_api_client']
+
+    # Composite News API Client
+    App\Service\News\CompositeNewsApiClient:
+        # This service will have all tagged news clients injected via the compiler pass
+        tags: ['app.news_service']
+
+    # Register the CompositeNewsApiClient as the implementation of NewsService
+    App\Service\News\NewsService: '@App\Service\News\CompositeNewsApiClient'

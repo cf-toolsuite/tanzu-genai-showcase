@@ -38,17 +38,7 @@ class CompanyMarketDataController extends AbstractController
         $limit = $request->query->getInt('limit', 10);
         $refresh = $request->query->getBoolean('refresh', false);
         $companyNews = $this->stockDataService->getCompanyNews($company->getTickerSymbol(), $limit, $refresh);
-
-        $marketNews = [];
-        try {
-            $newsApiClient = $clientsFactory->getNewsApiClient();
-            if ($newsApiClient) {
-                $marketNews = $newsApiClient->getTopHeadlines('business', 'us', 5);
-            }
-        } catch (\Exception $e) {
-            $this->logger->warning('Could not retrieve market headlines: ' . $e->getMessage());
-            $this->addFlash('warning', 'Could not retrieve market headlines: ' . $e->getMessage());
-        }
+        $marketNews = $this->stockDataService->getMarketNews(10, $refresh); // Fetch market news, limit to 10, allow refresh
 
         $titles = [];
         $duplicateCount = 0;
@@ -67,7 +57,7 @@ class CompanyMarketDataController extends AbstractController
         return $this->render('company/news.html.twig', [
             'company' => $company,
             'news' => $companyNews,
-            'marketNews' => $marketNews,
+            'marketNews' => $marketNews, // Pass market news to the template
             'limit' => $limit,
             'days' => $request->query->getInt('days', 30), // 'days' seems unused in logic
             'refresh' => $refresh,
@@ -100,18 +90,11 @@ class CompanyMarketDataController extends AbstractController
         }
 
         $institutionalOwners = [];
-        $totalInstitutionalOwnership = 0;
+        $totalInstitutionalOwnership = 0; // Initialize with default value
         try {
             $institutionalOwners = $this->stockDataService->getInstitutionalOwnership($company->getTickerSymbol(), 5);
-            $quote = $this->stockDataService->getStockQuote($company->getTickerSymbol());
-            $sharesOutstanding = $quote['sharesOutstanding'] ?? 0;
-            $totalShares = 0;
-            foreach ($institutionalOwners as $institution) {
-                $totalShares += $institution['sharesHeld'] ?? 0;
-            }
-            if ($sharesOutstanding > 0) {
-                $totalInstitutionalOwnership = ($totalShares / $sharesOutstanding) * 100;
-            }
+            // Use the new method from StockDataService to calculate total institutional ownership
+            $totalInstitutionalOwnership = $this->stockDataService->calculateTotalInstitutionalOwnership($company);
         } catch (\Exception $e) {
             $this->logger->info('Could not retrieve institutional ownership for additional metrics: ' . $e->getMessage());
         }
@@ -242,36 +225,93 @@ class CompanyMarketDataController extends AbstractController
         $timeRange = $request->query->get('range', '1M');
         $forceRefresh = $request->query->getBoolean('refresh', false);
 
-        $quote = $this->stockDataService->getStockQuote($company->getTickerSymbol());
-        $endDate = new \DateTime();
-        $startDate = $this->stockPriceDateHelper->calculateStartDate($endDate, $timeRange);
+        try {
+            // If refresh param is set, show a flash message
+            if ($forceRefresh) {
+                $this->addFlash('info', 'Data refresh requested. Fetching latest stock prices...');
+            }
 
-        $prices = $this->stockDataService->getHistoricalPrices(
-            $company->getTickerSymbol(),
-            $interval,
-            $this->stockPriceDateHelper->getOutputSizeForTimeRange($timeRange),
-            $forceRefresh
-        );
+            // Get quote data
+            $quote = $this->stockDataService->getStockQuote($company->getTickerSymbol());
 
-        $filteredPrices = array_filter($prices, function($price) use ($startDate) {
-            $priceDate = new \DateTime($price['date']);
-            return $priceDate >= $startDate;
-        });
-        $filteredPrices = array_values($filteredPrices);
-        usort($filteredPrices, fn($a, $b) => strtotime($a['date']) - strtotime($b['date']));
+            // Check if we need to warn about missing API key
+            if (isset($quote['marketState']) && $quote['marketState'] === 'ERROR') {
+                $this->addFlash('warning', 'Unable to fetch current stock data. The API connection may not be configured correctly.');
+            }
 
-        $enableRealTimeUpdates = $interval === 'daily' &&
-                                $timeRange === '1D' &&
-                                $this->stockPriceDateHelper->isMarketHours();
+            $endDate = new \DateTime();
+            $startDate = $this->stockPriceDateHelper->calculateStartDate($endDate, $timeRange);
 
-        return $this->render('company/stock_prices.html.twig', [
-            'company' => $company,
-            'prices' => $filteredPrices,
-            'quote' => $quote,
-            'interval' => $interval,
-            'timeRange' => $timeRange,
-            'enableRealTimeUpdates' => $enableRealTimeUpdates,
-            'lastUpdated' => new \DateTime(),
-        ]);
+            // Get historical price data
+            $prices = $this->stockDataService->getHistoricalPrices(
+                $company->getTickerSymbol(),
+                $interval,
+                $this->stockPriceDateHelper->getOutputSizeForTimeRange($timeRange),
+                $forceRefresh
+            );
+
+            // Filter prices by date range
+            $filteredPrices = [];
+            if (!empty($prices)) {
+                $filteredPrices = array_filter($prices, function($price) use ($startDate) {
+                    try {
+                        $priceDate = new \DateTime($price['date']);
+                        return $priceDate >= $startDate;
+                    } catch (\Exception $e) {
+                        $this->logger->warning('Invalid date in price data: ' . ($price['date'] ?? 'N/A'));
+                        return false;
+                    }
+                });
+                $filteredPrices = array_values($filteredPrices); // Re-index
+                usort($filteredPrices, fn($a, $b) => strtotime($a['date']) - strtotime($b['date']));
+            }
+
+            // Show a warning if we got no price data
+            if (empty($filteredPrices)) {
+                $this->addFlash(
+                    'warning',
+                    'No stock price data is available for ' . $company->getTickerSymbol() . ' with the selected settings.' .
+                    ' Try a different time range or interval.'
+                );
+            }
+
+            $enableRealTimeUpdates = $interval === 'daily' &&
+                                    $timeRange === '1D' &&
+                                    $this->stockPriceDateHelper->isMarketHours();
+
+            return $this->render('company/stock_prices.html.twig', [
+                'company' => $company,
+                'prices' => $filteredPrices,
+                'quote' => $quote,
+                'interval' => $interval,
+                'timeRange' => $timeRange,
+                'enableRealTimeUpdates' => $enableRealTimeUpdates,
+                'lastUpdated' => new \DateTime(),
+            ]);
+
+        } catch (\Exception $e) {
+            $this->logger->error('Error in stock prices view: ' . $e->getMessage(), [
+                'symbol' => $company->getTickerSymbol(),
+                'exception' => get_class($e)
+            ]);
+
+            $this->addFlash('danger', 'An error occurred while loading stock price data. Please try again later.');
+
+            // Return the view with empty data
+            return $this->render('company/stock_prices.html.twig', [
+                'company' => $company,
+                'prices' => [],
+                'quote' => [
+                    'price' => 0,
+                    'change' => 0,
+                    'changePercent' => 0,
+                    'marketState' => 'ERROR'
+                ],
+                'interval' => $interval,
+                'timeRange' => $timeRange,
+                'enableRealTimeUpdates' => false,
+                'lastUpdated' => new \DateTime(),
+            ]);
+        }
     }
 }

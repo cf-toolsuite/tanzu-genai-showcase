@@ -7,6 +7,11 @@ parameters:
     genai.base_url: '%env(resolve:GENAI_BASE_URL)%'
     genai.model: '%env(resolve:GENAI_MODEL)%'
 
+# Import domain-specific service configurations
+imports:
+    - { resource: services/api_clients.yaml }
+    - { resource: services/news_services.yaml }
+
 services:
     # default configuration for services in *this* file
     _defaults:
@@ -40,17 +45,6 @@ services:
     App\Service\YahooFinanceService:
         arguments:
             $rapidApiKey: '%rapid_api.api_key%'
-            $useMockData: '%env(default::bool:USE_MOCK_DATA)%'
-
-    # Stock Clients Factory Configuration
-    App\Service\ApiClient\StockClientsFactory:
-        arguments:
-            $useMockData: '%env(default::bool:USE_MOCK_DATA)%'
-            
-    # SEC API Client Factory Configuration
-    App\Service\ApiClient\SecApiClientFactory:
-        arguments:
-            $useMockData: '%env(default::bool:USE_MOCK_DATA)%'
 
     # LLM Client Factory Configuration
     App\Service\LlmClientFactory:

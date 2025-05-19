@@ -15,53 +15,57 @@ document.addEventListener('DOMContentLoaded', function() {
     let currentTimeRange = "{{ timeRange|e('js') }}";
     const enableRealTimeUpdates = {{ enableRealTimeUpdates ? 'true' : 'false' }};
 
-    // ... (rest of your JavaScript code from the original file, starting from the priceData.length check) ...
-    // Make sure to include the ENTIRE JS logic here.
-    // For brevity, I'm not pasting all 400+ lines again, but you should.
+    let stockChart = null; // Initialize chart variable
 
-    // Example of where to start copying from your previous JS:
-    if (!Array.isArray(priceData) || priceData.length === 0) {
-        console.warn("No price data available to display chart.");
-        // Optionally display a message to the user on the chart canvas
-        const chartContainer = document.querySelector('.stock-chart-container');
-        if (chartContainer) {
-            const noDataMsg = document.createElement('p');
-            noDataMsg.className = 'text-center m-5';
-            noDataMsg.textContent = 'No historical price data available for the selected range.';
-            // Clear previous content (like loading spinner) before adding message
-            while (chartContainer.firstChild) {
-                chartContainer.removeChild(chartContainer.firstChild);
-            }
-            chartContainer.appendChild(noDataMsg);
 
-             // Ensure main chart canvas is hidden or removed if it was created before this check
-            const stockPriceCanvas = document.getElementById('stockPriceChart');
-            if (stockPriceCanvas) stockPriceCanvas.style.display = 'none';
+
+    // Function to prepare data for Chart.js
+    function prepareChartData(data) {
+        if (!Array.isArray(data) || data.length === 0) {
+            return { labels: [], prices: [], volumes: [], ohlcData: [] };
         }
-        // Hide volume chart if main chart has no data
-        const volumeCanvas = document.getElementById('volumeChart');
-        if (volumeCanvas) volumeCanvas.style.display = 'none';
-        return; // Exit if no data
+
+        data.sort((a, b) => new Date(a.date) - new Date(b.date));
+
+        const labels = data.map(item => item.date);
+        const prices = data.map(item => parseFloat(item.close) || 0);
+        const volumes = data.map(item => parseInt(item.volume) || 0);
+        const ohlcData = data.map(item => ({
+            x: new Date(item.date).getTime(), // For time scale if ever used
+            date: item.date, // For category scale and easier reference
+            o: parseFloat(item.open) || 0,
+            h: parseFloat(item.high) || 0,
+            l: parseFloat(item.low) || 0,
+            c: parseFloat(item.close) || 0,
+            v: parseInt(item.volume) || 0
+        }));
+
+        return { labels, prices, volumes, ohlcData };
     }
 
-    priceData.sort((a, b) => new Date(a.date) - new Date(b.date));
+    let { labels, prices, volumes, ohlcData } = prepareChartData(priceData);
 
-    let labels = priceData.map(item => item.date);
-    let prices = priceData.map(item => item.close);
-    let volumes = priceData.map(item => item.volume);
-    // This ohlcData is used by candlestick/OHLC plugin and tooltips
-    let ohlcData = priceData.map(item => ({
-        x: new Date(item.date).getTime(), // For time scale if ever used
-        date: item.date, // For category scale and easier reference
-        o: item.open, h: item.high, l: item.low, c: item.close, v: item.volume
-    }));
+    // Handle no data case initially
+    if (!Array.isArray(priceData) || priceData.length === 0) {
+        console.warn("No price data available to display chart.");
+        const chartContainer = document.querySelector('.stock-chart-container');
+        const noDataMsg = document.querySelector('.no-data-message');
+        const mainChartCanvas = document.getElementById('stockPriceChart');
 
+        if (noDataMsg) {
+            noDataMsg.style.display = 'block';
+        }
 
+        if (mainChartCanvas) {
+            mainChartCanvas.style.display = 'none';
+        }
+    }
+
+    // Calculate initial colors based on the first and last close prices
     let startPrice = prices[0];
     let endPrice = prices[prices.length - 1];
     let percentChange = ((endPrice - startPrice) / startPrice) * 100;
     if (isNaN(percentChange) || !isFinite(percentChange)) percentChange = 0;
-
 
     let lineColor = percentChange >= 0 ? '#28a745' : '#dc3545';
     let fillColor = percentChange >= 0 ? 'rgba(40, 167, 69, 0.1)' : 'rgba(220, 53, 69, 0.1)';
@@ -69,57 +73,52 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     const ctx = document.getElementById('stockPriceChart').getContext('2d');
-    let stockChart = new Chart(ctx, { // Use let for stockChart as it will be reassigned
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: companySymbol,
-                data: prices,
-                borderColor: lineColor,
-                backgroundColor: fillColor,
-                borderWidth: 2,
-                fill: true,
-                tension: 0.1,
-                pointRadius: 0,
-                pointHoverRadius: 5,
-                pointHoverBackgroundColor: lineColor,
-                pointHoverBorderColor: '#fff',
-                pointHoverBorderWidth: 2
-            }]
-        },
-        options: {
+
+    // Function to create or update the chart
+    function createOrUpdateChart(type = 'line') {
+        if (stockChart) {
+            stockChart.destroy(); // Destroy existing chart instance
+        }
+
+        updateChartColorsAndData(); // Ensure colors are up-to-date
+
+        const commonOptions = {
             responsive: true,
             maintainAspectRatio: false,
             interaction: { mode: 'index', intersect: false, axis: 'x' },
             plugins: {
                 legend: { display: false },
                 tooltip: {
-                    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-                    titleColor: '#000', bodyColor: '#000', borderColor: '#ddd', borderWidth: 1, padding: 10, displayColors: false,
+                    backgroundColor: 'rgba(255, 255, 255, 0.9)', titleColor: '#000', bodyColor: '#000',
+                    borderColor: '#ddd', borderWidth: 1, padding: 10, displayColors: false,
                     callbacks: {
                         title: (tooltipItems) => {
-                            // priceData might be empty if API returned no data for range
-                            if (!tooltipItems || tooltipItems.length === 0 || !priceData[tooltipItems[0].dataIndex]) return '';
+                            if (!tooltipItems || tooltipItems.length === 0 || !ohlcData[tooltipItems[0].dataIndex]) return '';
                              const dataIndex = tooltipItems[0].dataIndex;
-                             return new Date(priceData[dataIndex].date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
+                             return new Date(ohlcData[dataIndex].date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
                         },
                         label: (context) => {
-                            const dataPoint = priceData[context.dataIndex];
+                            const dataPoint = ohlcData[context.dataIndex]; // Use ohlcData for OHLCV details
                             if (!dataPoint) return '';
-                            return [
-                                `Open: $${dataPoint.o.toFixed(2)}`, `High: $${dataPoint.h.toFixed(2)}`,
-                                `Low: $${dataPoint.l.toFixed(2)}`, `Close: $${dataPoint.c.toFixed(2)}`,
-                                `Volume: ${dataPoint.v.toLocaleString()}`
-                            ];
+
+                            if (context.dataset.yAxisID === 'y') { // Price dataset
+                                return [
+                                    `Open: ${dataPoint.o.toFixed(2)}`, `High: ${dataPoint.h.toFixed(2)}`,
+                                    `Low: ${dataPoint.l.toFixed(2)}`, `Close: ${dataPoint.c.toFixed(2)}`
+                                ];
+                            } else if (context.dataset.yAxisID === 'y1') { // Volume dataset
+                                return `Volume: ${dataPoint.v.toLocaleString()}`;
+                            }
+                            return '';
                         }
-                    }
+                    }}
                 }
             },
             scales: {
                 x: {
                     type: 'category', // Explicitly set for date strings as labels
                     grid: { display: false },
+                    labels: labels, // Important for category scale
                     ticks: {
                         maxTicksLimit: 10,
                         autoSkip: true,
@@ -132,34 +131,14 @@ document.addEventListener('DOMContentLoaded', function() {
                         }
                     }
                 },
-                y: {
-                    position: 'right', grid: { color: 'rgba(0, 0, 0, 0.05)' },
+                y: { // Primary Y-axis for Price
+                    position: 'right',
+                    grid: { color: 'rgba(0, 0, 0, 0.05)' },
                     ticks: { callback: (value) => '$' + value.toFixed(2) }
-                }
-            }
-        }
-    });
-
-    const volumeCtx = document.getElementById('volumeChart').getContext('2d');
-    let volumeChart = new Chart(volumeCtx, { // Use let for volumeChart
-        type: 'bar',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Volume', data: volumes, backgroundColor: volumeBarColor,
-                borderColor: 'transparent', barThickness: 'flex', maxBarThickness: 15, // Increased for visibility
-                categoryPercentage: 0.8, // Default is 0.8
-                barPercentage: 0.9,      // Default is 0.9
-            }]
-        },
-        options: {
-            responsive: true, maintainAspectRatio: false,
-            plugins: { legend: { display: false }, tooltip: { enabled: false } }, // Tooltip disabled for volume
-            interaction: { mode: 'index', intersect: false, axis: 'x' }, // Sync with main chart
-            scales: {
-                x: { type: 'category', display: false, grid: { display: false } }, // Synced with main chart's x-axis
-                y: {
-                    position: 'right', grid: { display: false },
+                },
+                y1: { // Secondary Y-axis for Volume
+                    position: 'left', // Position on the left
+                    grid: { display: false }, // No grid lines for volume axis
                     ticks: {
                         maxTicksLimit: 4, // Fewer ticks for volume
                         callback: function(value) {
@@ -168,15 +147,138 @@ document.addEventListener('DOMContentLoaded', function() {
                             if (value >= 1000) return (value / 1000).toFixed(1) + 'K';
                             return value;
                         }
-                    }
+                    },
+                    display: document.getElementById('showVolumeSwitch').checked, // Initially controlled by toggle state
+                    // Align the zero line of the volume axis with the bottom of the chart area
+                    // This requires a bit more complex scale configuration or a plugin,
+                    // but setting 'beginAtZero: true' and positioning left is a good start.
+                    beginAtZero: true,
                 }
             }
-        }
-    });
+        };
+
+        let datasets = [
+            { // Price Dataset (Line, Candlestick, or OHLC)
+                label: companySymbol,
+                data: (type === 'line') ? prices : ohlcData.map(d => d.c), // Use close prices for invisible line in custom types
+                borderColor: lineColor,
+                backgroundColor: fillColor,
+                borderWidth: 2,
+                fill: true,
+                tension: 0.1,
+                pointRadius: 0,
+                pointHoverRadius: 5,
+                pointHoverBackgroundColor: lineColor,
+                pointHoverBorderColor: '#fff',
+                pointHoverBorderWidth: 2,
+                yAxisID: 'y', // Associate with primary Y-axis
+                type: (type === 'line') ? 'line' : 'line', // Base type is line for custom drawing
+            },
+            { // Volume Dataset (Bar)
+                label: 'Volume',
+                data: volumes,
+                backgroundColor: volumeBarColor,
+                borderColor: 'transparent',
+                barThickness: 'flex',
+                maxBarThickness: 15,
+                categoryPercentage: 0.8,
+                barPercentage: 0.9,
+                yAxisID: 'y1', // Associate with secondary Y-axis
+                type: 'bar', // Explicitly a bar chart
+            }
+        ];
+
+        // Custom plugin for Candlestick/OHLC drawing
+        const financialChartPlugin = {
+            id: 'financialChartPlugin',
+            afterDatasetsDraw: function(chartInstance) {
+                const { ctx, data, chartArea, scales: { x: xScale, y: yScale, y1: volumeYScale } } = chartInstance;
+                const currentChartType = document.querySelector('.chart-type-selector .btn.active')?.getAttribute('data-chart-type') || 'line';
+
+                if ((currentChartType !== 'candlestick' && currentChartType !== 'ohlc') || !ohlcData || ohlcData.length === 0 || !chartArea) return;
+
+                ctx.save();
+                const barCount = ohlcData.length;
+                let barPixelWidth;
+                if (barCount > 1) {
+                    const x0 = xScale.getPixelForValue(0);
+                    const x1 = xScale.getPixelForValue(1);
+                    barPixelWidth = (x1 - x0) * 0.7;
+                } else if (barCount === 1) {
+                    barPixelWidth = (xScale.getPixelForValue(0) - xScale.left) * 0.7;
+                    if (isNaN(barPixelWidth) || barPixelWidth <=0) barPixelWidth = Math.max(5, (xScale.right - xScale.left) * 0.1);
+                } else {
+                    return;
+                }
+                barPixelWidth = Math.max(1, Math.floor(barPixelWidth));
 
 
-    function updateChartColorsAndData(chartInstance = stockChart) {
-        if (prices.length === 0) { // Handle no data case for colors
+                ohlcData.forEach((item, index) => {
+                    const x = xScale.getPixelForValue(index);
+                    // Use the primary Y-axis (yScale) for price drawing
+                    const openPx = yScale.getPixelForValue(item.o);
+                    const highPx = yScale.getPixelForValue(item.h);
+                    const lowPx = yScale.getPixelForValue(item.l);
+                    const closePx = yScale.getPixelForValue(item.c);
+
+                    const barColor = item.c >= item.o ? '#28a745' : '#dc3545'; // Green for up, Red for down
+                    ctx.strokeStyle = barColor;
+                    ctx.lineWidth = 1;
+
+                    // High-low wick (thin line)
+                    ctx.beginPath();
+                    ctx.moveTo(x, highPx);
+                    ctx.lineTo(x, lowPx);
+                    ctx.stroke();
+
+                    if (currentChartType === 'candlestick') {
+                        ctx.fillStyle = barColor;
+                        const bodyTop = Math.min(openPx, closePx);
+                        const bodyHeight = Math.abs(openPx - closePx);
+                        ctx.fillRect(x - barPixelWidth / 2, bodyTop, barPixelWidth, bodyHeight);
+                    } else if (currentChartType === 'ohlc') {
+                        const tickPixelWidth = Math.max(2, barPixelWidth * 0.25);
+                        // Open tick (left)
+                        ctx.beginPath();
+                        ctx.moveTo(x - barPixelWidth / 2, openPx);
+                        ctx.lineTo(x, openPx);
+                        ctx.stroke();
+                        // Close tick (right)
+                        ctx.beginPath();
+                        ctx.moveTo(x, closePx);
+                        ctx.lineTo(x + barPixelWidth / 2, closePx);
+                        ctx.stroke();
+                    }
+                });
+                ctx.restore();
+            }
+        };
+
+
+        stockChart = new Chart(ctx, {
+            type: type === 'line' ? 'line' : 'bar', // Base type for Chart.js, plugin draws over
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: commonOptions,
+            plugins: [financialChartPlugin] // Add the custom plugin
+        });
+
+        console.log(`Chart created/updated with type: ${type}`);
+    }
+
+    // Initial chart creation - if we have data
+    if (priceData && priceData.length > 0) {
+        createOrUpdateChart('line'); // Start with line chart
+        console.log('Initial chart created with', priceData.length, 'data points');
+    } else {
+        console.warn('No initial price data available for chart');
+    }
+
+
+    function updateChartColorsAndData() {
+        if (prices.length === 0) {
             lineColor = '#868e96'; // Neutral gray
             fillColor = 'rgba(134, 142, 150, 0.1)';
             volumeBarColor = 'rgba(134, 142, 150, 0.5)';
@@ -191,182 +293,46 @@ document.addEventListener('DOMContentLoaded', function() {
             volumeBarColor = percentChange >= 0 ? 'rgba(40, 167, 69, 0.5)' : 'rgba(220, 53, 69, 0.5)';
         }
 
+        if (stockChart && stockChart.data.datasets.length > 0) {
+            // Update price dataset colors (index 0)
+            const priceDataset = stockChart.data.datasets[0];
+            if (priceDataset.type === 'line') { // Only update line colors if it's a line chart
+                 priceDataset.borderColor = lineColor;
+                 priceDataset.backgroundColor = fillColor;
+                 priceDataset.pointHoverBackgroundColor = lineColor;
+            }
+            // Candlestick/OHLC colors are handled by the plugin
 
-        if (chartInstance.config.type === 'line' && chartInstance.data.datasets[0]) {
-            chartInstance.data.datasets[0].borderColor = lineColor;
-            chartInstance.data.datasets[0].backgroundColor = fillColor;
-            chartInstance.data.datasets[0].pointHoverBackgroundColor = lineColor;
-        }
-        // For candlestick/OHLC, the colors are set in the plugin during drawing.
-        // However, if you have an invisible line dataset for scales, its colors don't matter.
-
-        if (volumeChart.data.datasets[0]) {
-             volumeChart.data.datasets[0].backgroundColor = volumeBarColor;
+            // Update volume dataset colors (index 1)
+            const volumeDataset = stockChart.data.datasets[1];
+            if (volumeDataset) {
+                 volumeDataset.backgroundColor = volumeBarColor;
+            }
         }
     }
 
 
     function updateChartType(type) {
         console.log(`Changing chart type to: ${type}`);
-        stockChart.destroy(); // Destroy the old chart instance
 
-        let newConfig;
-        const currentChartCtx = document.getElementById('stockPriceChart').getContext('2d');
-
-        updateChartColorsAndData(); // Ensure colors are up-to-date with current data
-
-        const commonOptions = {
-            responsive: true, maintainAspectRatio: false,
-            interaction: { mode: 'index', intersect: false, axis: 'x' },
-            plugins: {
-                legend: { display: false },
-                tooltip: {
-                    backgroundColor: 'rgba(255, 255, 255, 0.9)', titleColor: '#000', bodyColor: '#000',
-                    borderColor: '#ddd', borderWidth: 1, padding: 10, displayColors: false,
-                    callbacks: {
-                        title: (tooltipItems) => {
-                            if (!tooltipItems || tooltipItems.length === 0 || !priceData[tooltipItems[0].dataIndex]) return '';
-                             const dataIndex = tooltipItems[0].dataIndex;
-                             return new Date(priceData[dataIndex].date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' });
-                        },
-                        label: (context) => {
-                            const dataPoint = priceData[context.dataIndex]; // Use full priceData for OHLCV details
-                            if (!dataPoint) return '';
-                            return [
-                                `Open: $${dataPoint.o.toFixed(2)}`, `High: $${dataPoint.h.toFixed(2)}`,
-                                `Low: $${dataPoint.l.toFixed(2)}`, `Close: $${dataPoint.c.toFixed(2)}`,
-                                `Volume: ${dataPoint.v.toLocaleString()}`
-                            ];
-                        }
-                    }
-                }
-            },
-            scales: {
-                x: {
-                    type: 'category', grid: { display: false },
-                    labels: labels, // Important for category scale
-                    ticks: {
-                        maxTicksLimit: 10,
-                        autoSkip: true,
-                        callback: function(value, index) {
-                            if (labels.length === 0) return '';
-                            if (labels.length <= 10 || index % Math.ceil(labels.length / 10) === 0) {
-                                return new Date(labels[index]).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                            }
-                            return '';
-                        }
-                    }
-                },
-                y: {
-                    position: 'right', grid: { color: 'rgba(0, 0, 0, 0.05)' },
-                    ticks: { callback: (value) => '$' + value.toFixed(2) }
-                }
-            }
-        };
-
-        if (type === 'line') {
-            newConfig = {
-                type: 'line',
-                data: {
-                    // labels: labels, // labels are now in scales.x.labels for category scale
-                    datasets: [{
-                        label: companySymbol, data: prices, borderColor: lineColor, backgroundColor: fillColor,
-                        borderWidth: 2, fill: true, tension: 0.1, pointRadius: 0, pointHoverRadius: 5,
-                        pointHoverBackgroundColor: lineColor, pointHoverBorderColor: '#fff', pointHoverBorderWidth: 2
-                    }]
-                },
-                options: commonOptions
-            };
-        } else if (type === 'candlestick' || type === 'ohlc') {
-             // Data for candlestick/OHLC should be the ohlcData itself if using a specialized library
-            // For custom drawing, we still base it on a 'line' chart with an invisible dataset
-            // The actual drawing happens in the plugin.
-            newConfig = {
-                type: 'line', // Base type, actual drawing is custom via plugin
-                data: {
-                    // labels: labels,
-                    // The dataset provides data points for the tooltip to find the index.
-                    // The y value can be the close price.
-                    datasets: [{
-                        label: companySymbol,
-                        data: priceData.map(d => d.c), // Use close prices for the invisible line
-                        borderColor: 'rgba(0,0,0,0)', // Invisible line
-                        backgroundColor: 'rgba(0,0,0,0)', // Invisible fill
-                        pointRadius: 0,
-                        fill: false
-                    }]
-                },
-                options: commonOptions, // Use common options
-                plugins: [...(commonOptions.plugins || []), { // Add custom drawing plugin
-                    id: 'financialChartPlugin',
-                    afterDatasetsDraw: function(chartInstance) {
-                        const { ctx, data, chartArea, scales: { x: xScale, y: yScale } } = chartInstance;
-                        if (!priceData || priceData.length === 0 || !chartArea) return;
-
-                        ctx.save();
-                        const barCount = priceData.length;
-                        // Calculate bar width more robustly for category scale
-                        let barPixelWidth;
-                        if (barCount > 1) {
-                            // Get pixel for category index 0 and 1
-                            const x0 = xScale.getPixelForValue(0); // xScale.getPixelForValue(labels[0]) if labels are direct dates
-                            const x1 = xScale.getPixelForValue(1); // xScale.getPixelForValue(labels[1])
-                            barPixelWidth = (x1 - x0) * 0.7; // 70% of the available space
-                        } else if (barCount === 1) {
-                            barPixelWidth = (xScale.getPixelForValue(0) - xScale.left) * 0.7; // if only one bar
-                            if (isNaN(barPixelWidth) || barPixelWidth <=0) barPixelWidth = Math.max(5, (xScale.right - xScale.left) * 0.1); // fallback
-                        } else {
-                            return; // No data to draw
-                        }
-                        barPixelWidth = Math.max(1, Math.floor(barPixelWidth));
-
-
-                        priceData.forEach((item, index) => {
-                            // For category scale, getPixelForValue takes the index
-                            const x = xScale.getPixelForValue(index);
-                            const openPx = yScale.getPixelForValue(item.o);
-                            const highPx = yScale.getPixelForValue(item.h);
-                            const lowPx = yScale.getPixelForValue(item.l);
-                            const closePx = yScale.getPixelForValue(item.c);
-
-                            const barColor = item.c >= item.o ? '#28a745' : '#dc3545'; // Green for up, Red for down
-                            ctx.strokeStyle = barColor;
-                            ctx.lineWidth = 1;
-
-                            // High-low wick (thin line)
-                            ctx.beginPath();
-                            ctx.moveTo(x, highPx);
-                            ctx.lineTo(x, lowPx);
-                            ctx.stroke();
-
-                            if (type === 'candlestick') {
-                                ctx.fillStyle = barColor;
-                                const bodyTop = Math.min(openPx, closePx);
-                                const bodyHeight = Math.abs(openPx - closePx);
-                                ctx.fillRect(x - barPixelWidth / 2, bodyTop, barPixelWidth, bodyHeight);
-                                // Optional: Add border to candlestick body
-                                // ctx.strokeRect(x - barPixelWidth / 2, bodyTop, barPixelWidth, bodyHeight);
-                            } else if (type === 'ohlc') {
-                                const tickPixelWidth = Math.max(2, barPixelWidth * 0.25);
-                                // Open tick (left)
-                                ctx.beginPath();
-                                ctx.moveTo(x - barPixelWidth / 2, openPx); // Start from edge of where candle body would be
-                                ctx.lineTo(x, openPx);
-                                ctx.stroke();
-                                // Close tick (right)
-                                ctx.beginPath();
-                                ctx.moveTo(x, closePx);
-                                ctx.lineTo(x + barPixelWidth / 2, closePx); // End at edge of where candle body would be
-                                ctx.stroke();
-                            }
-                        });
-                        ctx.restore();
-                    }
-                }]
-            };
+        // Make sure we have data to display
+        if (!ohlcData || ohlcData.length === 0) {
+            console.warn("Cannot update chart type - no data available");
+            return;
         }
-        stockChart = new Chart(currentChartCtx, newConfig);
-        console.log(`Chart type updated to: ${type}`);
+
+        // Recreate the chart with the new type configuration
+        createOrUpdateChart(type);
+
+        // Ensure volume visibility is maintained after recreation
+        const volumeSwitch = document.getElementById('showVolumeSwitch');
+        if (volumeSwitch && stockChart && stockChart.options && stockChart.options.scales && stockChart.options.scales.y1) {
+            stockChart.options.scales.y1.display = volumeSwitch.checked;
+            if (stockChart.data.datasets.length > 1) {
+                stockChart.data.datasets[1].hidden = !volumeSwitch.checked;
+            }
+            stockChart.update('none');
+        }
     }
 
     // Chart type switching functionality
@@ -376,29 +342,45 @@ document.addEventListener('DOMContentLoaded', function() {
             chartTypeButtons.forEach(btn => btn.classList.remove('active'));
             this.classList.add('active');
             const chartType = this.getAttribute('data-chart-type');
+            console.log(`Switching chart type to: ${chartType}`);
             updateChartType(chartType);
         });
     });
 
     // Volume toggle functionality
     const volumeSwitch = document.getElementById('showVolumeSwitch');
-    const volumeCanvasEl = document.getElementById('volumeChart');
-    const volumeContainer = document.querySelector('.volume-container');
 
-    volumeSwitch.addEventListener('change', function() {
-        if (this.checked) {
-            volumeContainer.style.height = '100px'; // Or original height
-            volumeCanvasEl.style.display = 'block';
-            if(volumeChart) volumeChart.resize();
-        } else {
-            volumeContainer.style.height = '0px';
-            volumeCanvasEl.style.display = 'none';
+    if (volumeSwitch) {
+        volumeSwitch.addEventListener('change', function() {
+            console.log(`Volume toggle switched to: ${this.checked ? 'on' : 'off'}`);
+            if (stockChart) {
+                // First make sure the y1 scale display property is set correctly
+                if (stockChart.options.scales.y1) {
+                    stockChart.options.scales.y1.display = this.checked;
+                }
+
+                // Then also toggle the volume dataset visibility
+                if (stockChart.data.datasets.length > 1) {
+                    stockChart.data.datasets[1].hidden = !this.checked;
+                }
+
+                stockChart.update('none'); // 'none' for no animation
+            }
+        });
+
+        // Initial state based on checkbox
+        if (stockChart) {
+            // Set both the scale display and dataset visibility
+            if (stockChart.options.scales.y1) {
+                stockChart.options.scales.y1.display = volumeSwitch.checked;
+            }
+
+            if (stockChart.data.datasets.length > 1) {
+                stockChart.data.datasets[1].hidden = !volumeSwitch.checked;
+            }
+
+            stockChart.update('none');
         }
-    });
-    // Initial state based on checkbox
-    if (!volumeSwitch.checked) {
-        volumeContainer.style.height = '0px';
-        volumeCanvasEl.style.display = 'none';
     }
 
 
@@ -412,7 +394,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const mainChartCanvas = document.getElementById('stockPriceChart'); // The canvas itself
 
     mainChartCanvas.addEventListener('mousemove', function(e) {
-        if (!stockChart || !stockChart.chartArea || priceData.length === 0) {
+        if (!stockChart || !stockChart.chartArea || ohlcData.length === 0) {
             // Hide all crosshair elements if chart is not ready or no data
             crosshairVertical.style.display = 'none';
             crosshairHorizontal.style.display = 'none';
@@ -426,6 +408,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const x = e.clientX - rect.left;
         const y = e.clientY - rect.top;
 
+        // Check if mouse is within the chart area
         if (y <= stockChart.chartArea.bottom && y >= stockChart.chartArea.top &&
             x >= stockChart.chartArea.left && x <= stockChart.chartArea.right) {
 
@@ -434,6 +417,7 @@ document.addEventListener('DOMContentLoaded', function() {
             crosshairVertical.style.left = x + 'px';
             crosshairHorizontal.style.top = y + 'px';
 
+            // Get the value on the primary Y-axis (price)
             const yValue = stockChart.scales.y.getValueForPixel(y);
             priceLabel.style.display = 'block';
             priceLabel.style.top = y + 'px';
@@ -444,13 +428,15 @@ document.addEventListener('DOMContentLoaded', function() {
             const points = stockChart.getElementsAtEventForMode(e, 'index', { intersect: false }, true);
             if (points.length > 0) {
                 const dataIndex = points[0].index;
-                if (dataIndex >= 0 && dataIndex < priceData.length) {
-                    const dataPoint = priceData[dataIndex]; // Use full priceData for OHLCV
+                if (dataIndex >= 0 && dataIndex < ohlcData.length) {
+                    const dataPoint = ohlcData[dataIndex]; // Use ohlcData for OHLCV
                     const pointDate = new Date(dataPoint.date);
 
                     dateLabel.style.display = 'block';
+                    // Position date label relative to the chart area bottom
                     dateLabel.style.left = x + 'px';
-                    dateLabel.style.bottom = (mainChartCanvas.height - stockChart.chartArea.bottom - 25) + 'px'; // Adjust for label height
+                    dateLabel.style.bottom = (mainChartCanvas.height - stockChart.chartArea.bottom + 5) + 'px'; // Position below x-axis
+
                     dateLabel.textContent = pointDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 
                     chartOverlayInfo.style.display = 'block';
@@ -466,6 +452,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 chartOverlayInfo.style.display = 'none';
             }
         } else {
+            // Hide all crosshair elements if mouse leaves chart area
             crosshairVertical.style.display = 'none';
             crosshairHorizontal.style.display = 'none';
             priceLabel.style.display = 'none';
@@ -484,8 +471,8 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
     // Real-time updates for stock price
-    if (enableRealTimeUpdates && priceData.length > 0) { // Only run if there's initial data
-        const updateIntervalMs = 60000;
+    if (enableRealTimeUpdates && ohlcData.length > 0) { // Only run if there's initial data
+        const updateIntervalMs = 60000; // 60 seconds
         const currentPriceElement = document.querySelector('.current-price');
         const priceChangeElement = document.querySelector('.price-change');
         const lastUpdatedElement = document.querySelector('.last-updated');
@@ -528,34 +515,35 @@ document.addEventListener('DOMContentLoaded', function() {
 
 
                         if (labels.length === 0 || latestDateStr !== lastChartDateStr || currentInterval === 'intraday') { // Add new point
-                            priceData.push(newOhlcv);
-                            labels.push(latestDateStr);
-                            prices.push(newOhlcv.c);
-                            volumes.push(newOhlcv.v);
-                            // ohlcData is already covered by priceData being updated
+                            ohlcData.push(newOhlcv); // Update the source of truth
+                            // Re-prepare data arrays for Chart.js datasets
+                            const prepared = prepareChartData(ohlcData);
+                            labels = prepared.labels;
+                            prices = prepared.prices;
+                            volumes = prepared.volumes;
                             dataUpdated = true;
                         } else { // Update last point for the current day
-                            const lastIdx = priceData.length - 1;
-                            priceData[lastIdx].h = Math.max(priceData[lastIdx].h, newOhlcv.h);
-                            priceData[lastIdx].l = Math.min(priceData[lastIdx].l, newOhlcv.l);
-                            priceData[lastIdx].c = newOhlcv.c;
-                            priceData[lastIdx].v = newOhlcv.v; // Or += if volume is incremental
+                            const lastIdx = ohlcData.length - 1;
+                            ohlcData[lastIdx].h = Math.max(ohlcData[lastIdx].h, newOhlcv.h);
+                            ohlcData[lastIdx].l = Math.min(ohlcData[lastIdx].l, newOhlcv.l);
+                            ohlcData[lastIdx].c = newOhlcv.c;
+                            ohlcData[lastIdx].v = newOhlcv.v; // Or += if volume is incremental
 
+                            // Update the corresponding data arrays used by Chart.js datasets
                             prices[lastIdx] = newOhlcv.c;
                             volumes[lastIdx] = newOhlcv.v;
                             dataUpdated = true;
                         }
 
-                        if (dataUpdated) {
-                            updateChartColorsAndData(stockChart); // Recalculate trend colors for the main chart
-                            stockChart.data.labels = labels; // For category scale
-                            stockChart.data.datasets[0].data = (stockChart.config.type === 'line') ? prices : priceData.map(d=>d.c);
+                        if (dataUpdated && stockChart) {
+                            updateChartColorsAndData(); // Recalculate trend colors
+                            stockChart.data.labels = labels; // Update labels for category scale
 
-                            volumeChart.data.labels = labels; // For category scale
-                            volumeChart.data.datasets[0].data = volumes;
+                            // Update datasets
+                            stockChart.data.datasets[0].data = (stockChart.config.type === 'line') ? prices : ohlcData.map(d=>d.c);
+                            stockChart.data.datasets[1].data = volumes;
 
                             stockChart.update('none'); // 'none' for no animation
-                            volumeChart.update('none');
                         }
                     } else {
                         console.warn("Latest price update failed or no price data:", data.message);
@@ -580,76 +568,136 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
 
-    function loadHistoricalData(interval, range) {
+    function loadHistoricalData(interval, range, forceRefresh = false) {
         currentInterval = interval;
         currentTimeRange = range;
 
         const loadingIndicator = document.querySelector('.chart-loading');
         loadingIndicator.style.display = 'flex';
-        // Hide chart canvases while loading new data to prevent visual glitches
+        // Hide chart canvas while loading new data to prevent visual glitches
         document.getElementById('stockPriceChart').style.visibility = 'hidden';
-        document.getElementById('volumeChart').style.visibility = 'hidden';
 
+        console.log(`Loading historical data: interval=${interval}, range=${range}, refresh=${forceRefresh}`);
 
-        fetch(`/company/api/company/${companyId}/historical-prices?interval=${encodeURIComponent(interval)}&range=${encodeURIComponent(range)}`)
+        const url = forceRefresh ?
+            `/company/api/company/${companyId}/historical-prices?interval=${encodeURIComponent(interval)}&range=${encodeURIComponent(range)}&refresh=true` :
+            `/company/api/company/${companyId}/historical-prices?interval=${encodeURIComponent(interval)}&range=${encodeURIComponent(range)}`;
+
+        fetch(url)
             .then(response => {
                 if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
                 return response.json();
             })
             .then(data => {
-                if (data.success && data.prices) {
-                    if (data.prices.length > 0) {
-                        priceData = data.prices.sort((a, b) => new Date(a.date) - new Date(b.date))
-                                           .map(p => ({ // Ensure consistent structure and types
-                                                date: p.date,
-                                                o: parseFloat(p.open), h: parseFloat(p.high),
-                                                l: parseFloat(p.low), c: parseFloat(p.close),
-                                                v: parseInt(p.volume)
-                                            }));
-                        labels = priceData.map(item => item.date);
-                        prices = priceData.map(item => item.c); // Use consistent 'c' for close
-                        volumes = priceData.map(item => item.v); // Use consistent 'v' for volume
-                        // ohlcData is covered by priceData
-                    } else { // API returned success but no data points for the range
-                        priceData = []; labels = []; prices = []; volumes = [];
-                        console.warn("No historical data points returned for range:", range, "interval:", interval);
+                if (data.success) {
+                    // First, ensure we show the canvas and hide the no-data message
+                    document.getElementById('stockPriceChart').style.display = 'block';
+                    const noDataMsg = document.querySelector('.no-data-message');
+                    if (noDataMsg) {
+                        noDataMsg.style.display = 'none';
                     }
 
-                    updateChartColorsAndData(stockChart);
+                    if (data.prices && data.prices.length > 0) {
+                        priceData = data.prices; // Update the source of truth
+                        console.log(`Received ${data.prices.length} data points for ${companySymbol}`);
+                        console.log('First data point:', data.prices[0]);
+                        const prepared = prepareChartData(priceData);
+                        labels = prepared.labels;
+                        prices = prepared.prices;
+                        volumes = prepared.volumes;
+                        ohlcData = prepared.ohlcData; // Ensure ohlcData is also updated
+                    } else { // API returned success but no data points for the range
+                        priceData = []; labels = []; prices = []; volumes = []; ohlcData = [];
+                        console.warn("No historical data points returned for range:", range, "interval:", interval);
 
-                    stockChart.data.labels = labels; // For category scale
-                    stockChart.data.datasets[0].data = (stockChart.config.type === 'line') ? prices : priceData.map(d=>d.c);
+                        // Show no-data message and hide chart
+                        document.getElementById('stockPriceChart').style.display = 'none';
+                        if (noDataMsg) {
+                            // Update message with API-provided message if available
+                            if (data.message) {
+                                const errorDetails = noDataMsg.querySelector('.mb-0.text-muted');
+                                if (errorDetails) {
+                                    errorDetails.textContent = 'Reason: ' + data.message;
+                                }
+                            }
+                            noDataMsg.style.display = 'block';
+                        }
+                    }
 
-                    volumeChart.data.labels = labels; // For category scale
-                    volumeChart.data.datasets[0].data = volumes;
+                    if (stockChart) {
+                        updateChartColorsAndData(); // Recalculate trend colors
 
-                    stockChart.update();
-                    volumeChart.update();
-                    document.querySelector('.last-updated').textContent = 'Last updated: ' + new Date(data.lastUpdated).toLocaleString();
+                        stockChart.data.labels = labels; // Update labels for category scale
+
+                        // Update datasets
+                        // Determine the right data based on chart type
+                        if (stockChart.config.type === 'line') {
+                            stockChart.data.datasets[0].data = prices;
+                        } else {
+                            // For custom chart types, we update the base data that the plugin will use
+                            stockChart.data.datasets[0].data = ohlcData.map(d => d.c);
+                        }
+                        stockChart.data.datasets[1].data = volumes;
+
+                        stockChart.update();
+                    } else {
+                         // If chart wasn't created initially (e.g., no data), create it now if data is available
+                         if (priceData.length > 0) {
+                              createOrUpdateChart();
+                         }
+                    }
+
+                    // Update last updated time (assuming API response includes it or use current time)
+                    document.querySelector('.last-updated').textContent = 'Last updated: ' + new Date().toLocaleString(); // Using current time as fallback
+
+
                 } else {
                     console.error('Failed to load historical data or invalid format:', data.message || 'Unknown error');
                      // Optionally, clear the chart or show an error message on the chart
-                    priceData = []; labels = []; prices = []; volumes = [];
-                    updateChartColorsAndData(stockChart);
-                    stockChart.data.labels = []; stockChart.data.datasets[0].data = [];
-                    volumeChart.data.labels = []; volumeChart.data.datasets[0].data = [];
-                    stockChart.update(); volumeChart.update();
+                    priceData = []; labels = []; prices = []; volumes = []; ohlcData = [];
+                    if (stockChart) {
+                        updateChartColorsAndData();
+                        stockChart.data.labels = []; stockChart.data.datasets[0].data = []; stockChart.data.datasets[1].data = [];
+                        stockChart.update();
+                    }
                     document.querySelector('.last-updated').textContent = 'Last updated: Error loading data.';
                 }
             })
             .catch(error => {
                 console.error('Error fetching historical data:', error);
-                priceData = []; labels = []; prices = []; volumes = []; // Clear data on error
-                updateChartColorsAndData(stockChart);
-                stockChart.data.labels = []; stockChart.data.datasets[0].data = [];
-                volumeChart.data.labels = []; volumeChart.data.datasets[0].data = [];
-                stockChart.update(); volumeChart.update();
-                document.querySelector('.last-updated').textContent = 'Last updated: Network error.';
+                priceData = []; labels = []; prices = []; volumes = []; ohlcData = []; // Clear data on error
+
+                // Show error message
+                const noDataMsg = document.querySelector('.no-data-message');
+                if (noDataMsg) {
+                    // Update error message with actual error if available
+                    const errorDetails = noDataMsg.querySelector('.mb-0.text-muted');
+                    if (errorDetails) {
+                        errorDetails.textContent = 'Error details: ' +
+                            (error.message || 'Unable to fetch historical price data for ' + companySymbol);
+                    }
+                    noDataMsg.style.display = 'block';
+                }
+
+                // Hide the chart canvas
+                const chartCanvas = document.getElementById('stockPriceChart');
+                if (chartCanvas) {
+                    chartCanvas.style.display = 'none';
+                }
+
+                // Clear chart data if it exists
+                if (stockChart) {
+                    stockChart.data.labels = [];
+                    stockChart.data.datasets[0].data = [];
+                    stockChart.data.datasets[1].data = [];
+                    stockChart.update('none'); // 'none' for no animation
+                }
+
+                document.querySelector('.last-updated').textContent = 'Last updated: Error loading data';
             })
             .finally(() => {
                 loadingIndicator.style.display = 'none';
                 document.getElementById('stockPriceChart').style.visibility = 'visible';
-                document.getElementById('volumeChart').style.visibility = 'visible';
             });
     }
 

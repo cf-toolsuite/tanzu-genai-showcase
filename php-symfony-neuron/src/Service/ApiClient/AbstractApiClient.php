@@ -7,9 +7,9 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 use Psr\Log\LoggerInterface;
 
 /**
- * Abstract base class for REAL API clients. Mock logic is moved to separate classes.
+ * Abstract base class API clients.
  */
-abstract class AbstractApiClient implements ApiClientInterface
+abstract class AbstractApiClient
 {
     protected HttpClientInterface $httpClient;
     protected ParameterBagInterface $params;
@@ -33,10 +33,10 @@ abstract class AbstractApiClient implements ApiClientInterface
         $this->initialize();
 
         // Check for API key if it's required for this client (determined by getAuthParams)
-        // This check happens when the REAL client is instantiated.
+        // This check happens when the client is instantiated.
         if (empty($this->apiKey) && !empty($this->getAuthParams())) {
             $clientClass = get_class($this);
-            $this->logger->error("{$clientClass}: API key is missing. Real API calls WILL fail.");
+            $this->logger->error("{$clientClass}: API key is missing. API calls WILL fail.");
             // Optionally throw an exception immediately if a key is absolutely required
             // throw new \InvalidArgumentException("API Key is missing for " . $clientClass);
         }
@@ -57,7 +57,7 @@ abstract class AbstractApiClient implements ApiClientInterface
     abstract protected function getAuthParams(): array;
 
     /**
-     * Make a REAL API request. Throws exception on failure.
+     * Make a API request. Throws exception on failure.
      *
      * @param string $method HTTP method
      * @param string $endpoint API endpoint (relative path or full URL if baseUrl is empty)
@@ -89,6 +89,8 @@ abstract class AbstractApiClient implements ApiClientInterface
             'query' => ($method === 'GET') ? array_merge($params, $authParams) : $authParams,
             // Default body handling (use $params as body for non-GET)
             'json' => ($method !== 'GET') ? $params : null,
+            // Set a shorter timeout to avoid long-hanging requests
+            'timeout' => 5.0, // 5 seconds timeout
         ], $options); // Merge caller-provided options last
 
         // Remove null json body if present
@@ -101,7 +103,7 @@ abstract class AbstractApiClient implements ApiClientInterface
         }
 
         try {
-            $this->logger->info("Making REAL API {$method} request to {$url}", ['option_keys' => array_keys($requestOptions)]);
+            $this->logger->info("Making API {$method} request to {$url}", ['option_keys' => array_keys($requestOptions)]);
             $response = $this->httpClient->request($method, $url, $requestOptions);
 
             $statusCode = $response->getStatusCode();
@@ -120,10 +122,16 @@ abstract class AbstractApiClient implements ApiClientInterface
             $data = $response->toArray(); // Throws exception on invalid JSON
             return $data;
         } catch (\Symfony\Contracts\HttpClient\Exception\TransportExceptionInterface $e) {
-            $this->logger->error("API transport error for {$url}: {$e->getMessage()}");
+            $this->logger->error("API transport error for {$url}: {$e->getMessage()}", [
+                'exception_type' => get_class($e),
+                'params' => json_encode($params)
+            ]);
             throw new \RuntimeException("API transport error for {$url}: " . $e->getMessage(), $e->getCode(), $e);
         } catch (\Symfony\Contracts\HttpClient\Exception\ExceptionInterface $e) { // Catch other client errors
-            $this->logger->error("API client error for {$url}: {$e->getMessage()}");
+            $this->logger->error("API client error for {$url}: {$e->getMessage()}", [
+                'exception_type' => get_class($e),
+                'params' => json_encode($params)
+            ]);
             // Check if it's an HTTP exception to get response details
             $responseContent = 'N/A';
             if ($e instanceof \Symfony\Contracts\HttpClient\Exception\HttpExceptionInterface) {
@@ -135,7 +143,10 @@ abstract class AbstractApiClient implements ApiClientInterface
             $this->logger->error('API client error details:', ['response_content' => $responseContent]);
             throw new \RuntimeException("API client error for {$url}: " . $e->getMessage(), $e->getCode(), $e);
         } catch (\Exception $e) { // Catch potential JsonException from toArray() or others
-            $this->logger->error("Error processing API request or response for {$url}: {$e->getMessage()}");
+            $this->logger->error("Error processing API request or response for {$url}: {$e->getMessage()}", [
+                'exception_type' => get_class($e),
+                'params' => json_encode($params)
+            ]);
             throw new \RuntimeException("Error processing API request or response for {$url}: " . $e->getMessage(), $e->getCode(), $e);
         }
     }

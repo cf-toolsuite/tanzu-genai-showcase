@@ -151,14 +151,14 @@
 {% block body %}
     <div class="container mt-4">
         <h1>{{ company.name }} ({{ company.tickerSymbol }}) - Additional Metrics</h1>
-        
+
         <nav aria-label="breadcrumb" class="mb-4">
             <ol class="breadcrumb">
                 <li class="breadcrumb-item"><a href="{{ path('company_show', {'id': company.id}) }}">Company Profile</a></li>
                 <li class="breadcrumb-item active" aria-current="page">Additional Metrics</li>
             </ol>
         </nav>
-        
+
         <div class="metrics-nav">
             <ul class="nav nav-pills">
                 <li class="nav-item">
@@ -193,7 +193,7 @@
                 </li>
             </ul>
         </div>
-        
+
         <div class="row">
             <!-- ESG Data -->
             <div class="col-md-6">
@@ -206,7 +206,7 @@
                         {% if esgData %}
                             <div class="esg-score">{{ esgData.totalScore|number_format(1) }}</div>
                             <div class="esg-label">Overall ESG Score</div>
-                            
+
                             <div class="mt-4">
                                 <div class="esg-component">
                                     <span class="esg-component-label">Environmental</span>
@@ -215,7 +215,7 @@
                                     </div>
                                     <span class="esg-component-score">{{ esgData.environmentScore|number_format(1) }}</span>
                                 </div>
-                                
+
                                 <div class="esg-component">
                                     <span class="esg-component-label">Social</span>
                                     <div class="esg-component-bar">
@@ -223,7 +223,7 @@
                                     </div>
                                     <span class="esg-component-score">{{ esgData.socialScore|number_format(1) }}</span>
                                 </div>
-                                
+
                                 <div class="esg-component">
                                     <span class="esg-component-label">Governance</span>
                                     <div class="esg-component-bar">
@@ -232,7 +232,7 @@
                                     <span class="esg-component-score">{{ esgData.governanceScore|number_format(1) }}</span>
                                 </div>
                             </div>
-                            
+
                             <div class="mt-3 text-center">
                                 <small class="text-muted">Last updated: {{ esgData.lastUpdated|date('M d, Y') }}</small>
                             </div>
@@ -244,7 +244,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Analyst Ratings -->
             <div class="col-md-6">
                 <div class="card metrics-card">
@@ -268,7 +268,7 @@
                                         </div>
                                         <div class="text-muted">Consensus Rating</div>
                                     </div>
-                                    
+
                                     <div class="text-center">
                                         <div class="h3">${{ analystConsensus.averagePriceTarget|number_format(2) }}</div>
                                         <div class="text-muted">Average Price Target</div>
@@ -282,10 +282,10 @@
                                             <span>{{ analystConsensus.buy }}</span>
                                         </div>
                                         <div class="progress" style="height: 6px;">
-                                            <div class="progress-bar bg-success" role="progressbar" 
-                                                 style="width: {{ (analystConsensus.buy / analystConsensus.total * 100)|number_format }}%" 
-                                                 aria-valuenow="{{ analystConsensus.buy }}" 
-                                                 aria-valuemin="0" 
+                                            <div class="progress-bar bg-success" role="progressbar"
+                                                 style="width: {{ (analystConsensus.buy / analystConsensus.total * 100)|number_format }}%"
+                                                 aria-valuenow="{{ analystConsensus.buy }}"
+                                                 aria-valuemin="0"
                                                  aria-valuemax="{{ analystConsensus.total }}">
                                             </div>
                                         </div>
@@ -296,10 +296,10 @@
                                             <span>{{ analystConsensus.hold }}</span>
                                         </div>
                                         <div class="progress" style="height: 6px;">
-                                            <div class="progress-bar bg-warning" role="progressbar" 
-                                                 style="width: {{ (analystConsensus.hold / analystConsensus.total * 100)|number_format }}%" 
-                                                 aria-valuenow="{{ analystConsensus.hold }}" 
-                                                 aria-valuemin="0" 
+                                            <div class="progress-bar bg-warning" role="progressbar"
+                                                 style="width: {{ (analystConsensus.hold / analystConsensus.total * 100)|number_format }}%"
+                                                 aria-valuenow="{{ analystConsensus.hold }}"
+                                                 aria-valuemin="0"
                                                  aria-valuemax="{{ analystConsensus.total }}">
                                             </div>
                                         </div>
@@ -310,10 +310,10 @@
                                             <span>{{ analystConsensus.sell }}</span>
                                         </div>
                                         <div class="progress" style="height: 6px;">
-                                            <div class="progress-bar bg-danger" role="progressbar" 
-                                                 style="width: {{ (analystConsensus.sell / analystConsensus.total * 100)|number_format }}%" 
-                                                 aria-valuenow="{{ analystConsensus.sell }}" 
-                                                 aria-valuemin="0" 
+                                            <div class="progress-bar bg-danger" role="progressbar"
+                                                 style="width: {{ (analystConsensus.sell / analystConsensus.total * 100)|number_format }}%"
+                                                 aria-valuenow="{{ analystConsensus.sell }}"
+                                                 aria-valuemin="0"
                                                  aria-valuemax="{{ analystConsensus.total }}">
                                             </div>
                                         </div>
@@ -329,7 +329,7 @@
                 </div>
             </div>
         </div>
-        
+
         <div class="row">
             <!-- SEC Filings -->
             <div class="col-md-6">
@@ -374,7 +374,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- Insider Transactions -->
             <div class="col-md-6">
                 <div class="card metrics-card">
@@ -428,7 +428,7 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- Institutional Ownership -->
         <div class="row mt-4">
             <div class="col-12">
@@ -448,17 +448,17 @@
                                 </div>
                                 <div class="col-md-8">
                                     <div class="progress" style="height: 24px;">
-                                        <div class="progress-bar bg-primary" role="progressbar" 
-                                             style="width: {{ totalInstitutionalOwnership }}%" 
-                                             aria-valuenow="{{ totalInstitutionalOwnership }}" 
-                                             aria-valuemin="0" 
+                                        <div class="progress-bar bg-primary" role="progressbar"
+                                             style="width: {{ totalInstitutionalOwnership }}%"
+                                             aria-valuenow="{{ totalInstitutionalOwnership }}"
+                                             aria-valuemin="0"
                                              aria-valuemax="100">
                                             {{ totalInstitutionalOwnership|number_format(2) }}%
                                         </div>
-                                        <div class="progress-bar bg-secondary" role="progressbar" 
-                                             style="width: {{ 100 - totalInstitutionalOwnership }}%" 
-                                             aria-valuenow="{{ 100 - totalInstitutionalOwnership }}" 
-                                             aria-valuemin="0" 
+                                        <div class="progress-bar bg-secondary" role="progressbar"
+                                             style="width: {{ 100 - totalInstitutionalOwnership }}%"
+                                             aria-valuenow="{{ 100 - totalInstitutionalOwnership }}"
+                                             aria-valuemin="0"
                                              aria-valuemax="100">
                                             {{ (100 - totalInstitutionalOwnership)|number_format(2) }}%
                                         </div>
@@ -469,7 +469,7 @@
                                     </div>
                                 </div>
                             </div>
-                            
+
                             <div class="table-responsive">
                                 <table class="table table-hover">
                                     <thead>

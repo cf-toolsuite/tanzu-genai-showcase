@@ -68,7 +68,7 @@ class InsiderTradingRepository extends ServiceEntityRepository
     /**
      * Get net buying/selling by transaction type
      */
-    public function getNetTransactionsByType(string $symbol, \DateTime $startDate = null): array
+    public function getNetTransactionsByType(string $symbol, ?\DateTime $startDate = null): array
     {
         $qb = $this->createQueryBuilder('i')
             ->select('i.transactionType, SUM(i.transactionValue) as totalValue, SUM(i.shares) as totalShares')

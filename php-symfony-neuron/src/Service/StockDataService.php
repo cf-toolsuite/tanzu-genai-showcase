@@ -6,48 +6,37 @@ namespace App\Service;
 use App\Entity\Company;
 use App\Entity\ExecutiveProfile;
 use App\Entity\FinancialData;
-use App\Entity\StockPrice; // Added missing use statement
-use App\Service\ApiClient\StockClientsFactory; // Import the factory
-use App\Service\ApiClient\ApiClientInterface; // Keep interface hint
+use App\Entity\StockPrice;
 use Doctrine\ORM\EntityManagerInterface;
 use Psr\Log\LoggerInterface;
-use Symfony\Contracts\Cache\CacheInterface; // Use CacheInterface for type hint
-use Symfony\Contracts\Cache\ItemInterface; // Needed for cache->get()
+use Symfony\Contracts\Cache\CacheInterface;
+use Symfony\Contracts\Cache\ItemInterface;
+use App\Repository\InstitutionalOwnershipRepository; // Import the repository
 
 class StockDataService
 {
-    private ApiClientInterface $alphaVantageClient;
-    private ApiClientInterface $yahooFinanceClient;
-    private ApiClientInterface $newsApiClient;
-    private ApiClientInterface $secApiClient;
-    private ApiClientInterface $tradeFeedsClient;
+    private FinancialDataServiceInterface $financialDataService;
     private EntityManagerInterface $entityManager;
-    private CacheInterface $cache; // Use CacheInterface
+    private CacheInterface $cache;
     private LoggerInterface $logger;
+    private InstitutionalOwnershipRepository $institutionalOwnershipRepository; // Add the property
 
     /**
      * Constructor
      */
     public function __construct(
-        StockClientsFactory $stockClientsFactory, // Inject the factory
+        FinancialDataServiceInterface $financialDataService,
         EntityManagerInterface $entityManager,
-        CacheInterface $cache, // Use CacheInterface
-        LoggerInterface $logger
+        CacheInterface $cache,
+        LoggerInterface $logger,
+        InstitutionalOwnershipRepository $institutionalOwnershipRepository // Inject the repository
     ) {
-        // Get clients from the factory
-        $this->alphaVantageClient = $stockClientsFactory->getAlphaVantageClient();
-        $this->yahooFinanceClient = $stockClientsFactory->getYahooFinanceClient();
-        $this->newsApiClient = $stockClientsFactory->getNewsApiClient();
-        $this->secApiClient = $stockClientsFactory->getSecApiClient();
-        $this->tradeFeedsClient = $stockClientsFactory->getTradeFeedsClient();
-
-        // Assign other dependencies
+        $this->financialDataService = $financialDataService;
         $this->entityManager = $entityManager;
         $this->cache = $cache;
         $this->logger = $logger;
+        $this->institutionalOwnershipRepository = $institutionalOwnershipRepository; // Assign the repository
     }
-
-    // --- Existing Methods (Unchanged content, just ensure they use the correct properties) ---
 
     /**
      * Search for companies by name or ticker symbol
@@ -56,70 +45,114 @@ class StockDataService
     public function searchCompanies(string $term, int $limit = 25): array
     {
         $cacheKey = 'company_search_' . md5($term);
+
+        // Add debug logging before cache call
+        $this->logger->debug('Searching for companies with term', [
+            'term' => $term,
+            'cache_key' => $cacheKey,
+            'limit' => $limit
+        ]);
+
         return $this->cache->get($cacheKey, function (ItemInterface $item) use ($term, $limit) {
-            $item->expiresAfter(3600); // Cache for 1 hour
+            // Set a shorter cache time for failed searches
+            $item->expiresAfter(300); // Cache for 5 minutes initially
             $this->logger->info('Cache miss for company search', ['term' => $term]);
 
             $results = [];
-            $processedNames = []; // Track processed company names to avoid duplicates
-            $processedSymbols = []; // Track processed symbols to avoid duplicates
+            $hasError = false;
 
             try {
-                // Get results from Alpha Vantage
-                $alphaResults = $this->alphaVantageClient->searchCompanies($term);
-                foreach ($alphaResults as &$result) {
-                    $result['provider'] = 'Alpha Vantage API';
-                    $normalizedName = strtolower($result['name']);
-                    $normalizedSymbol = strtolower($result['symbol']);
+                // Detailed logging of the API call about to be made
+                $this->logger->debug('About to call financialDataService->searchCompanies', [
+                    'term' => $term,
+                    'service_class' => get_class($this->financialDataService)
+                ]);
 
-                    // Only add if we haven't seen this company name or symbol before
-                    if (!isset($processedNames[$normalizedName]) && !isset($processedSymbols[$normalizedSymbol])) {
-                        $results[] = $result;
-                        $processedNames[$normalizedName] = true;
-                        $processedSymbols[$normalizedSymbol] = true;
-                    }
-                }
-
-                // Try Yahoo Finance regardless of Alpha Vantage results to get more comprehensive results
+                // We need to use the APIs differently since searchCompanies is not in the interface
+                // Try to find the company by symbol first (direct match)
                 try {
-                    $yahooResults = $this->yahooFinanceClient->searchCompanies($term);
-                    foreach ($yahooResults as &$result) {
-                        $result['provider'] = 'Yahoo Finance API';
-                        $normalizedName = strtolower($result['name']);
-                        $normalizedSymbol = strtolower($result['symbol']);
+                    $profile = $this->financialDataService->getCompanyProfile($term);
 
-                        // Only add if we haven't seen this company name or symbol before
-                        if (!isset($processedNames[$normalizedName]) && !isset($processedSymbols[$normalizedSymbol])) {
-                            $results[] = $result;
-                            $processedNames[$normalizedName] = true;
-                            $processedSymbols[$normalizedSymbol] = true;
+                    // If we found a profile, create a result in the expected format
+                    if (is_array($profile) && !empty($profile['symbol'])) {
+                        $results = [[
+                            'symbol' => $profile['symbol'],
+                            'name' => $profile['name'] ?? 'Unknown Company',
+                            'exchange' => $profile['exchange'] ?? '',
+                            'type' => 'EQUITY',
+                            'sector' => $profile['sector'] ?? '',
+                            'industry' => $profile['industry'] ?? '',
+                            'currency' => $profile['currency'] ?? 'USD',
+                            'description' => $profile['description'] ?? '',
+                            'provider' => 'Profile API'
+                        ]];
 
-                            // Stop if we've reached the limit
-                            if (count($results) >= $limit) {
-                                break;
-                            }
-                        }
+                        $this->logger->info('Found company profile for exact symbol match', [
+                            'term' => $term,
+                            'symbol' => $profile['symbol']
+                        ]);
                     }
                 } catch (\Exception $e) {
-                    $this->logger->error('Error with Yahoo Finance search: ' . $e->getMessage());
-                    // Continue with Alpha Vantage results
+                    // Log but continue - this means it's not a direct symbol match
+                    $this->logger->debug('No direct symbol match found', [
+                        'term' => $term,
+                        'error' => $e->getMessage()
+                    ]);
                 }
 
-                return $results;
-            } catch (\Exception $e) {
-                $this->logger->error('Error searching companies with Alpha Vantage: ' . $e->getMessage());
-                try {
-                    $results = $this->yahooFinanceClient->searchCompanies($term);
-                    // Add provider information to each result
-                    foreach ($results as &$result) {
-                        $result['provider'] = 'Yahoo Finance API';
-                    }
-                    return $results;
-                } catch (\Exception $e2) {
-                    $this->logger->error('Error with fallback search: ' . $e2->getMessage());
-                    return [];
+                // If we still don't have results, try our best to find similar matches
+                // This part will need to be implemented by the actual API clients
+                if (empty($results)) {
+                    $this->logger->debug('No API search results found, no search method available', [
+                        'term' => $term
+                    ]);
+                    $results = [];
                 }
+
+                // Log the results we found
+                $this->logger->debug('External API search results', [
+                    'is_array' => is_array($results),
+                    'count' => is_array($results) ? count($results) : 'not_array',
+                    'result_type' => gettype($results),
+                    'sample' => is_array($results) && !empty($results) ? json_encode(array_slice($results, 0, 1)) : 'empty'
+                ]);
+
+                if (!empty($results)) {
+                    $this->logger->info('Found external search results', ['count' => count($results)]);
+
+                    // Set a longer cache time for successful results
+                    $item->expiresAfter(3600); // Cache successful results for 1 hour
+
+                    return $results;
+                } else {
+                    $this->logger->info('External API returned zero results', ['term' => $term]);
+                    // Keep the shorter cache time for empty results
+                }
+            } catch (\Exception $e) {
+                $hasError = true;
+                $this->logger->error('Error searching companies via API', [
+                    'term' => $term,
+                    'error' => $e->getMessage(),
+                    'exception_type' => get_class($e),
+                    'trace' => $e->getTraceAsString()
+                ]);
+
+                // Set a very short cache time for errors
+                $item->expiresAfter(60); // Only cache errors for 1 minute
             }
+
+            // If we got here, either we had an error or we got empty results
+            if ($hasError) {
+                // For errors, add a flag indicating the error
+                return [
+                    'error' => true,
+                    'message' => 'External search service temporarily unavailable',
+                    'results' => []
+                ];
+            }
+
+            // For legitimate empty results
+            return $results;
         });
     }
 
@@ -133,21 +166,11 @@ class StockDataService
             $item->expiresAfter(86400); // Cache for 24 hours
             $this->logger->info('Cache miss for company profile', ['symbol' => $symbol]);
             try {
-                $profile = $this->alphaVantageClient->getCompanyProfile($symbol);
-                if (empty($profile['name'])) {
-                    $this->logger->info('No valid profile from Alpha Vantage, trying Yahoo Finance');
-                    $profile = $this->yahooFinanceClient->getCompanyProfile($symbol);
-                }
+                $profile = $this->financialDataService->getCompanyProfile($symbol);
                 return $profile;
             } catch (\Exception $e) {
                 $this->logger->error('Error getting company profile: ' . $e->getMessage());
-                try {
-                    $profile = $this->yahooFinanceClient->getCompanyProfile($symbol);
-                    return $profile;
-                } catch (\Exception $e2) {
-                    $this->logger->error('Error with fallback profile: ' . $e2->getMessage());
-                    return null;
-                }
+                return null;
             }
         });
     }
@@ -162,21 +185,142 @@ class StockDataService
             $item->expiresAfter(300); // Cache for 5 minutes
             $this->logger->info('Cache miss for stock quote', ['symbol' => $symbol]);
             try {
-                $quote = $this->alphaVantageClient->getQuote($symbol);
-                if (empty($quote['price'])) {
-                    $this->logger->info('No valid quote from Alpha Vantage, trying Yahoo Finance');
-                    $quote = $this->yahooFinanceClient->getQuote($symbol);
+                $rawQuote = $this->financialDataService->getStockQuote($symbol);
+
+                // Define a standard quote structure with default values
+                $standardQuote = [
+                    'symbol' => $symbol,
+                    'price' => 0.0,
+                    'change' => 0.0,
+                    'changePercent' => 0.0,
+                    'volume' => 0,
+                    'latestTradingDay' => date('Y-m-d'),
+                    'previousClose' => 0.0,
+                    'open' => 0.0,
+                    'high' => 0.0,
+                    'low' => 0.0,
+                    'marketCap' => 0.0,
+                    'sharesOutstanding' => 0.0,
+                    'fiftyTwoWeekHigh' => 0.0,
+                    'fiftyTwoWeekLow' => 0.0,
+                    'averageVolume' => 0,
+                    'peRatio' => null, // Use null for N/A
+                    'eps' => null,
+                    'dividendYield' => null,
+                    'beta' => null,
+                    'timestamp' => time(), // Default to current time
+                    'marketState' => 'UNKNOWN',
+                ];
+
+                // Merge raw quote data into the standard structure,
+                // overwriting defaults with actual data if available.
+                // Use array_merge to preserve numeric keys if any, though unlikely here.
+                // Use a loop for more control over type casting and specific mapping if needed.
+                $quote = $standardQuote;
+                if (is_array($rawQuote)) {
+                    foreach ($standardQuote as $key => $defaultValue) {
+                        if (isset($rawQuote[$key])) {
+                            // Attempt to cast to the default value's type
+                            if (is_float($defaultValue)) {
+                                $quote[$key] = (float) $rawQuote[$key];
+                            } elseif (is_int($defaultValue)) {
+                                $quote[$key] = (int) $rawQuote[$key];
+                            } elseif (is_string($defaultValue) || is_null($defaultValue)) {
+                                $quote[$key] = (string) $rawQuote[$key];
+                            } else {
+                                $quote[$key] = $rawQuote[$key]; // Fallback
+                            }
+                        }
+                    }
+                     // Ensure timestamp is an integer if provided as such
+                    if (isset($rawQuote['timestamp'])) {
+                         $quote['timestamp'] = (int) $rawQuote['timestamp'];
+                    }
+                     // Ensure latestTradingDay is a string
+                    if (isset($rawQuote['latestTradingDay'])) {
+                         $quote['latestTradingDay'] = (string) $rawQuote['latestTradingDay'];
+                    }
                 }
+
+
+                // --- Step 3 Enhancement: Fetch and merge data from other endpoints ---
+                // This part implements the optional enhancement to get more complete data.
+                // It adds calls to getCompanyProfile and getFinancialData and merges them.
+
+                try {
+                    $profileData = $this->financialDataService->getCompanyProfile($symbol);
+                    if (is_array($profileData)) {
+                        // Merge relevant fields from profile data
+                        $quote['marketCap'] = (float)($profileData['marketCap'] ?? $quote['marketCap']);
+                        $quote['peRatio'] = isset($profileData['peRatio']) && $profileData['peRatio'] !== 0.0 ? (float)$profileData['peRatio'] : $quote['peRatio'];
+                        $quote['dividendYield'] = isset($profileData['dividendYield']) && $profileData['dividendYield'] !== 0.0 ? (float)$profileData['dividendYield'] : $quote['dividendYield'];
+                        $quote['beta'] = isset($profileData['beta']) && $profileData['beta'] !== 0.0 ? (float)$profileData['beta'] : $quote['beta'];
+                        $quote['sharesOutstanding'] = (float)($profileData['sharesOutstanding'] ?? $quote['sharesOutstanding']); // Profile might have shares outstanding
+                         // Yahoo Finance Client's getQuote already provides 52-week high/low and average volume
+                         // If using AlphaVantage, these would still be defaults unless fetched separately.
+                         // For now, rely on the primary getStockQuote client providing these or defaulting.
+                    }
+                } catch (\Exception $e) {
+                    $this->logger->warning('Error merging profile data into quote: ' . $e->getMessage(), ['symbol' => $symbol]);
+                    // Continue without profile data
+                }
+
+                try {
+                    // Fetch recent financial data (e.g., quarterly) to get latest EPS
+                    $financialData = $this->financialDataService->getFinancialData($symbol, 'quarterly');
+                    if (!empty($financialData) && is_array($financialData[0])) {
+                        // Use EPS from the most recent financial report
+                        $quote['eps'] = isset($financialData[0]['eps']) && $financialData[0]['eps'] !== 0.0 ? (float)$financialData[0]['eps'] : $quote['eps'];
+                         // Financials might also have marketCap, PE, etc. - prioritize quote/profile
+                    }
+                } catch (\Exception $e) {
+                    $this->logger->warning('Error merging financial data (EPS) into quote: ' . $e->getMessage(), ['symbol' => $symbol]);
+                    // Continue without financial data
+                }
+
+                // End Step 3 Enhancement
+
+                // Ensure essential fields are not null if they should be numeric
+                $quote['price'] = (float)($quote['price'] ?? 0.0);
+                $quote['change'] = (float)($quote['change'] ?? 0.0);
+                $quote['changePercent'] = (float)($quote['changePercent'] ?? 0.0);
+                $quote['volume'] = (int)($quote['volume'] ?? 0);
+                $quote['marketCap'] = (float)($quote['marketCap'] ?? 0.0);
+                $quote['sharesOutstanding'] = (float)($quote['sharesOutstanding'] ?? 0.0);
+                $quote['fiftyTwoWeekHigh'] = (float)($quote['fiftyTwoWeekHigh'] ?? 0.0);
+                $quote['fiftyTwoWeekLow'] = (float)($quote['fiftyTwoWeekLow'] ?? 0.0);
+                $quote['averageVolume'] = (int)($quote['averageVolume'] ?? 0);
+                 // PE, EPS, Dividend Yield, Beta can be null if data is not available
+
                 return $quote;
+
             } catch (\Exception $e) {
                 $this->logger->error('Error getting stock quote: ' . $e->getMessage());
-                try {
-                    $quote = $this->yahooFinanceClient->getQuote($symbol);
-                    return $quote;
-                } catch (\Exception $e2) {
-                    $this->logger->error('Error with fallback quote: ' . $e2->getMessage());
-                    return null;
-                }
+                // Return a standardized empty quote structure on error
+                 return [
+                    'symbol' => $symbol,
+                    'price' => 0.0,
+                    'change' => 0.0,
+                    'changePercent' => 0.0,
+                    'volume' => 0,
+                    'latestTradingDay' => date('Y-m-d'),
+                    'previousClose' => 0.0,
+                    'open' => 0.0,
+                    'high' => 0.0,
+                    'low' => 0.0,
+                    'marketCap' => 0.0,
+                    'sharesOutstanding' => 0.0,
+                    'fiftyTwoWeekHigh' => 0.0,
+                    'fiftyTwoWeekLow' => 0.0,
+                    'averageVolume' => 0,
+                    'peRatio' => null,
+                    'eps' => null,
+                    'dividendYield' => null,
+                    'beta' => null,
+                    'timestamp' => time(),
+                    'marketState' => 'ERROR', // Indicate error state
+                    'message' => 'Could not retrieve stock quote data.' // Add an error message
+                ];
             }
         });
     }
@@ -191,87 +335,49 @@ class StockDataService
             $item->expiresAfter(86400); // Cache for 24 hours
             $this->logger->info('Cache miss for financial data', ['symbol' => $symbol, 'period' => $period]);
             try {
-                $financials = $this->alphaVantageClient->getFinancials($symbol, $period);
-                if (empty($financials)) {
-                    $this->logger->info('No valid financial data from Alpha Vantage, trying Yahoo Finance');
-                    $financials = $this->yahooFinanceClient->getFinancials($symbol, $period);
-                }
+                $financials = $this->financialDataService->getFinancialData($symbol, $period);
                 return $financials;
             } catch (\Exception $e) {
                 $this->logger->error('Error getting financial data: ' . $e->getMessage());
-                try {
-                    $financials = $this->yahooFinanceClient->getFinancials($symbol, $period);
-                    return $financials;
-                } catch (\Exception $e2) {
-                    $this->logger->error('Error with fallback financials: ' . $e2->getMessage());
-                    return [];
-                }
+                return [];
             }
         });
     }
 
     /**
-     * Get company news
+     * Get general market news
+     *
+     * @param int $limit Maximum number of news items to return
+     * @param bool $forceRefresh Whether to force a cache refresh
+     * @return array Market news
      */
-    public function getCompanyNews(string $symbol, int $limit = 5, bool $forceRefresh = false): array
+    public function getMarketNews(int $limit = 10, bool $forceRefresh = false): array
     {
-        $cacheKey = 'company_news_' . $symbol . '_' . $limit;
+        $cacheKey = 'market_news_' . $limit;
 
         // If force refresh is requested, delete the existing cache item
         if ($forceRefresh) {
             $this->cache->delete($cacheKey);
-            $this->logger->info('Forced cache refresh for company news', ['symbol' => $symbol]);
+            $this->logger->info('Forced cache refresh for market news');
         }
 
-        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($symbol, $limit) {
-            // Reduce cache time to 5 minutes to get more recent news throughout the day
+        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($limit) {
+            // Cache market news for 5 minutes
             $item->expiresAfter(300);
-            $this->logger->info('Cache miss for company news', ['symbol' => $symbol]);
-
-            $allNews = [];
+            $this->logger->info('Cache miss for market news');
 
             try {
-                $companyInfo = $this->getCompanyProfile($symbol);
-                $companyName = $companyInfo['name'] ?? '';
-                $searchTerm = !empty($companyName) ? $companyName : $symbol;
+                // Call the new method in FinancialDataAggregatorService
+                $news = $this->financialDataService->getMarketNews($limit);
 
-                // Try NewsAPI first
-                try {
-                    $newsApiResults = $this->newsApiClient->getCompanyNews($searchTerm, $limit * 2); // Get more to account for filtering
-                    foreach ($newsApiResults as $article) {
-                        $article['provider'] = 'NewsAPI';
-                        $allNews[] = $this->validateNewsArticle($article);
-                    }
-                } catch (\Exception $e) {
-                    $this->logger->error('Error getting company news from NewsAPI: ' . $e->getMessage());
-                }
-
-                // Try Yahoo Finance regardless of NewsAPI success
-                try {
-                    $yahooResults = $this->yahooFinanceClient->getCompanyNews($symbol, $limit * 2);
-                    foreach ($yahooResults as $article) {
-                        $article['provider'] = 'Yahoo Finance';
-                        $allNews[] = $this->validateNewsArticle($article);
-                    }
-                } catch (\Exception $e2) {
-                    $this->logger->error('Error with Yahoo Finance news: ' . $e2->getMessage());
-                }
-
-                // Try Alpha Vantage if we still need more articles
-                if (count($allNews) < $limit) {
-                    try {
-                        $alphaResults = $this->alphaVantageClient->getCompanyNews($symbol, $limit * 2);
-                        foreach ($alphaResults as $article) {
-                            $article['provider'] = 'Alpha Vantage';
-                            $allNews[] = $this->validateNewsArticle($article);
-                        }
-                    } catch (\Exception $e3) {
-                        $this->logger->error('Error with Alpha Vantage news: ' . $e3->getMessage());
-                    }
+                // Process and validate each article (reusing the existing logic)
+                $processedNews = [];
+                foreach ($news as $article) {
+                    $processedNews[] = $this->validateNewsArticle($article);
                 }
 
                 // Deduplicate news articles
-                $dedupedNews = $this->deduplicateNewsArticles($allNews);
+                $dedupedNews = $this->deduplicateNewsArticles($processedNews);
 
                 // Sort by published date (newest first)
                 usort($dedupedNews, function($a, $b) {
@@ -297,7 +403,65 @@ class StockDataService
                 // Return only the requested number of articles
                 return array_slice($dedupedNews, 0, $limit);
             } catch (\Exception $e) {
-                $this->logger->error('Error with all news sources: ' . $e->getMessage());
+                $this->logger->error('Error getting market news: ' . $e->getMessage());
+                return [];
+            }
+        });
+    }
+
+    /**
+     * Get company news
+     *
+     * @param string $symbol The stock symbol
+     * @param int $limit Maximum number of news items to return
+     * @return array Company news
+     */
+    public function getCompanyNews(string $symbol, int $limit = 5): array
+    {
+        $cacheKey = 'company_news_' . $symbol . '_' . $limit;
+
+        return $this->cache->get($cacheKey, function (ItemInterface $item) use ($symbol, $limit) {
+            // Set cache time to 10 minutes (600 seconds)
+            $item->expiresAfter(600);
+            $this->logger->info('Cache miss or expired for company news', ['symbol' => $symbol]);
+
+            try {
+                $news = $this->financialDataService->getCompanyNews($symbol, $limit);
+
+                // Process and validate each article
+                $processedNews = [];
+                foreach ($news as $article) {
+                    $processedNews[] = $this->validateNewsArticle($article);
+                }
+
+                // Deduplicate news articles
+                $dedupedNews = $this->deduplicateNewsArticles($processedNews);
+
+                // Sort by published date (newest first)
+                usort($dedupedNews, function($a, $b) {
+                    $dateA = strtotime($a['publishedAt'] ?? 0);
+                    $dateB = strtotime($b['publishedAt'] ?? 0);
+
+                    // Check if either article is from today
+                    $todayStart = strtotime('today midnight');
+                    $isAToday = ($dateA >= $todayStart);
+                    $isBToday = ($dateB >= $todayStart);
+
+                    // Prioritize today's news
+                    if ($isAToday && !$isBToday) {
+                        return -1; // A is from today, B is not, so A comes first
+                    } elseif (!$isAToday && $isBToday) {
+                        return 1;  // B is from today, A is not, so B comes first
+                    }
+
+                    // If both are from today or both are older, sort by date (newest first)
+                    return $dateB - $dateA;
+                });
+
+                // Return only the requested number of articles
+                return array_slice($dedupedNews, 0, $limit);
+            } catch (\Exception $e) {
+                $this->logger->error('Error getting company news: ' . $e->getMessage());
                 return [];
             }
         });
@@ -487,17 +651,11 @@ class StockDataService
             $item->expiresAfter(86400); // Cache for 24 hours
             $this->logger->info('Cache miss for executives', ['symbol' => $symbol]);
             try {
-                $executives = $this->yahooFinanceClient->getExecutives($symbol);
+                $executives = $this->financialDataService->getExecutives($symbol);
                 return $executives;
             } catch (\Exception $e) {
                 $this->logger->error('Error getting company executives: ' . $e->getMessage());
-                try {
-                    $executives = $this->alphaVantageClient->getExecutives($symbol);
-                    return $executives;
-                } catch (\Exception $e2) {
-                    $this->logger->error('Error with fallback executives: ' . $e2->getMessage());
-                    return [];
-                }
+                return [];
             }
         });
     }
@@ -537,33 +695,74 @@ class StockDataService
             $item->expiresAfter($cacheTtl);
             $this->logger->info('Cache miss for historical prices', ['symbol' => $symbol, 'interval' => $interval]);
             try {
-                $prices = $this->alphaVantageClient->getHistoricalPrices($symbol, $interval, $outputSize);
+                $prices = $this->financialDataService->getHistoricalPrices($symbol, $interval, $outputSize);
+
+                // Handle case where we get empty or invalid data
                 if (empty($prices)) {
-                    $this->logger->info('No valid historical price data from Alpha Vantage, trying Yahoo Finance');
-                    $prices = $this->yahooFinanceClient->getHistoricalPrices($symbol, $interval, $outputSize);
-                }
-                
-                // Ensure consistent date ordering (oldest to newest) for all interval types
-                usort($prices, function($a, $b) {
-                    return strtotime($a['date']) - strtotime($b['date']);
-                });
-                
-                return $prices;
-            } catch (\Exception $e) {
-                $this->logger->error('Error getting historical prices: ' . $e->getMessage());
-                try {
-                    $prices = $this->yahooFinanceClient->getHistoricalPrices($symbol, $interval, $outputSize);
-                    
-                    // Ensure consistent date ordering (oldest to newest) for all interval types
-                    usort($prices, function($a, $b) {
-                        return strtotime($a['date']) - strtotime($b['date']);
-                    });
-                    
-                    return $prices;
-                } catch (\Exception $e2) {
-                    $this->logger->error('Error with fallback prices: ' . $e2->getMessage());
+                    $this->logger->warning('Empty historical price data returned for ' . $symbol);
+
+                    // Set a shorter cache time for empty results
+                    $item->expiresAfter(60); // Only cache empty results for 1 minute
+
                     return [];
                 }
+
+                // Process the prices to ensure all required data points are present and valid
+                $processedPrices = [];
+                foreach ($prices as $price) {
+                    // Skip any entries without a date or price
+                    if (!isset($price['date']) || !isset($price['close'])) {
+                        continue;
+                    }
+
+                    // Ensure all required fields are present, with fallbacks
+                    $processedPrices[] = [
+                        'date' => $price['date'],
+                        'open' => isset($price['open']) ? (float)$price['open'] : (float)$price['close'],
+                        'high' => isset($price['high']) ? (float)$price['high'] : (float)$price['close'],
+                        'low' => isset($price['low']) ? (float)$price['low'] : (float)$price['close'],
+                        'close' => (float)$price['close'],
+                        'adjustedClose' => isset($price['adjustedClose']) ? (float)$price['adjustedClose'] : (float)$price['close'],
+                        'volume' => isset($price['volume']) ? (int)$price['volume'] : 0,
+                        'change' => isset($price['change']) ? (float)$price['change'] : 0,
+                        'changePercent' => isset($price['changePercent']) ? (float)$price['changePercent'] : 0,
+                        'dividend' => isset($price['dividend']) ? (float)$price['dividend'] : 0,
+                        'split' => isset($price['split']) ? (float)$price['split'] : 1.0
+                    ];
+                }
+
+                if (empty($processedPrices)) {
+                    $this->logger->warning('No valid price data points after processing for ' . $symbol);
+                    $item->expiresAfter(60); // Short cache time for invalid results
+                    return [];
+                }
+
+                // Ensure consistent date ordering (oldest to newest) for all interval types
+                usort($processedPrices, function($a, $b) {
+                    return strtotime($a['date']) - strtotime($b['date']);
+                });
+
+                // Normalize historical prices based on splits
+                $normalizedPrices = $this->normalizeHistoricalPrices($processedPrices);
+
+                $this->logger->info('Returning historical prices', [
+                    'symbol' => $symbol,
+                    'interval' => $interval,
+                    'count' => count($normalizedPrices)
+                ]);
+
+                return $normalizedPrices;
+            } catch (\Exception $e) {
+                $this->logger->error('Error getting historical prices: ' . $e->getMessage(), [
+                    'symbol' => $symbol,
+                    'interval' => $interval,
+                    'exception' => get_class($e)
+                ]);
+
+                // Set a very short cache time for errors
+                $item->expiresAfter(30);
+
+                return [];
             }
         });
     }
@@ -738,8 +937,6 @@ class StockDataService
 
     /**
      * Get analyst ratings
-     *
-     * TradeFeeds is the exclusive provider for analyst ratings
      */
     public function getAnalystRatings(string $symbol): array
     {
@@ -748,55 +945,28 @@ class StockDataService
             $item->expiresAfter(21600); // Cache for 6 hours
             $this->logger->info('Cache miss for analyst ratings', ['symbol' => $symbol]);
 
-            // Get ratings exclusively from TradeFeeds API
             try {
-                if (method_exists($this->tradeFeedsClient, 'getAnalystRatings')) {
-                    $ratings = $this->tradeFeedsClient->getAnalystRatings($symbol);
-
-                    if (!empty($ratings['ratings'])) {
-                        $this->logger->info('Using analyst ratings from TradeFeeds API', [
-                            'count' => count($ratings['ratings']),
-                            'symbol' => $symbol
-                        ]);
-                    } else {
-                        // If no ratings but we have a message, log it
-                        if (isset($ratings['message'])) {
-                            $this->logger->info('TradeFeeds API returned message: ' . $ratings['message'], [
-                                'symbol' => $symbol
-                            ]);
-                        } else {
-                            $this->logger->info('TradeFeeds API returned no ratings for ' . $symbol);
-                        }
-                    }
-
-                    // Always return what TradeFeeds gives us, even if empty
-                    return $ratings;
-                } else {
-                    $this->logger->error('TradeFeeds API client does not support getAnalystRatings method');
-                }
+                $ratings = $this->financialDataService->getAnalystRatings($symbol);
+                return $ratings;
             } catch (\Exception $e) {
-                $this->logger->error('Error getting analyst ratings from TradeFeeds API: ' . $e->getMessage(), [
-                    'symbol' => $symbol,
-                    'exception' => get_class($e)
-                ]);
-            }
+                $this->logger->error('Error getting analyst ratings: ' . $e->getMessage());
 
-            // If we get here, something went wrong with TradeFeeds API
-            // Return an empty structure with a generic message
-            return [
-                'ratings' => [],
-                'consensus' => [
-                    'consensusRating' => 'N/A',
-                    'averagePriceTarget' => 0,
-                    'lowPriceTarget' => 0,
-                    'highPriceTarget' => 0,
-                    'buy' => 0,
-                    'hold' => 0,
-                    'sell' => 0,
-                    'upside' => 0
-                ],
-                'message' => 'Analyst ratings are currently unavailable. Please try again later.'
-            ];
+                // Return an empty structure with a generic message
+                return [
+                    'ratings' => [],
+                    'consensus' => [
+                        'consensusRating' => 'N/A',
+                        'averagePriceTarget' => 0,
+                        'lowPriceTarget' => 0,
+                        'highPriceTarget' => 0,
+                        'buy' => 0,
+                        'hold' => 0,
+                        'sell' => 0,
+                        'upside' => 0
+                    ],
+                    'message' => 'Analyst ratings are currently unavailable. Please try again later.'
+                ];
+            }
         });
     }
 
@@ -810,168 +980,14 @@ class StockDataService
             $item->expiresAfter(86400); // Cache for 1 day
             $this->logger->info('Cache miss for insider trading', ['symbol' => $symbol]);
 
-            // Try to get data from Yahoo Finance FIRST (reversed priority)
             try {
-                $this->logger->info('Attempting to get insider trading data from Yahoo Finance', ['symbol' => $symbol]);
-                $yahooData = $this->yahooFinanceClient->getInsiderTrading($symbol, $limit);
-
-                if (!empty($yahooData)) {
-                    $this->logger->info('Successfully retrieved insider trading data from Yahoo Finance', ['count' => count($yahooData)]);
-                    return $this->transformYahooInsiderData($yahooData);
-                }
+                $insiderData = $this->financialDataService->getInsiderTrading($symbol, $limit);
+                return $insiderData;
             } catch (\Exception $e) {
-                $this->logger->error('Error getting insider trading data from Yahoo Finance: ' . $e->getMessage());
+                $this->logger->error('Error getting insider trading data: ' . $e->getMessage());
+                return [];
             }
-
-            // Fall back to SEC API if Yahoo failed
-            try {
-                $this->logger->info('Falling back to SEC API for insider trading data', ['symbol' => $symbol]);
-                $secData = $this->secApiClient->getInsiderTrading($symbol, $limit);
-
-                // If we got data, transform it to the expected format
-                if (!empty($secData)) {
-                    $this->logger->info('Successfully retrieved insider trading data from SEC API', ['count' => count($secData)]);
-                    return $this->transformSecInsiderData($secData);
-                }
-            } catch (\Exception $e) {
-                $this->logger->error('Error getting insider trading data from SEC API: ' . $e->getMessage());
-            }
-
-            // Return empty array if both sources failed
-            return [];
         });
-    }
-
-    /**
-     * Transform SEC API insider trading data to the format expected by the template
-     */
-    private function transformSecInsiderData(array $secData): array
-    {
-        $result = [];
-
-        foreach ($secData as $filing) {
-            // Skip if essential data is missing
-            if (!isset($filing['companyName'])) {
-                continue;
-            }
-
-            // Form 4 filings often have the company as the issuer and an insider as the owner
-            // For Kaleidoscope API, we need to extract or infer the owner information
-
-            // Extract potential owner information from form description or report title
-            $ownerName = $filing['companyName'] ?? 'Unknown';  // Default to company name
-            $formDesc = $filing['formDescription'] ?? '';
-
-            // If formDescription contains "filed by", try to extract the name after it
-            if (preg_match('/filed\s+by\s+([^(]+)/i', $formDesc, $matches)) {
-                $ownerName = trim($matches[1]);
-            }
-
-            // Create a filing entry with the expected structure
-            $filingEntry = [
-                'ownerName' => $ownerName,
-                'ownerTitle' => $filing['formDescription'] ?? '',
-                'isDirector' => stripos($formDesc, 'director') !== false,
-                'isOfficer' => stripos($formDesc, 'officer') !== false ||
-                               stripos($formDesc, 'executive') !== false,
-                'isTenPercentOwner' => stripos($formDesc, '10%') !== false ||
-                                       stripos($formDesc, 'ten percent') !== false,
-                'filingDate' => isset($filing['filingDate']) ? new \DateTime($filing['filingDate']) : new \DateTime(),
-                'transactionDate' => isset($filing['reportDate']) ? new \DateTime($filing['reportDate']) : new \DateTime(),
-                'formUrl' => $filing['htmlUrl'] ?? '',
-                'transactions' => [
-                    [
-                        'transactionType' => $this->determineTransactionType($filing['formType'] ?? ''),
-                        'securityType' => 'Common Stock',
-                        'shares' => 0, // Would need to parse the actual Form 4 document to get this
-                        'pricePerShare' => 0, // Would need to parse the actual Form 4 document to get this
-                        'totalValue' => 0, // Would need to parse the actual Form 4 document to get this
-                        'ownershipType' => 'Direct',
-                        'sharesOwnedFollowing' => 0 // Would need to parse the actual Form 4 document to get this
-                    ]
-                ]
-            ];
-
-            $result[] = $filingEntry;
-        }
-
-        return $result;
-    }
-
-    /**
-     * Transform Yahoo Finance insider trading data to the format expected by the template
-     */
-    private function transformYahooInsiderData(array $yahooData): array
-    {
-        $result = [];
-
-        foreach ($yahooData as $transaction) {
-            // Skip if essential data is missing
-            if (!isset($transaction['insider'])) {
-                continue;
-            }
-
-            // Determine transaction type code
-            $typeCode = 'O'; // Other by default
-            $transactionType = $transaction['transactionType'] ?? '';
-            if (stripos($transactionType, 'purchase') !== false) {
-                $typeCode = 'P';
-            } elseif (stripos($transactionType, 'sale') !== false) {
-                $typeCode = 'S';
-            } elseif (stripos($transactionType, 'grant') !== false ||
-                      stripos($transactionType, 'award') !== false) {
-                $typeCode = 'A';
-            } elseif (stripos($transactionType, 'disposition') !== false) {
-                $typeCode = 'D';
-            }
-
-            // Create a filing entry with the expected structure
-            $filingEntry = [
-                'ownerName' => $transaction['insider'] ?? 'Unknown',
-                'ownerTitle' => $transaction['title'] ?? '',
-                'isDirector' => stripos($transaction['title'] ?? '', 'director') !== false,
-                'isOfficer' => stripos($transaction['title'] ?? '', 'officer') !== false ||
-                               stripos($transaction['title'] ?? '', 'ceo') !== false ||
-                               stripos($transaction['title'] ?? '', 'cfo') !== false ||
-                               stripos($transaction['title'] ?? '', 'president') !== false,
-                'isTenPercentOwner' => stripos($transaction['title'] ?? '', '10%') !== false,
-                'filingDate' => isset($transaction['date']) ? new \DateTime($transaction['date']) : new \DateTime(),
-                'transactionDate' => isset($transaction['date']) ? new \DateTime($transaction['date']) : new \DateTime(),
-                'formUrl' => '',
-                'transactions' => [
-                    [
-                        'transactionType' => $typeCode,
-                        'securityType' => 'Common Stock',
-                        'shares' => $transaction['shares'] ?? 0,
-                        'pricePerShare' => $transaction['price'] ?? 0,
-                        'totalValue' => $transaction['value'] ?? 0,
-                        'ownershipType' => 'Direct',
-                        'sharesOwnedFollowing' => $transaction['sharesOwned'] ?? 0
-                    ]
-                ]
-            ];
-
-            $result[] = $filingEntry;
-        }
-
-        return $result;
-    }
-
-    /**
-     * Determine transaction type code from form type
-     */
-    private function determineTransactionType(string $formType): string
-    {
-        // Form 4 is for changes in ownership
-        if ($formType === '4') {
-            // We don't have the actual transaction type from the form content
-            // But we can return a reasonable default for Form 4
-            // P = Purchase, S = Sale, A = Grant/Award, D = Disposition, O = Other
-            return 'P'; // Default to Purchase as it's common and looks better in UI
-        }
-
-        // Default to 'O' (Other) for other form types
-        return 'O';
     }
 
     /**
@@ -984,7 +1000,7 @@ class StockDataService
             $item->expiresAfter(604800); // Cache for 1 week
             $this->logger->info('Cache miss for institutional ownership', ['symbol' => $symbol]);
             try {
-                return $this->secApiClient->getInstitutionalOwnership($symbol, $limit);
+                return $this->financialDataService->getInstitutionalOwnership($symbol, $limit);
             } catch (\Exception $e) {
                 $this->logger->error('Error getting institutional ownership data: ' . $e->getMessage());
                 return [];
@@ -1031,6 +1047,25 @@ class StockDataService
     }
 
     /**
+     * Calculate total institutional ownership percentage
+     *
+     * @param Company $company The company entity
+     * @return float Total institutional ownership percentage
+     */
+    public function calculateTotalInstitutionalOwnership(Company $company): float
+    {
+        $owners = $this->institutionalOwnershipRepository->findByCompany($company);
+
+        $totalPercentage = 0;
+        foreach ($owners as $owner) {
+            $totalPercentage += $owner->getPercentageOwned();
+        }
+
+        // Cap at 100% (sometimes there can be double counting in the data)
+        return min($totalPercentage, 100);
+    }
+
+    /**
      * Check if current time is during market hours (9:30 AM - 4:00 PM ET, Monday-Friday)
      */
     private function isMarketHours(\DateTime $now): bool
@@ -1061,9 +1096,6 @@ class StockDataService
     }
 
     /**
-     * Import historical stock prices for a company
-     */
-    /**
      * Normalize historical prices based on stock splits
      *
      * This method adjusts historical prices to account for stock splits,
@@ -1091,127 +1123,86 @@ class StockDataService
             }
         }
 
-        // If no splits, return the original data
-        if (empty($splitEvents)) {
-            return $prices;
-        }
-
-        $this->logger->info('Found ' . count($splitEvents) . ' stock split events to apply');
-
-        // Apply each split to prior prices
-        // Note: Splits are already incorporated in adjusted close from the API,
-        // but we need to normalize open, high, low, close for visualization
-        foreach ($splitEvents as $splitEvent) {
-            $splitDate = $splitEvent['date'];
-            $splitRatio = $splitEvent['ratio'];
-
-            $this->logger->info('Applying stock split', [
-                'date' => $splitDate,
-                'ratio' => $splitRatio
-            ]);
-
-            // Adjust all prices prior to the split
-            for ($i = 0; $i < $splitEvent['index']; $i++) {
-                // For a 2:1 split, divide historical prices by 2
-                $prices[$i]['open'] /= $splitRatio;
-                $prices[$i]['high'] /= $splitRatio;
-                $prices[$i]['low'] /= $splitRatio;
-                $prices[$i]['close'] /= $splitRatio;
-
-                // Volume would be multiplied, but we'll leave as is since we already have adjusted values
-
-                // Recalculate change and change percent if needed
-                if ($i > 0 && isset($prices[$i]['change']) && isset($prices[$i-1]['close'])) {
-                    $prices[$i]['change'] = $prices[$i]['close'] - $prices[$i-1]['close'];
-                    if ($prices[$i-1]['close'] != 0) {
-                        $prices[$i]['changePercent'] = ($prices[$i]['change'] / $prices[$i-1]['close']) * 100;
-                    }
-                }
+        // Apply splits
+        $normalizedPrices = $prices;
+        foreach ($splitEvents as $split) {
+            $splitRatio = $split['ratio'];
+            for ($i = 0; $i < $split['index']; $i++) {
+                $normalizedPrices[$i]['open'] *= $splitRatio;
+                $normalizedPrices[$i]['high'] *= $splitRatio;
+                $normalizedPrices[$i]['low'] *= $splitRatio;
+                $normalizedPrices[$i]['close'] *= $splitRatio;
+                $normalizedPrices[$i]['adjustedClose'] *= $splitRatio;
+                $normalizedPrices[$i]['volume'] /= $splitRatio;
             }
         }
 
-        return $prices;
+        return $normalizedPrices;
     }
 
-    public function importHistoricalPrices(Company $company, string $interval = 'daily', int $limit = 100): int
+    /**
+     * Import historical price data for a company
+     *
+     * @param Company $company The company entity
+     * @param string $interval The interval (daily, weekly, monthly)
+     * @param int $limit The maximum number of data points to import
+     */
+    public function importHistoricalPrices(Company $company, string $interval = 'daily', int $limit = 100): void
     {
-        $prices = $this->getHistoricalPrices(
-            $company->getTickerSymbol(),
-            $interval,
-            $limit > 100 ? 'full' : 'compact'
-        );
+        $prices = $this->getHistoricalPrices($company->getTickerSymbol(), $interval, 'full'); // Fetch full history to ensure accurate normalization
 
         if (empty($prices)) {
-            $this->logger->warning('No historical price data available for ' . $company->getTickerSymbol());
-            return 0;
+            $this->logger->warning('No historical price data available for ' . $company->getTickerSymbol() . ' (' . $interval . ')');
+            return;
         }
 
-        // Normalize prices to account for stock splits
-        $prices = $this->normalizeHistoricalPrices($prices);
+        // Normalize prices based on splits
+        $normalizedPrices = $this->normalizeHistoricalPrices($prices);
 
-        $count = 0;
-        $repository = $this->entityManager->getRepository(StockPrice::class);
+        // Get existing prices for this company and interval
+        $existingPrices = $this->entityManager->getRepository(StockPrice::class)
+            ->findBy(['company' => $company, 'interval' => $interval]);
 
-        if ($limit > 0 && count($prices) > $limit) {
-            $prices = array_slice($prices, 0, $limit);
+        $existingDates = [];
+        foreach ($existingPrices as $price) {
+            $existingDates[$price->getDate()->format('Y-m-d')] = $price;
         }
 
-        $batchSize = 50; // Process in batches
+        $importedCount = 0;
+        // Iterate through normalized prices (newest first for easier limiting)
+        $normalizedPrices = array_reverse($normalizedPrices);
+        foreach ($normalizedPrices as $priceData) {
+            if ($importedCount >= $limit) break;
 
-        foreach ($prices as $index => $priceData) {
-            try {
-                $date = new \DateTime($priceData['date']);
-            } catch (\Exception $e) {
-                $this->logger->warning('Invalid date format in price data, skipping.', ['data' => $priceData]);
-                continue;
-            }
+            $dateString = $priceData['date'];
+            $date = new \DateTime($dateString);
 
-            $existingPrice = $repository->findOneBy([
-                'company' => $company,
-                'date' => $date,
-                'period' => $interval
-            ]);
-
-            $price = $existingPrice ?? new StockPrice();
-            if (!$existingPrice) {
-                // For new stock price entities, make sure to use the same company object that's already persisted
+            $price = $existingDates[$dateString] ?? null;
+            if (!$price) {
+                $price = new StockPrice();
                 $price->setCompany($company);
-                $price->setDate($date);
                 $price->setPeriod($interval);
+                $price->setDate($date);
                 $price->setCreatedAt(new \DateTimeImmutable());
-                $this->logger->debug('Creating price data for ' . $company->getTickerSymbol() . ': ' . $priceData['date']);
-
-                // Add this new price to the company's collection to ensure bidirectional relationship
-                $company->addStockPrice($price);
+                $this->logger->info('Creating stock price for ' . $company->getTickerSymbol() . ' (' . $interval . '): ' . $dateString);
             } else {
-                 $this->logger->debug('Updating price data for ' . $company->getTickerSymbol() . ': ' . $priceData['date']);
+                 $this->logger->info('Updating stock price for ' . $company->getTickerSymbol() . ' (' . $interval . '): ' . $dateString);
             }
 
             $price->setOpen($priceData['open'] ?? 0);
             $price->setHigh($priceData['high'] ?? 0);
             $price->setLow($priceData['low'] ?? 0);
             $price->setClose($priceData['close'] ?? 0);
-            $price->setAdjustedClose($priceData['adjustedClose'] ?? $price->getClose());
+            $price->setAdjustedClose($priceData['adjustedClose'] ?? $priceData['close'] ?? 0);
             $price->setVolume($priceData['volume'] ?? 0);
-            $price->setChange($priceData['change'] ?? null);
-            $price->setChangePercent($priceData['changePercent'] ?? null);
-            $price->setSource('API');
+            $price->setChangeValue($priceData['change'] ?? 0);
+            $price->setChangePercent($priceData['changePercent'] ?? 0);
+            $price->setDividend($priceData['dividend'] ?? 0);
+            $price->setSplit($priceData['split'] ?? 1.0);
             $price->setUpdatedAt(new \DateTimeImmutable());
 
             $this->entityManager->persist($price);
-            $count++;
-
-            if (($index + 1) % $batchSize === 0) {
-                $this->entityManager->flush();
-                $this->entityManager->clear(StockPrice::class); // Detach processed entities
-                $this->logger->debug("Flushed batch of {$batchSize} price records.");
-            }
+            $importedCount++;
         }
-
-        $this->entityManager->flush(); // Flush remaining entities
-        $this->entityManager->clear(StockPrice::class);
-        $this->logger->info('Imported/Updated ' . $count . ' price records for ' . $company->getTickerSymbol());
-
-        return $count;
     }
 }

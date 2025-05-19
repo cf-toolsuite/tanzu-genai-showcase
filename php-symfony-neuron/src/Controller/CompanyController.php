@@ -35,35 +35,55 @@ class CompanyController extends AbstractController
         ]);
     }
 
-    #[Route('/search', name: 'company_search', methods: ['GET', 'POST'])] // POST if form based search
+    #[Route('/search', name: 'company_search', methods: ['GET', 'POST'])]
     public function search(Request $request, CompanySearchService $companySearchService): Response
     {
-        $searchTerm = $request->query->get('searchTerm', $request->request->get('searchTerm')); // Allow GET or POST
+        $searchTerm = trim($request->query->get('searchTerm', $request->request->get('searchTerm')));
         $results = ['dbResults' => [], 'apiResults' => []];
+        $apiError = false;
 
-        if ($searchTerm) {
-            $results = $companySearchService->searchCompanies($searchTerm);
-            if (empty($results['apiResults']) && !empty($results['dbResults'])) {
-                // Add flash message if API search failed but we have DB results
-                 if (count($companySearchService->searchCompanies($searchTerm)['apiResults']) === 0 &&
-                     count($this->getDoctrine()->getManager()->getRepository(Company::class)->findBySearchCriteria($searchTerm)) > 0 ) {
-                     // This logic for flash is a bit complex for here, ideally SearchService returns status
-                 }
+        if (!empty($searchTerm)) {
+            $this->logger->info('Processing search request', ['term' => $searchTerm]);
+
+            // Attempt to search with the provided term
+            try {
+                $results = $companySearchService->searchCompanies($searchTerm);
+
+                // Add appropriate flash messages based on results
+                if (empty($results['dbResults']) && empty($results['apiResults'])) {
+                    // No results found
+                    $this->logger->info('No results found for search term', ['term' => $searchTerm]);
+                } elseif (!empty($results['dbResults']) && empty($results['apiResults'])) {
+                    // Only database results found
+                    $this->logger->info('Found only database results', ['count' => count($results['dbResults'])]);
+
+                    // Check if there was an API error
+                    if ($apiError) {
+                        $this->addFlash('warning', 'External search services are currently unavailable. Showing only results from our database.');
+                    }
+                } elseif (empty($results['dbResults']) && !empty($results['apiResults'])) {
+                    // Only API results found
+                    $this->logger->info('Found only external API results', ['count' => count($results['apiResults'])]);
+                    $this->addFlash('info', 'We found some companies from external sources that match your search. You can import them to our database.');
+                } else {
+                    // Both database and API results found
+                    $this->logger->info('Found results from both sources', [
+                        'dbCount' => count($results['dbResults']),
+                        'apiCount' => count($results['apiResults'])
+                    ]);
+                }
+            } catch (\Exception $e) {
+                $this->logger->error('Error during company search', ['error' => $e->getMessage()]);
+                $this->addFlash('error', 'An error occurred while searching. Please try again later.');
+                $apiError = true;
             }
         }
-        // Add flash if API results couldn't be fetched (CompanySearchService should log details)
-        // This requires CompanySearchService to indicate if an API error occurred
-        // For now, we assume if apiResults is empty and searchTerm was present, it might be an issue.
-        if ($searchTerm && empty($results['apiResults']) && !empty($results['dbResults'])) {
-             // this->addFlash('warning', 'Could not fetch additional results from external sources.');
-             // A better way: search service returns a status or specific error type.
-        }
-
 
         return $this->render('company/search.html.twig', [
             'dbResults' => $results['dbResults'],
             'apiResults' => $results['apiResults'],
             'searchTerm' => $searchTerm,
+            'apiError' => $apiError
         ]);
     }
 

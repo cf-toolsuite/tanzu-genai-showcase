@@ -8,8 +8,9 @@ use Symfony\Component\DependencyInjection\ParameterBag\ParameterBagInterface;
 
 /**
  * News API client (newsapi.org) - REAL Implementation
+ * Specialized for news data only
  */
-class NewsApiClient extends AbstractApiClient
+class NewsApiClient extends AbstractApiClient implements NewsApiClientInterface
 {
     /**
      * {@inheritdoc}
@@ -31,14 +32,18 @@ class NewsApiClient extends AbstractApiClient
 
     /**
      * Get company news from News API (uses /everything endpoint)
+     *
+     * @param string $symbol The company symbol
+     * @param int $limit The maximum number of news articles to return
+     * @return array The news articles
      */
-    public function getCompanyNews(string $query, int $limit = 10, ?\DateTime $from = null, ?\DateTime $to = null): array
+    public function getCompanyNews(string $symbol, int $limit = 10): array
     {
         $endpoint = '/everything';
-        if (!$from) $from = new \DateTime('30 days ago');
-        if (!$to) $to = new \DateTime('tomorrow'); // Use tomorrow to ensure we get today's news
+        $from = new \DateTime('30 days ago');
+        $to = new \DateTime('tomorrow'); // Use tomorrow to ensure we get today's news
         $params = [
-            'q' => $query,
+            'q' => $symbol,
             'searchIn' => 'title,description', // Search in both title and description for better results
             'from' => $from->format('Y-m-d'),
             'to' => $to->format('Y-m-d'),
@@ -99,94 +104,5 @@ class NewsApiClient extends AbstractApiClient
             }
         }
         return $articles;
-    }
-
-    // --- Stubs for other ApiClientInterface methods ---
-    public function searchCompanies(string $term): array
-    {
-        throw new \BadMethodCallException('Not implemented');
-    }
-    public function getCompanyProfile(string $symbol): array
-    {
-        throw new \BadMethodCallException('Not implemented');
-    }
-    public function getQuote(string $symbol): array
-    {
-        throw new \BadMethodCallException('Not implemented');
-    }
-    public function getFinancials(string $symbol, string $period = 'quarterly'): array
-    {
-        throw new \BadMethodCallException('Not implemented');
-    }
-    public function getExecutives(string $symbol): array
-    {
-        throw new \BadMethodCallException('Not implemented');
-    }
-    public function getHistoricalPrices(string $symbol, string $interval = 'daily', string $outputSize = 'compact'): array
-    {
-        throw new \BadMethodCallException('Not implemented');
-    }
-
-    /**
-     * Get ESG (Environmental, Social, Governance) data for a company
-     *
-     * @param string $symbol Company ticker symbol
-     * @return array ESG data with scores
-     * @throws \Exception If the API request fails
-     */
-    public function getESGData(string $symbol): array
-    {
-        throw new \BadMethodCallException('News API does not support ESG data');
-    }
-
-    /**
-     * Get recent SEC filings for a company
-     *
-     * @param string $symbol Company ticker symbol
-     * @param int $limit Maximum number of filings to return
-     * @return array SEC filings data
-     * @throws \Exception If the API request fails
-     */
-    public function getRecentSecFilings(string $symbol, int $limit = 5): array
-    {
-        throw new \BadMethodCallException('News API does not support SEC filings data');
-    }
-
-    /**
-     * Get analyst ratings for a company
-     *
-     * @param string $symbol Company ticker symbol
-     * @return array Analyst ratings data
-     * @throws \Exception If the API request fails
-     */
-    public function getAnalystRatings(string $symbol): array
-    {
-        throw new \BadMethodCallException('News API does not support analyst ratings');
-    }
-
-    /**
-     * Get insider trading data for a company
-     *
-     * @param string $symbol Company ticker symbol
-     * @param int $limit Maximum number of records to return
-     * @return array Insider trading data
-     * @throws \Exception If the API request fails
-     */
-    public function getInsiderTrading(string $symbol, int $limit = 20): array
-    {
-        throw new \BadMethodCallException('News API does not support insider trading data');
-    }
-
-    /**
-     * Get institutional ownership data for a company
-     *
-     * @param string $symbol Company ticker symbol
-     * @param int $limit Maximum number of records to return
-     * @return array Institutional ownership data
-     * @throws \Exception If the API request fails
-     */
-    public function getInstitutionalOwnership(string $symbol, int $limit = 20): array
-    {
-        throw new \BadMethodCallException('News API does not support institutional ownership data');
     }
 }

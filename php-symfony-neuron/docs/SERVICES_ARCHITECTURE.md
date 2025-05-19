@@ -77,6 +77,24 @@ This document provides a comprehensive overview of the services architecture in 
 | FinancialDataServiceInterface.php | FinancialDataServiceInterface | getInstitutionalOwnership |
 | FinancialDataServiceInterface.php | FinancialDataServiceInterface | getAnalystRatings |
 | FinancialDataServiceInterface.php | FinancialDataServiceInterface | getAdditionalMetricsSummary |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | addStockMarketDataClient |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | addNewsClient |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | addSecFilingsClient |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | addAnalystRatingsClient |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | addEsgDataClient |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | addExecutiveDataClient |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getESGData |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getSecFilings |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getInsiderTrading |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getInstitutionalOwnership |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getAnalystRatings |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getAdditionalMetricsSummary |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getCompanyNews |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getCompanyProfile |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getExecutives |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getStockQuote |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getHistoricalPrices |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getFinancialData |
 | HunterService.php | HunterService | findExecutivesByDomain |
 | HunterService.php | HunterService | findExecutivesByCompany |
 | HunterService.php | HunterService | searchExecutiveByRole |
@@ -142,13 +160,7 @@ This document provides a comprehensive overview of the services architecture in 
 | YahooFinanceService.php | YahooFinanceService | fetchInsiderTransactions |
 | YahooFinanceService.php | YahooFinanceService | fetchInstitutionalOwnership |
 | YahooFinanceService.php | YahooFinanceService | fetchAnalystRatings |
-| YahooFinanceService.php | YahooFinanceService | getMockESGData |
-| YahooFinanceService.php | YahooFinanceService | getMockSecFilings |
-| YahooFinanceService.php | YahooFinanceService | getMockInsiderTransactions |
-| YahooFinanceService.php | YahooFinanceService | getMockInstitutionalOwnership |
 | YahooFinanceService.php | YahooFinanceService | getIndustryPeers |
-| YahooFinanceService.php | YahooFinanceService | getMockIndustryPeers |
-| YahooFinanceService.php | YahooFinanceService | getMockAnalystRatings |
 
 ## 3. API Clients
 
@@ -157,77 +169,51 @@ This document provides a comprehensive overview of the services architecture in 
 | AbstractApiClient.php | AbstractApiClient | Abstract base class | initialize |
 | AbstractApiClient.php | AbstractApiClient | Abstract base class | getAuthParams |
 | AbstractApiClient.php | AbstractApiClient | Implemented | request |
-| ApiClientInterface.php | ApiClientInterface | Interface definition | searchCompanies |
-| ApiClientInterface.php | ApiClientInterface | Interface definition | getCompanyProfile |
-| ApiClientInterface.php | ApiClientInterface | Interface definition | getQuote |
-| ApiClientInterface.php | ApiClientInterface | Interface definition | getFinancials |
-| ApiClientInterface.php | ApiClientInterface | Interface definition | getCompanyNews |
-| ApiClientInterface.php | ApiClientInterface | Interface definition | getExecutives |
-| ApiClientInterface.php | ApiClientInterface | Interface definition | getHistoricalPrices |
-| ApiClientInterface.php | ApiClientInterface | Interface definition | getESGData |
-| ApiClientInterface.php | ApiClientInterface | Interface definition | getRecentSecFilings |
-| ApiClientInterface.php | ApiClientInterface | Interface definition | getAnalystRatings |
-| ApiClientInterface.php | ApiClientInterface | Interface definition | getInsiderTrading |
-| ApiClientInterface.php | ApiClientInterface | Interface definition | getInstitutionalOwnership |
-| AlphaVantageClient.php | AlphaVantageClient | Implemented | initialize |
-| AlphaVantageClient.php | AlphaVantageClient | Implemented | getAuthParams |
-| AlphaVantageClient.php | AlphaVantageClient | Implemented | searchCompanies |
-| AlphaVantageClient.php | AlphaVantageClient | Implemented | getCompanyProfile |
-| AlphaVantageClient.php | AlphaVantageClient | Implemented | getQuote |
-| AlphaVantageClient.php | AlphaVantageClient | Implemented | getFinancials |
-| AlphaVantageClient.php | AlphaVantageClient | Implemented | formatFinancialReport |
-| AlphaVantageClient.php | AlphaVantageClient | Implemented | getCompanyNews |
-| AlphaVantageClient.php | AlphaVantageClient | Implemented | formatAvDate |
-| AlphaVantageClient.php | AlphaVantageClient | Implemented | getExecutives |
-| AlphaVantageClient.php | AlphaVantageClient | Implemented | getHistoricalPrices |
-| AlphaVantageClient.php | AlphaVantageClient | Stub (returns empty data) | getESGData |
-| AlphaVantageClient.php | AlphaVantageClient | Stub (returns empty data) | getRecentSecFilings |
-| AlphaVantageClient.php | AlphaVantageClient | Stub (returns empty data) | getAnalystRatings |
-| AlphaVantageClient.php | AlphaVantageClient | Stub (returns empty data) | getInsiderTrading |
-| AlphaVantageClient.php | AlphaVantageClient | Stub (returns empty data) | getInstitutionalOwnership |
-| HunterApiClient.php | HunterApiClient | Implemented | domainSearch |
-| HunterApiClient.php | HunterApiClient | Implemented | companySearch |
-| HunterApiClient.php | HunterApiClient | Implemented | makeRequest |
+| StockMarketDataApiClientInterface.php | StockMarketDataApiClientInterface | Interface definition | searchCompanies |
+| StockMarketDataApiClientInterface.php | StockMarketDataApiClientInterface | Interface definition | getCompanyProfile |
+| StockMarketDataApiClientInterface.php | StockMarketDataApiClientInterface | Interface definition | getQuote |
+| StockMarketDataApiClientInterface.php | StockMarketDataApiClientInterface | Interface definition | getFinancials |
+| StockMarketDataApiClientInterface.php | StockMarketDataApiClientInterface | Interface definition | getHistoricalPrices |
+| NewsApiClientInterface.php | NewsApiClientInterface | Interface definition | getCompanyNews |
+| SecFilingsApiClientInterface.php | SecFilingsApiClientInterface | Interface definition | getRecentSecFilings |
+| AnalystRatingsApiClientInterface.php | AnalystRatingsApiClientInterface | Interface definition | getAnalystRatings |
+| EsgDataApiClientInterface.php | EsgDataApiClientInterface | Interface definition | getESGData |
+| ExecutiveDataApiClientInterface.php | ExecutiveDataApiClientInterface | Interface definition | getExecutives |
+| ExecutiveDataApiClientInterface.php | ExecutiveDataApiClientInterface | Interface definition | getInsiderTrading |
+| ExecutiveDataApiClientInterface.php | ExecutiveDataApiClientInterface | Interface definition | getInstitutionalOwnership |
 | HunterApiClientInterface.php | HunterApiClientInterface | Interface definition | domainSearch |
 | HunterApiClientInterface.php | HunterApiClientInterface | Interface definition | companySearch |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | initialize |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | getAuthParams |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | searchFilings |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | filterFilingsByType |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | normalizeFilingData |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | searchFilingsWithPagination |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | get10KReports |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | downloadReport |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | extractReportSections |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | extractSectionBetweenMarkers |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | searchCompanies |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | getCompanyProfile |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Stub (throws exception) | getQuote |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Stub (returns empty array) | getFinancials |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Stub (throws exception) | getCompanyNews |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Stub (throws exception) | getExecutives |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Stub (throws exception) | getHistoricalPrices |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Stub (returns empty data) | getESGData |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | getRecentSecFilings |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Stub (returns empty data) | getAnalystRatings |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented (limited) | getInsiderTrading |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Stub (returns empty array) | getInstitutionalOwnership |
-| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implemented | getMockData |
-| NewsApiClient.php | NewsApiClient | Implemented | initialize |
-| NewsApiClient.php | NewsApiClient | Implemented | getAuthParams |
-| NewsApiClient.php | NewsApiClient | Implemented | getCompanyNews |
-| NewsApiClient.php | NewsApiClient | Implemented | getTopHeadlines |
-| NewsApiClient.php | NewsApiClient | Stub (throws exception) | searchCompanies |
-| NewsApiClient.php | NewsApiClient | Stub (throws exception) | getCompanyProfile |
-| NewsApiClient.php | NewsApiClient | Stub (throws exception) | getQuote |
-| NewsApiClient.php | NewsApiClient | Stub (throws exception) | getFinancials |
-| NewsApiClient.php | NewsApiClient | Stub (throws exception) | getExecutives |
-| NewsApiClient.php | NewsApiClient | Stub (throws exception) | getHistoricalPrices |
-| NewsApiClient.php | NewsApiClient | Stub (throws exception) | getESGData |
-| NewsApiClient.php | NewsApiClient | Stub (throws exception) | getRecentSecFilings |
-| NewsApiClient.php | NewsApiClient | Stub (throws exception) | getAnalystRatings |
-| NewsApiClient.php | NewsApiClient | Stub (throws exception) | getInsiderTrading |
-| NewsApiClient.php | NewsApiClient | Stub (throws exception) | getInstitutionalOwnership |
+| AlphaVantageClient.php | AlphaVantageClient | Implements StockMarketDataApiClientInterface, NewsApiClientInterface | initialize |
+| AlphaVantageClient.php | AlphaVantageClient | Implements StockMarketDataApiClientInterface, NewsApiClientInterface | getAuthParams |
+| AlphaVantageClient.php | AlphaVantageClient | Implements StockMarketDataApiClientInterface, NewsApiClientInterface | searchCompanies |
+| AlphaVantageClient.php | AlphaVantageClient | Implements StockMarketDataApiClientInterface, NewsApiClientInterface | getCompanyProfile |
+| AlphaVantageClient.php | AlphaVantageClient | Implements StockMarketDataApiClientInterface, NewsApiClientInterface | getQuote |
+| AlphaVantageClient.php | AlphaVantageClient | Implements StockMarketDataApiClientInterface, NewsApiClientInterface | getFinancials |
+| AlphaVantageClient.php | AlphaVantageClient | Implements StockMarketDataApiClientInterface, NewsApiClientInterface | formatFinancialReport |
+| AlphaVantageClient.php | AlphaVantageClient | Implements StockMarketDataApiClientInterface, NewsApiClientInterface | getCompanyNews |
+| AlphaVantageClient.php | AlphaVantageClient | Implements StockMarketDataApiClientInterface, NewsApiClientInterface | formatAvDate |
+| AlphaVantageClient.php | AlphaVantageClient | Implements StockMarketDataApiClientInterface, NewsApiClientInterface | getHistoricalPrices |
+| HunterApiClient.php | HunterApiClient | Implements HunterApiClientInterface, ExecutiveDataApiClientInterface | domainSearch |
+| HunterApiClient.php | HunterApiClient | Implements HunterApiClientInterface, ExecutiveDataApiClientInterface | companySearch |
+| HunterApiClient.php | HunterApiClient | Implements HunterApiClientInterface, ExecutiveDataApiClientInterface | getExecutives |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | initialize |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | getAuthParams |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | searchFilings |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | filterFilingsByType |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | normalizeFilingData |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | searchFilingsWithPagination |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | get10KReports |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | downloadReport |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | extractReportSections |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | extractSectionBetweenMarkers |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | searchCompanies |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | getCompanyProfile |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | getRecentSecFilings |
+| KaleidoscopeApiClient.php | KaleidoscopeApiClient | Implements SecFilingsApiClientInterface, ExecutiveDataApiClientInterface | getInsiderTrading |
+| NewsApiClient.php | NewsApiClient | Implements NewsApiClientInterface | initialize |
+| NewsApiClient.php | NewsApiClient | Implements NewsApiClientInterface | getAuthParams |
+| NewsApiClient.php | NewsApiClient | Implements NewsApiClientInterface | getCompanyNews |
+| NewsApiClient.php | NewsApiClient | Implements NewsApiClientInterface | getTopHeadlines |
 | SecApiClient.php | SecApiClient | Proxy class | (extends KaleidoscopeApiClient) |
 | SecApiClientFactory.php | SecApiClientFactory | Factory class | createClient |
 | SecApiClientFactory.php | SecApiClientFactory | Factory class | getSubscribedServices |
@@ -237,62 +223,51 @@ This document provides a comprehensive overview of the services architecture in 
 | StockClientsFactory.php | StockClientsFactory | Factory class | getSecApiClient |
 | StockClientsFactory.php | StockClientsFactory | Factory class | getTradeFeedsClient |
 | StockClientsFactory.php | StockClientsFactory | Factory class | getSubscribedServices |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Implemented | initialize |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Implemented | getAuthParams |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Stub (returns empty array) | searchCompanies |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Stub (returns empty array) | getCompanyProfile |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Stub (returns empty array) | getQuote |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Stub (returns empty array) | getFinancials |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Stub (returns empty array) | getCompanyNews |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Stub (returns empty array) | getExecutives |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Stub (returns empty array) | getHistoricalPrices |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Stub (returns empty array) | getInsiderTrading |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Stub (returns empty array) | getInstitutionalOwnership |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Stub (returns empty array) | getESGData |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Stub (returns empty array) | getRecentSecFilings |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Implemented | getAnalystRatings |
-| TradeFeedsApiClient.php | TradeFeedsApiClient | Implemented | getEmptyRatingsStructure |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | initialize |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | getAuthParams |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | request |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | searchCompanies |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | getCompanyProfile |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | getQuote |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | getFinancials |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | getCompanyNews |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | getExecutives |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | getAnalystRatings |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | getInsiderTrading |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | getInstitutionalOwnership |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | getESGData |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | getRecentSecFilings |
-| YahooFinanceClient.php | YahooFinanceClient | Implemented | getHistoricalPrices |
+| TradeFeedsApiClient.php | TradeFeedsApiClient | Implements AnalystRatingsApiClientInterface | initialize |
+| TradeFeedsApiClient.php | TradeFeedsApiClient | Implements AnalystRatingsApiClientInterface | getAuthParams |
+| TradeFeedsApiClient.php | TradeFeedsApiClient | Implements AnalystRatingsApiClientInterface | getAnalystRatings |
+| TradeFeedsApiClient.php | TradeFeedsApiClient | Implements AnalystRatingsApiClientInterface | getEmptyRatingsStructure |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | initialize |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | getAuthParams |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | request |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | searchCompanies |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | getCompanyProfile |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | getQuote |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | getFinancials |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | getCompanyNews |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | getExecutives |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | getAnalystRatings |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | getInsiderTrading |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | getInstitutionalOwnership |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | getESGData |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | getRecentSecFilings |
+| YahooFinanceClient.php | YahooFinanceClient | Implements all domain-specific interfaces | getHistoricalPrices |
 
 ## 4. Controller Method to Service Method to API Client Method
 
-| Controller File | Controller Class | Controller Method | Service File | Service Class | Service Method | API Client File | API Client Class | API Client Method |
-|-----------------|------------------|-------------------|--------------|---------------|----------------|-----------------|------------------|-------------------|
-| CompanyController.php | CompanyController | search | CompanySearchService.php | CompanySearchService | searchCompanies | AlphaVantageClient.php/YahooFinanceClient.php | AlphaVantageClient/YahooFinanceClient | searchCompanies |
-| CompanyController.php | CompanyController | importFromApi | StockDataService.php | StockDataService | importCompany | AlphaVantageClient.php/YahooFinanceClient.php | AlphaVantageClient/YahooFinanceClient | getCompanyProfile |
-| CompanyController.php | CompanyController | new | NeuronAiService.php | NeuronAiService | generateCompanyInfo | - | - | - |
-| CompanyGenerationController.php | CompanyGenerationController | generateLeadership | HunterService.php | HunterService | findCompanyExecutives | HunterApiClient.php | HunterApiClient | companySearch |
-| CompanyGenerationController.php | CompanyGenerationController | generateCompetitors | NeuronAiService.php | NeuronAiService | generateCompetitorAnalysis | - | - | - |
-| CompanyGenerationController.php | CompanyGenerationController | generateReports | NeuronAiService.php | NeuronAiService | generateResearchReports | - | - | - |
-| CompanyGenerationController.php | CompanyGenerationController | generateFinancial | NeuronAiService.php | NeuronAiService | generateFinancialData | - | - | - |
-| CompanyMarketDataController.php | CompanyMarketDataController | news | StockDataService.php | StockDataService | getCompanyNews | NewsApiClient.php/YahooFinanceClient.php | NewsApiClient/YahooFinanceClient | getCompanyNews |
-| CompanyMarketDataController.php | CompanyMarketDataController | additionalMetrics | StockDataService.php | StockDataService | getAnalystConsensus/getAnalystRatings/getInsiderTrading/getInstitutionalOwnership | TradeFeedsApiClient.php/YahooFinanceClient.php | TradeFeedsApiClient/YahooFinanceClient | getAnalystRatings/getInsiderTrading/getInstitutionalOwnership |
-| CompanyMarketDataController.php | CompanyMarketDataController | analystRatings | StockDataService.php | StockDataService | getAnalystConsensus/getAnalystRatings | TradeFeedsApiClient.php | TradeFeedsApiClient | getAnalystRatings |
-| CompanyMarketDataController.php | CompanyMarketDataController | insiderTrading | StockDataService.php | StockDataService | getInsiderTrading | YahooFinanceClient.php/SecApiClient.php | YahooFinanceClient/SecApiClient | getInsiderTrading |
-| CompanyMarketDataController.php | CompanyMarketDataController | stockprices | StockDataService.php | StockDataService | getHistoricalPrices | AlphaVantageClient.php/YahooFinanceClient.php | AlphaVantageClient/YahooFinanceClient | getHistoricalPrices |
-| CompanyStockApiController.php | CompanyStockApiController | getLatestPrice | StockDataService.php | StockDataService | getStockQuote | AlphaVantageClient.php/YahooFinanceClient.php | AlphaVantageClient/YahooFinanceClient | getQuote |
-| CompanyStockApiController.php | CompanyStockApiController | getHistoricalPrices | StockDataService.php | StockDataService | getHistoricalPrices | AlphaVantageClient.php/YahooFinanceClient.php | AlphaVantageClient/YahooFinanceClient | getHistoricalPrices |
-| ReportController.php | ReportController | exportPdf | ReportExportService.php | ReportExportService | exportToPdf | - | - | - |
-| ReportController.php | ReportController | exportExcel | ReportExportService.php | ReportExportService | exportToExcel | - | - | - |
-| ReportController.php | ReportController | exportWord | ReportExportService.php | ReportExportService | exportToWord | - | - | - |
-| SecFilingController.php | SecFilingController | import | SecFilingService.php | SecFilingService | import10KReports | KaleidoscopeApiClient.php | KaleidoscopeApiClient | get10KReports |
-| SecFilingController.php | SecFilingController | process | SecFilingService.php | SecFilingService | processSecFiling | KaleidoscopeApiClient.php | KaleidoscopeApiClient | downloadReport/extractReportSections |
-| SecFilingController.php | SecFilingController | download | SecFilingService.php | SecFilingService | processSecFiling | KaleidoscopeApiClient.php | KaleidoscopeApiClient | downloadReport |
-| SecFilingController.php | SecFilingController | summarizeSection | NeuronAiService.php | NeuronAiService | generateCompletion | - | - | - |
+| Controller File | Controller Class | Controller Method | Service File | Service Class | Service Method | API Client Interface | API Client Method |
+|-----------------|------------------|-------------------|--------------|---------------|----------------|---------------------|-------------------|
+| CompanyController.php | CompanyController | search | CompanySearchService.php | CompanySearchService | searchCompanies | StockMarketDataApiClientInterface | searchCompanies |
+| CompanyController.php | CompanyController | importFromApi | StockDataService.php | StockDataService | importCompany | StockMarketDataApiClientInterface | getCompanyProfile |
+| CompanyController.php | CompanyController | new | NeuronAiService.php | NeuronAiService | generateCompanyInfo | - | - |
+| CompanyGenerationController.php | CompanyGenerationController | generateLeadership | HunterService.php | HunterService | findCompanyExecutives | HunterApiClientInterface | companySearch |
+| CompanyGenerationController.php | CompanyGenerationController | generateCompetitors | NeuronAiService.php | NeuronAiService | generateCompetitorAnalysis | - | - |
+| CompanyGenerationController.php | CompanyGenerationController | generateReports | NeuronAiService.php | NeuronAiService | generateResearchReports | - | - |
+| CompanyGenerationController.php | CompanyGenerationController | generateFinancial | NeuronAiService.php | NeuronAiService | generateFinancialData | - | - |
+| CompanyMarketDataController.php | CompanyMarketDataController | news | FinancialDataAggregatorService.php | FinancialDataAggregatorService | getCompanyNews | NewsApiClientInterface | getCompanyNews |
+| CompanyMarketDataController.php | CompanyMarketDataController | additionalMetrics | FinancialDataAggregatorService.php | FinancialDataAggregatorService | getAdditionalMetricsSummary | Multiple interfaces | Multiple methods |
+| CompanyMarketDataController.php | CompanyMarketDataController | analystRatings | FinancialDataAggregatorService.php | FinancialDataAggregatorService | getAnalystRatings | AnalystRatingsApiClientInterface | getAnalystRatings |
+| CompanyMarketDataController.php | CompanyMarketDataController | insiderTrading | FinancialDataAggregatorService.php | FinancialDataAggregatorService | getInsiderTrading | ExecutiveDataApiClientInterface | getInsiderTrading |
+| CompanyMarketDataController.php | CompanyMarketDataController | stockprices | FinancialDataAggregatorService.php | FinancialDataAggregatorService | getHistoricalPrices | StockMarketDataApiClientInterface | getHistoricalPrices |
+| CompanyStockApiController.php | CompanyStockApiController | getLatestPrice | FinancialDataAggregatorService.php | FinancialDataAggregatorService | getStockQuote | StockMarketDataApiClientInterface | getQuote |
+| CompanyStockApiController.php | CompanyStockApiController | getHistoricalPrices | FinancialDataAggregatorService.php | FinancialDataAggregatorService | getHistoricalPrices | StockMarketDataApiClientInterface | getHistoricalPrices |
+| ReportController.php | ReportController | exportPdf | ReportExportService.php | ReportExportService | exportToPdf | - | - |
+| ReportController.php | ReportController | exportExcel | ReportExportService.php | ReportExportService | exportToExcel | - | - |
+| ReportController.php | ReportController | exportWord | ReportExportService.php | ReportExportService | exportToWord | - | - |
+| SecFilingController.php | SecFilingController | import | SecFilingService.php | SecFilingService | import10KReports | SecFilingsApiClientInterface | get10KReports |
+| SecFilingController.php | SecFilingController | process | SecFilingService.php | SecFilingService | processSecFiling | SecFilingsApiClientInterface | downloadReport/extractReportSections |
+| SecFilingController.php | SecFilingController | download | SecFilingService.php | SecFilingService | processSecFiling | SecFilingsApiClientInterface | downloadReport |
+| SecFilingController.php | SecFilingController | summarizeSection | NeuronAiService.php | NeuronAiService | generateCompletion | - | - |
 
 ## 5. Controller API Endpoints
 
@@ -365,8 +340,8 @@ This document provides a comprehensive overview of the services architecture in 
 | HunterService.php | HunterService | searchExecutiveByRole | GET https://api.hunter.io/v2/domain-search |
 | NeuronAiService.php | NeuronAiService | generateCompletion | POST /v1/completions |
 | NeuronAiService.php | NeuronAiService | generateChatCompletion | POST /v1/chat/completions |
-| StockDataService.php | StockDataService | getCompanyNews | GET https://newsapi.org/v2/everything |
-| StockDataService.php | StockDataService | getAnalystRatings | GET https://data.tradefeeds.com/api/v1/company_ratings |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getCompanyNews | (Aggregates from NewsApiClientInterface) |
+| FinancialDataAggregatorService.php | FinancialDataAggregatorService | getAnalystRatings | (Aggregates from AnalystRatingsApiClientInterface) |
 
 ## 7. API Client API Endpoints
 
@@ -402,10 +377,37 @@ This document provides a comprehensive overview of the services architecture in 
 
 | Service Name | API Base URL | Purpose | Used By |
 |--------------|--------------|---------|---------|
-| Alpha Vantage | https://www.alphavantage.co | Stock market data, company information, financial data | StockDataService |
-| Hunter.io | https://api.hunter.io | Finding company executives and email addresses | HunterService |
-| Kaleidoscope | https://api.kscope.io | SEC filings and document analysis | SecFilingService |
-| NewsAPI | https://newsapi.org | Company news and headlines | StockDataService |
-| RapidAPI (Yahoo Finance) | https://yahoo-finance-real-time1.p.rapidapi.com | Comprehensive financial data, stock quotes, company profiles | StockDataService, YahooFinanceService |
-| TradeFeeds | https://data.tradefeeds.com | Analyst ratings and financial metrics | StockDataService |
+| Alpha Vantage | https://www.alphavantage.co | Stock market data, company information, financial data | AlphaVantageClient |
+| Hunter.io | https://api.hunter.io | Finding company executives and email addresses | HunterApiClient |
+| Kaleidoscope | https://api.kscope.io | SEC filings and document analysis | KaleidoscopeApiClient |
+| NewsAPI | https://newsapi.org | Company news and headlines | NewsApiClient |
+| RapidAPI (Yahoo Finance) | https://yahoo-finance-real-time1.p.rapidapi.com | Comprehensive financial data, stock quotes, company profiles | YahooFinanceClient |
+| TradeFeeds | https://data.tradefeeds.com | Analyst ratings and financial metrics | TradeFeedsApiClient |
 | LLM API (OpenAI/Azure/etc.) | Configured via environment | AI-powered text generation for company information, financial analysis | NeuronAiService |
+
+## 9. API Client Architecture
+
+The API client architecture has been refactored to use domain-specific interfaces instead of a single large interface. This allows each API client to implement only the interfaces relevant to its capabilities.
+
+### Domain-Specific Interfaces
+
+- **StockMarketDataApiClientInterface**: Core financial data methods
+- **NewsApiClientInterface**: News-related methods
+- **SecFilingsApiClientInterface**: SEC filings methods
+- **AnalystRatingsApiClientInterface**: Analyst ratings methods
+- **EsgDataApiClientInterface**: ESG data methods
+- **ExecutiveDataApiClientInterface**: Executive and ownership data methods
+- **HunterApiClientInterface**: Hunter.io specific methods
+
+### API Client Implementations
+
+- **YahooFinanceClient**: Implements all domain-specific interfaces
+- **AlphaVantageClient**: Implements StockMarketDataApiClientInterface and NewsApiClientInterface
+- **NewsApiClient**: Implements NewsApiClientInterface only
+- **KaleidoscopeApiClient**: Implements SecFilingsApiClientInterface and ExecutiveDataApiClientInterface
+- **TradeFeedsApiClient**: Implements AnalystRatingsApiClientInterface only
+- **HunterApiClient**: Implements ExecutiveDataApiClientInterface and HunterApiClientInterface
+
+### Financial Data Aggregator Service
+
+The FinancialDataAggregatorService implements the FinancialDataServiceInterface and aggregates data from multiple specialized API clients. It collects API clients by their domain-specific interfaces and tries each relevant client until it gets a valid response.
