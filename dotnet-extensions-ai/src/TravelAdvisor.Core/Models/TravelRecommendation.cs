@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-
 namespace TravelAdvisor.Core.Models
 {
     /// <summary>

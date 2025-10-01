@@ -1,5 +1,3 @@
-using Microsoft.SemanticKernel.ChatCompletion;
-
 namespace TravelAdvisor.Core.Services
 {
     /// <summary>

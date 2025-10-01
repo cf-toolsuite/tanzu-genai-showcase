@@ -1,8 +1,6 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using OpenAI;
-using System;
-using System.Net.Http;
 using TravelAdvisor.Infrastructure.Options;
 
 namespace TravelAdvisor.Infrastructure.Clients

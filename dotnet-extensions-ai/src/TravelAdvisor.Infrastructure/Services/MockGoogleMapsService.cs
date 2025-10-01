@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using TravelAdvisor.Core.Models;
 using TravelAdvisor.Core.Services;

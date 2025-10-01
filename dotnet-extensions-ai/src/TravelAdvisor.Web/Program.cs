@@ -1,17 +1,6 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.AI;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
 using TravelAdvisor.Infrastructure;
-using TravelAdvisor.Infrastructure.Options;
 using Steeltoe.Extensions.Configuration.CloudFoundry;
 using Steeltoe.Management.Endpoint;
-using System;
-using System.IO;
-using TravelAdvisor.Core.Services;
 using TravelAdvisor.Core.Utilities;
 
 var builder = WebApplication.CreateBuilder(args);

@@ -1,13 +1,7 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Text.Json;
-using System.Threading;
-using System.Threading.Tasks;
 using TravelAdvisor.Infrastructure.Utilities;
 
 namespace TravelAdvisor.Infrastructure.Clients

@@ -1,15 +1,8 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
-using Steeltoe.Connector.CloudFoundry;
 using Steeltoe.Extensions.Configuration.CloudFoundry;
 using TravelAdvisor.Infrastructure.Options;
-using Steeltoe.Common.HealthChecks;
-using Steeltoe.Connector;
 
 namespace TravelAdvisor.Infrastructure.CloudFoundry
 {

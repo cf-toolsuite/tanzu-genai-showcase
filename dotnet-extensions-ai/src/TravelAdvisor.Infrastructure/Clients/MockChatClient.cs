@@ -1,9 +1,5 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
-using System;
-using System.Collections.Generic;
-using System.Threading;
-using System.Threading.Tasks;
 using TravelAdvisor.Infrastructure.Utilities;
 
 namespace TravelAdvisor.Infrastructure.Clients

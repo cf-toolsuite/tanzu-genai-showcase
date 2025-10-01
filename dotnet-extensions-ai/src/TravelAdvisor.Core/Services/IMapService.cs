@@ -1,4 +1,3 @@
-using System.Threading.Tasks;
 using TravelAdvisor.Core.Models;
 
 namespace TravelAdvisor.Core.Services

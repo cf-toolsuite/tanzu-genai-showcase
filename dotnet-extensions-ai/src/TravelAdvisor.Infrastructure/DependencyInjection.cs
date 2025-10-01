@@ -3,20 +3,11 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OpenAI;
-using OpenAI.Chat;
-using System;
-using System.Collections.Generic;
-using System.Net.Http;
-using System.Threading;
-using System.Threading.Tasks;
 using TravelAdvisor.Core.Services;
-using TravelAdvisor.Core.Utilities;
 using TravelAdvisor.Infrastructure.CloudFoundry;
 using TravelAdvisor.Infrastructure.Services;
 using TravelAdvisor.Infrastructure.Options;
 using TravelAdvisor.Infrastructure.Clients;
-using System.Linq;
 
 namespace TravelAdvisor.Infrastructure
 {
