@@ -1,37 +1,36 @@
-namespace TravelAdvisor.Infrastructure.Utilities
+namespace TravelAdvisor.Infrastructure.Utilities;
+
+/// <summary>
+/// Utility classes for working with async enumerables
+/// </summary>
+public static class AsyncEnumerableUtilities
 {
     /// <summary>
-    /// Utility classes for working with async enumerables
+    /// Helper class for empty async enumerable results
     /// </summary>
-    public static class AsyncEnumerableUtilities
+    public class EmptyAsyncEnumerable<T> : IAsyncEnumerable<T>
     {
-        /// <summary>
-        /// Helper class for empty async enumerable results
-        /// </summary>
-        public class EmptyAsyncEnumerable<T> : IAsyncEnumerable<T>
+        public static readonly EmptyAsyncEnumerable<T> Instance = new();
+
+        private EmptyAsyncEnumerable() { }
+
+        public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
         {
-            public static readonly EmptyAsyncEnumerable<T> Instance = new();
+            return new EmptyAsyncEnumerator();
+        }
 
-            private EmptyAsyncEnumerable() { }
+        private class EmptyAsyncEnumerator : IAsyncEnumerator<T>
+        {
+            public T Current => default!;
 
-            public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+            public ValueTask<bool> MoveNextAsync()
             {
-                return new EmptyAsyncEnumerator();
+                return new ValueTask<bool>(false);
             }
 
-            private class EmptyAsyncEnumerator : IAsyncEnumerator<T>
+            public ValueTask DisposeAsync()
             {
-                public T Current => default!;
-
-                public ValueTask<bool> MoveNextAsync()
-                {
-                    return new ValueTask<bool>(false);
-                }
-
-                public ValueTask DisposeAsync()
-                {
-                    return ValueTask.CompletedTask;
-                }
+                return ValueTask.CompletedTask;
             }
         }
     }
