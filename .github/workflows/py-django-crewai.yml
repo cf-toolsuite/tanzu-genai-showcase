@@ -19,7 +19,7 @@ jobs:
         working-directory: py-django-crewai
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -43,7 +43,7 @@ jobs:
         working-directory: py-django-crewai
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Set up Node.js
       uses: actions/setup-node@v4
@@ -88,7 +88,7 @@ jobs:
         working-directory: py-django-crewai
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v5
 
     - name: Download frontend build
       uses: actions/download-artifact@v4
