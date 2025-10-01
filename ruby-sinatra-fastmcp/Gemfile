@@ -3,7 +3,7 @@ ruby '3.3.6'  # Add explicit Ruby version
 
 gem 'sinatra', '~> 4.1'
 gem 'puma', '~> 6.6'
-gem 'fast-mcp', '~> 1.0.0', require: 'fast_mcp'
+gem 'fast-mcp', '~> 1.6.0', require: 'fast_mcp'
 gem 'faraday', '~> 2.12'
 gem 'json', '~> 2.6'
 gem 'dotenv', '~> 2.8'
