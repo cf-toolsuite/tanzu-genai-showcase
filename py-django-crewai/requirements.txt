@@ -1,6 +1,6 @@
 # Django framework
 Django==5.2
-python-dotenv==1.1.0
+python-dotenv==1.1.1
 whitenoise==6.9.0
 geopy==2.4.1
 requests==2.32.3
