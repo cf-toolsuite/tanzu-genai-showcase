@@ -30,7 +30,7 @@
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-boot.version>3.2.4</spring-boot.version>
         <spring-ai.version>1.0.0-SNAPSHOT</spring-ai.version>
-        <langchain4j.version>0.31.0</langchain4j.version>
+        <langchain4j.version>1.6.0</langchain4j.version>
         <langgraph4j.version>1.5.1</langgraph4j.version>
         <node.version>v20.13.0</node.version>
         <npm.version>10.7.0</npm.version>
