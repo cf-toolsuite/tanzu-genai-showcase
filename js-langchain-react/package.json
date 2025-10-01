@@ -10,7 +10,7 @@
     "@testing-library/user-event": "^14.6.1",
     "axios": "^1.8.4",
     "cors": "^2.8.5",
-    "dotenv": "^16.4.7",
+    "dotenv": "^17.2.3",
     "express": "^4.19.2",
     "langchain": "^0.3.20",
     "react": "^18.3.1",
