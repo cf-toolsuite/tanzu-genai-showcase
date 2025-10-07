@@ -84,10 +84,11 @@ public static class DependencyInjection
             }
             else
             {
-                var serviceLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<TravelAdvisorService>();
                 var chatClient = sp.GetRequiredService<IChatClient>();
                 var promptFactory = sp.GetRequiredService<IPromptFactory>();
-                return new TravelAdvisorService(chatClient, promptFactory, mapService, serviceLogger);
+                var genAiOptions = sp.GetRequiredService<IOptionsMonitor<GenAIOptions>>();
+                var serviceLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<TravelAdvisorService>();
+                return new TravelAdvisorService(chatClient, promptFactory, mapService, genAiOptions, serviceLogger);
             }
         });
     }

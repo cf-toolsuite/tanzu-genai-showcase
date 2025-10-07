@@ -1,3 +1,5 @@
+using Microsoft.Extensions.AI;
+
 namespace TravelAdvisor.Infrastructure.Options;
 
 /// <summary>
@@ -19,6 +21,11 @@ public class GenAIOptions
     /// Model to use for AI completions
     /// </summary>
     public string Model { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Configure the chat options for the AI service
+    /// </summary>
+    public ChatOptions ChatOptions { get; set; } = new ();
 
     /// <summary>
     /// Service name in Cloud Foundry

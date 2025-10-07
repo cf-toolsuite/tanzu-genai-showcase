@@ -1,8 +1,10 @@
 using System.Text.Json;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using TravelAdvisor.Core.Models;
 using TravelAdvisor.Core.Services;
+using TravelAdvisor.Infrastructure.Options;
 
 namespace TravelAdvisor.Infrastructure.Services;
 
@@ -15,17 +17,20 @@ public class TravelAdvisorService : ITravelAdvisorService
     private readonly IMapService _mapService;
     private readonly IChatClient _chatClient;
     private readonly IPromptFactory _promptFactory;
+    private readonly IOptionsMonitor<GenAIOptions> _genAiOptionsMonitor;
 
     public TravelAdvisorService(
         IChatClient chatClient,
         IPromptFactory promptFactory,
         IMapService mapService,
+        IOptionsMonitor<GenAIOptions> genAiOptionsMonitor,
         ILogger<TravelAdvisorService> logger)
     {
         _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
         _promptFactory = promptFactory ?? throw new ArgumentNullException(nameof(promptFactory));
         _mapService = mapService ?? throw new ArgumentNullException(nameof(mapService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+        _genAiOptionsMonitor = genAiOptionsMonitor ?? throw new ArgumentNullException(nameof(genAiOptionsMonitor));
     }
 
     /// <inheritdoc />
@@ -86,7 +91,8 @@ public class TravelAdvisorService : ITravelAdvisorService
             };
 
             // Get response from AI
-            var response = await _chatClient.GetResponseAsync(history, new ChatOptions { Temperature = 0 });
+            var response =
+                await _chatClient.GetResponseAsync(history, _genAiOptionsMonitor.CurrentValue.ChatOptions);
 
             // Check if the response contains an error (e.g., service unavailable)
             var errorProperty = response.GetType().GetProperty("Error");
@@ -311,7 +317,8 @@ public class TravelAdvisorService : ITravelAdvisorService
             };
 
             // Get response from AI
-            var response = await _chatClient.GetResponseAsync(history, new ChatOptions { Temperature = 0.7f });
+            var response =
+                await _chatClient.GetResponseAsync(history, _genAiOptionsMonitor.CurrentValue.ChatOptions);
 
             return GetContentFromResponse(response) ??
                    "I'm sorry, I couldn't generate a detailed explanation for this recommendation.";
@@ -377,7 +384,8 @@ public class TravelAdvisorService : ITravelAdvisorService
             };
 
             // Get response from AI
-            var response = await _chatClient.GetResponseAsync(history, new ChatOptions { Temperature = 0.7f });
+            var response =
+                await _chatClient.GetResponseAsync(history, _genAiOptionsMonitor.CurrentValue.ChatOptions);
 
             // Check if the response contains an error (e.g., service unavailable)
             var errorProperty = response.GetType().GetProperty("Error");
