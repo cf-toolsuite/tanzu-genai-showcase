@@ -1,29 +1,9 @@
-using Microsoft.AspNetCore.Builder;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.AI;
-using Microsoft.SemanticKernel;
-using Microsoft.SemanticKernel.ChatCompletion;
 using TravelAdvisor.Infrastructure;
-using TravelAdvisor.Infrastructure.Options;
 using Steeltoe.Extensions.Configuration.CloudFoundry;
 using Steeltoe.Management.Endpoint;
-using System;
-using System.IO;
-using TravelAdvisor.Core.Services;
 using TravelAdvisor.Core.Utilities;
 
 var builder = WebApplication.CreateBuilder(args);
-
-// Set the port explicitly to avoid conflicts with default port (5000)
-// Use environment variable PORT if provided, otherwise use default port
-string port = Environment.GetEnvironmentVariable("PORT") ?? "5000";
-
-// Add this line to ensure binding to all interfaces
-builder.WebHost.ConfigureKestrel(options => {
-    options.ListenAnyIP(int.Parse(port));
-});
 
 // Initialize environment variables
 try
@@ -66,10 +46,7 @@ builder.Services.AddServerSideBlazor();
 
 // Add actuators for health monitoring
 // Configure OpenTelemetry for Steeltoe Management
-builder.Services.AddAllActuators(builder.Configuration);
-
-// Temporarily comment out CloudFoundry actuator due to compatibility issues
-// builder.Services.AddCloudFoundryActuator();
+builder.AddAllActuators();
 
 // Add infrastructure services (including AI and Google Maps services)
 builder.Services.AddInfrastructureServices(builder.Configuration);
@@ -94,8 +71,5 @@ app.UseRouting();
 app.MapRazorPages();
 app.MapBlazorHub();
 app.MapFallbackToPage("/_Host");
-
-// Map Steeltoe actuator endpoints
-app.MapAllActuators();
 
 app.Run();
