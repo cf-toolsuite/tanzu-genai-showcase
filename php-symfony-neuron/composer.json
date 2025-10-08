@@ -30,7 +30,7 @@
         "symfony/mime": "7.3.*",
         "symfony/monolog-bundle": "^3.0",
         "symfony/notifier": "7.2.*",
-        "symfony/process": "7.2.*",
+        "symfony/process": "7.3.*",
         "symfony/property-access": "7.2.*",
         "symfony/property-info": "7.2.*",
         "symfony/runtime": "7.2.*",
