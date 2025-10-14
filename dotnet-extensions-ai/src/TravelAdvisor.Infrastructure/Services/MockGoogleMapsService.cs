@@ -7,14 +7,9 @@ namespace TravelAdvisor.Infrastructure.Services;
 /// <summary>
 /// Mock implementation of IGoogleMapsService for development/testing
 /// </summary>
-public class MockGoogleMapsService : IGoogleMapsService
+public class MockGoogleMapsService(ILogger<MockGoogleMapsService> logger) : IGoogleMapsService
 {
-    private readonly ILogger<MockGoogleMapsService> _logger;
-
-    public MockGoogleMapsService(ILogger<MockGoogleMapsService> logger)
-    {
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ILogger<MockGoogleMapsService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
 
     /// <inheritdoc />
     public Task<(double distanceKm, int durationMinutes)> CalculateDistanceAndDurationAsync(
@@ -105,21 +100,21 @@ public class MockGoogleMapsService : IGoogleMapsService
                 case TransportMode.Car:
                     steps.Add(new TravelStep
                     {
-                        Description = $"Head south on WA-527 S from Mill Creek",
+                        Description = "Head south on WA-527 S from Mill Creek",
                         Mode = mode,
                         DurationMinutes = 10,
                         DistanceKm = 7.5
                     });
                     steps.Add(new TravelStep
                     {
-                        Description = $"Take I-405 S and I-5 S to 15th Ave NW in Seattle",
+                        Description = "Take I-405 S and I-5 S to 15th Ave NW in Seattle",
                         Mode = mode,
                         DurationMinutes = 25,
                         DistanceKm = 20.0
                     });
                     steps.Add(new TravelStep
                     {
-                        Description = $"Follow 15th Ave NW to Ballard",
+                        Description = "Follow 15th Ave NW to Ballard",
                         Mode = mode,
                         DurationMinutes = 15,
                         DistanceKm = 7.5
@@ -129,28 +124,28 @@ public class MockGoogleMapsService : IGoogleMapsService
                 case TransportMode.Bus:
                     steps.Add(new TravelStep
                     {
-                        Description = $"Take Bus 105 from Mill Creek Park & Ride",
+                        Description = "Take Bus 105 from Mill Creek Park & Ride",
                         Mode = mode,
                         DurationMinutes = 35,
                         DistanceKm = 15.0
                     });
                     steps.Add(new TravelStep
                     {
-                        Description = $"Transfer to Bus 512 at Lynnwood Transit Center",
+                        Description = "Transfer to Bus 512 at Lynnwood Transit Center",
                         Mode = mode,
                         DurationMinutes = 10,
                         DistanceKm = 0.2
                     });
                     steps.Add(new TravelStep
                     {
-                        Description = $"Take Bus 512 to Northgate Station",
+                        Description = "Take Bus 512 to Northgate Station",
                         Mode = mode,
                         DurationMinutes = 25,
                         DistanceKm = 12.0
                     });
                     steps.Add(new TravelStep
                     {
-                        Description = $"Transfer to Bus 40 to Ballard",
+                        Description = "Transfer to Bus 40 to Ballard",
                         Mode = mode,
                         DurationMinutes = 40,
                         DistanceKm = 7.8
@@ -160,21 +155,21 @@ public class MockGoogleMapsService : IGoogleMapsService
                 case TransportMode.Bike:
                     steps.Add(new TravelStep
                     {
-                        Description = $"Take Interurban Trail south from Mill Creek",
+                        Description = "Take Interurban Trail south from Mill Creek",
                         Mode = mode,
                         DurationMinutes = 45,
                         DistanceKm = 12.5
                     });
                     steps.Add(new TravelStep
                     {
-                        Description = $"Continue on Burke-Gilman Trail west",
+                        Description = "Continue on Burke-Gilman Trail west",
                         Mode = mode,
                         DurationMinutes = 50,
                         DistanceKm = 15.0
                     });
                     steps.Add(new TravelStep
                     {
-                        Description = $"Take 8th Ave NW north to Ballard",
+                        Description = "Take 8th Ave NW north to Ballard",
                         Mode = mode,
                         DurationMinutes = 35,
                         DistanceKm = 7.5
@@ -184,21 +179,21 @@ public class MockGoogleMapsService : IGoogleMapsService
                 case TransportMode.Walk:
                     steps.Add(new TravelStep
                     {
-                        Description = $"Walk south on Bothell-Everett Highway",
+                        Description = "Walk south on Bothell-Everett Highway",
                         Mode = mode,
                         DurationMinutes = 120,
                         DistanceKm = 10.0
                     });
                     steps.Add(new TravelStep
                     {
-                        Description = $"Continue on Lake City Way NE",
+                        Description = "Continue on Lake City Way NE",
                         Mode = mode,
                         DurationMinutes = 150,
                         DistanceKm = 12.5
                     });
                     steps.Add(new TravelStep
                     {
-                        Description = $"Follow N 45th St west to Ballard",
+                        Description = "Follow N 45th St west to Ballard",
                         Mode = mode,
                         DurationMinutes = 150,
                         DistanceKm = 12.5
@@ -259,21 +254,21 @@ public class MockGoogleMapsService : IGoogleMapsService
 
         var steps = new List<TravelStep>
         {
-            new TravelStep
+            new()
             {
                 Description = $"Start from {origin}",
                 Mode = mode,
                 DurationMinutes = stepDuration,
                 DistanceKm = stepDistance
             },
-            new TravelStep
+            new()
             {
                 Description = $"Continue towards {destination}",
                 Mode = mode,
                 DurationMinutes = stepDuration,
                 DistanceKm = stepDistance
             },
-            new TravelStep
+            new()
             {
                 Description = $"Arrive at {destination}",
                 Mode = mode,

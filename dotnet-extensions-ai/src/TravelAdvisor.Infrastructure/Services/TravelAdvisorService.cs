@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.RegularExpressions;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -11,27 +12,16 @@ namespace TravelAdvisor.Infrastructure.Services;
 /// <summary>
 /// Implementation of ITravelAdvisorService using Microsoft.Extensions.AI and Semantic Kernel
 /// </summary>
-public class TravelAdvisorService : ITravelAdvisorService
+public class TravelAdvisorService(
+    IChatClient chatClient,
+    IMapService mapService,
+    IOptionsMonitor<GenAIOptions> genAiOptionsMonitor,
+    ILogger<TravelAdvisorService> logger) : ITravelAdvisorService
 {
-    private readonly ILogger<TravelAdvisorService> _logger;
-    private readonly IMapService _mapService;
-    private readonly IChatClient _chatClient;
-    private readonly IPromptFactory _promptFactory;
-    private readonly IOptionsMonitor<GenAIOptions> _genAiOptionsMonitor;
-
-    public TravelAdvisorService(
-        IChatClient chatClient,
-        IPromptFactory promptFactory,
-        IMapService mapService,
-        IOptionsMonitor<GenAIOptions> genAiOptionsMonitor,
-        ILogger<TravelAdvisorService> logger)
-    {
-        _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
-        _promptFactory = promptFactory ?? throw new ArgumentNullException(nameof(promptFactory));
-        _mapService = mapService ?? throw new ArgumentNullException(nameof(mapService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _genAiOptionsMonitor = genAiOptionsMonitor ?? throw new ArgumentNullException(nameof(genAiOptionsMonitor));
-    }
+    private readonly ILogger<TravelAdvisorService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IMapService _mapService = mapService ?? throw new ArgumentNullException(nameof(mapService));
+    private readonly IChatClient _chatClient = chatClient ?? throw new ArgumentNullException(nameof(chatClient));
+    private readonly IOptionsMonitor<GenAIOptions> _genAiOptionsMonitor = genAiOptionsMonitor ?? throw new ArgumentNullException(nameof(genAiOptionsMonitor));
 
     /// <inheritdoc />
     public async Task<TravelQuery> ProcessNaturalLanguageQueryAsync(string query)
@@ -43,7 +33,7 @@ public class TravelAdvisorService : ITravelAdvisorService
             // Create a conversation history with the system prompt and user query
             var history = new List<ChatMessage>
             {
-                new ChatMessage(ChatRole.System, @"
+                new(ChatRole.System, @"
                         You are a travel advisor assistant. Your primary task is to CAREFULLY extract the origin and destination locations from the user's query.
 
                         IMPORTANT: Your most critical task is to identify the specific origin and destination locations mentioned in the query.
@@ -87,7 +77,7 @@ public class TravelAdvisorService : ITravelAdvisorService
                         1. For 'What's the best way to get from Seattle to Portland?', you should extract 'Seattle' as Origin and 'Portland' as Destination.
                         2. For 'How can I travel cheaply from Mill Creek, WA to Lynnwood, WA?', you should extract 'Mill Creek, WA' as Origin and 'Lynnwood, WA' as Destination.
                     "),
-                new ChatMessage(ChatRole.User, query)
+                new(ChatRole.User, query)
             };
 
             // Get response from AI
@@ -132,7 +122,7 @@ public class TravelAdvisorService : ITravelAdvisorService
                 jsonResponse = CleanMarkdownCodeBlocks(jsonResponse);
 
                 // Log the cleaned JSON for debugging
-                _logger.LogDebug($"Cleaned JSON response: {jsonResponse}");
+                _logger.LogDebug("Cleaned JSON response: {JsonResponse}", jsonResponse);
 
                 // Try to deserialize the JSON response
                 var travelQuery = JsonSerializer.Deserialize<TravelQuery>(jsonResponse,
@@ -261,7 +251,7 @@ public class TravelAdvisorService : ITravelAdvisorService
             recommendations = recommendations.OrderByDescending(r => r.OverallScore).ToList();
 
             // Mark the top recommendation as recommended
-            if (recommendations.Any())
+            if (recommendations.Count != 0)
             {
                 recommendations[0].IsRecommended = true;
             }
@@ -271,7 +261,7 @@ public class TravelAdvisorService : ITravelAdvisorService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating recommendations");
-            return new List<TravelRecommendation>();
+            return [];
         }
     }
 
@@ -285,35 +275,35 @@ public class TravelAdvisorService : ITravelAdvisorService
             // Create message history for the explanation
             var history = new List<ChatMessage>
             {
-                new ChatMessage(ChatRole.System, @"
-                        You are a travel advisor assistant. Generate a detailed explanation for the recommended travel mode.
-                        Provide a natural, conversational explanation that covers:
-                        1. Why this mode is suitable for the distance
-                        2. How it aligns with the user's preferences
-                        3. Trade-offs between time, cost, convenience, and environmental impact
-                        4. Any special considerations for this journey
+                new(ChatRole.System, """
+                                         You are a travel advisor assistant. Generate a detailed explanation for the recommended travel mode.
+                                         Provide a natural, conversational explanation that covers:
+                                         1. Why this mode is suitable for the distance
+                                         2. How it aligns with the user's preferences
+                                         3. Trade-offs between time, cost, convenience, and environmental impact
+                                         4. Any special considerations for this journey
 
-                        Keep the explanation conversational and friendly. Avoid using technical jargon.
-                    "),
-                new ChatMessage(ChatRole.User, $@"
-                        Origin: {query.Origin}
-                        Destination: {query.Destination}
-                        Recommended Mode: {recommendation.Mode}
-                        Travel Distance: {recommendation.DistanceKm:F1} km
-                        Travel Duration: {recommendation.DurationMinutes} minutes
-                        Estimated Cost: {(recommendation.EstimatedCost.HasValue ? $"${recommendation.EstimatedCost.Value:F2}" : "Unavailable")}
+                                         Keep the explanation conversational and friendly. Avoid using technical jargon.
+                                     """),
+                new(ChatRole.User, $"""
+                                        Origin: {query.Origin}
+                                        Destination: {query.Destination}
+                                        Recommended Mode: {recommendation.Mode}
+                                        Travel Distance: {recommendation.DistanceKm:F1} km
+                                        Travel Duration: {recommendation.DurationMinutes} minutes
+                                        Estimated Cost: {(recommendation.EstimatedCost.HasValue ? $"${recommendation.EstimatedCost.Value:F2}" : "Unavailable")}
 
-                        Pros:
-                        {string.Join("\n", recommendation.Pros.Select(p => $"- {p}"))}
+                                        Pros:
+                                        {string.Join("\n", recommendation.Pros.Select(p => $"- {p}"))}
 
-                        Cons:
-                        {string.Join("\n", recommendation.Cons.Select(c => $"- {c}"))}
+                                        Cons:
+                                        {string.Join("\n", recommendation.Cons.Select(c => $"- {c}"))}
 
-                        User Preferences:
-                        {JsonSerializer.Serialize(query.Preferences, new JsonSerializerOptions { WriteIndented = true })}
+                                        User Preferences:
+                                        {JsonSerializer.Serialize(query.Preferences, new JsonSerializerOptions { WriteIndented = true })}
 
-                        Generate a detailed explanation for why this travel mode is recommended.
-                    ")
+                                        Generate a detailed explanation for why this travel mode is recommended.
+                                    """)
             };
 
             // Get response from AI
@@ -343,44 +333,44 @@ public class TravelAdvisorService : ITravelAdvisorService
             // Create message history for answering the follow-up question
             var history = new List<ChatMessage>
             {
-                new ChatMessage(ChatRole.System, @"
-                        You are a travel advisor assistant. Answer the user's follow-up question about the recommended travel mode.
-                        Provide a helpful, accurate, and concise answer to the user's question in plain text format.
+                new(ChatRole.System, """
+                                     You are a travel advisor assistant. Answer the user's follow-up question about the recommended travel mode.
+                                     Provide a helpful, accurate, and concise answer to the user's question in plain text format.
 
-                        IMPORTANT:
-                        - Respond with natural language only, not with function calls or JSON.
-                        - Do not use code blocks, markdown formatting, or structured data formats.
-                        - Provide a direct, conversational response as if you were speaking to the user.
+                                     IMPORTANT:
+                                     - Respond with natural language only, not with function calls or JSON.
+                                     - Do not use code blocks, markdown formatting, or structured data formats.
+                                     - Provide a direct, conversational response as if you were speaking to the user.
 
-                        If you don't have specific information to answer the question, acknowledge that and suggest what information might be helpful.
-                    "),
-                new ChatMessage(ChatRole.User, $@"
-                        Original Query:
-                        Origin: {query.Origin}
-                        Destination: {query.Destination}
+                                     If you don't have specific information to answer the question, acknowledge that and suggest what information might be helpful.
+                                     """),
+                new(ChatRole.User, $"""
+                                    Original Query:
+                                    Origin: {query.Origin}
+                                    Destination: {query.Destination}
 
-                        Recommended Mode: {recommendation.Mode}
-                        Travel Distance: {recommendation.DistanceKm:F1} km
-                        Travel Duration: {recommendation.DurationMinutes} minutes
-                        Estimated Cost: {(recommendation.EstimatedCost.HasValue ? $"${recommendation.EstimatedCost.Value:F2}" : "Unavailable")}
+                                    Recommended Mode: {recommendation.Mode}
+                                    Travel Distance: {recommendation.DistanceKm:F1} km
+                                    Travel Duration: {recommendation.DurationMinutes} minutes
+                                    Estimated Cost: {(recommendation.EstimatedCost.HasValue ? $"${recommendation.EstimatedCost.Value:F2}" : "Unavailable")}
 
-                        Details:
-                        Environmental Score: {recommendation.EnvironmentalScore}/100
-                        Convenience Score: {recommendation.ConvenienceScore}/100
-                        Preference Match Score: {recommendation.PreferenceMatchScore}/100
-                        Overall Score: {recommendation.OverallScore}/100
+                                    Details:
+                                    Environmental Score: {recommendation.EnvironmentalScore}/100
+                                    Convenience Score: {recommendation.ConvenienceScore}/100
+                                    Preference Match Score: {recommendation.PreferenceMatchScore}/100
+                                    Overall Score: {recommendation.OverallScore}/100
 
-                        Pros:
-                        {string.Join("\n", recommendation.Pros.Select(p => $"- {p}"))}
+                                    Pros:
+                                    {string.Join("\n", recommendation.Pros.Select(p => $"- {p}"))}
 
-                        Cons:
-                        {string.Join("\n", recommendation.Cons.Select(c => $"- {c}"))}
+                                    Cons:
+                                    {string.Join("\n", recommendation.Cons.Select(c => $"- {c}"))}
 
-                        Steps:
-                        {string.Join("\n", recommendation.Steps.Select(step => $"- {step.Description} ({step.DistanceKm:F1} km, {step.DurationMinutes} mins)"))}
+                                    Steps:
+                                    {string.Join("\n", recommendation.Steps.Select(step => $"- {step.Description} ({step.DistanceKm:F1} km, {step.DurationMinutes} mins)"))}
 
-                        User's Follow-up Question: {question}
-                    ")
+                                    User's Follow-up Question: {question}
+                                    """)
             };
 
             // Get response from AI
@@ -419,7 +409,7 @@ public class TravelAdvisorService : ITravelAdvisorService
         }
         catch (InvalidOperationException ex) when (ex.Message.Contains("USE_MOCK_DATA is false"))
         {
-            // Special handling for the case when USE_MOCK_DATA is false but we're trying to use mock data
+            // Special handling for the case when USE_MOCK_DATA is false, but we're trying to use mock data
             _logger.LogError(ex, "AI service configuration error when answering follow-up question");
             return "I'm sorry, there's an issue with the AI service configuration. Please contact the administrator to verify the API key and settings.";
         }
@@ -435,7 +425,7 @@ public class TravelAdvisorService : ITravelAdvisorService
     /// <summary>
     /// Cleans up a JSON response by removing any non-JSON text before or after the JSON object
     /// </summary>
-    private string CleanJsonResponse(string response)
+    private static string CleanJsonResponse(string response)
     {
         try
         {
@@ -471,9 +461,9 @@ public class TravelAdvisorService : ITravelAdvisorService
 
             // Simple pattern matching for common travel query formats
             // Look for "from X to Y" pattern
-            var fromToMatch = System.Text.RegularExpressions.Regex.Match(query,
+            var fromToMatch = Regex.Match(query,
                 @"from\s+([^,\.;]+(?:,[^,\.;]+)*)\s+to\s+([^,\.;]+(?:,[^,\.;]+)*)",
-                System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                RegexOptions.IgnoreCase);
 
             if (fromToMatch.Success)
             {
@@ -484,9 +474,9 @@ public class TravelAdvisorService : ITravelAdvisorService
             // If not found, look for "between X and Y" pattern
             if (origin == "Unknown" || destination == "Unknown")
             {
-                var betweenMatch = System.Text.RegularExpressions.Regex.Match(query,
+                var betweenMatch = Regex.Match(query,
                     @"between\s+([^,\.;]+(?:,[^,\.;]+)*)\s+and\s+([^,\.;]+(?:,[^,\.;]+)*)",
-                    System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+                    RegexOptions.IgnoreCase);
 
                 if (betweenMatch.Success)
                 {
@@ -759,11 +749,11 @@ public class TravelAdvisorService : ITravelAdvisorService
             if (priority.Contains("fast") || priority.Contains("quick") || priority.Contains("time"))
             {
                 // Higher score for faster modes (plane for long distances, car for medium, bike/walk for very short)
-                if (recommendation.Mode == TransportMode.Plane && recommendation.DistanceKm > 300)
+                if (recommendation is { Mode: TransportMode.Plane, DistanceKm: > 300 })
                     score += 20;
-                else if (recommendation.Mode == TransportMode.Car && recommendation.DistanceKm is > 10 and <= 300)
+                else if (recommendation is { Mode: TransportMode.Car, DistanceKm: > 10 and <= 300 })
                     score += 15;
-                else if ((recommendation.Mode == TransportMode.Bike || recommendation.Mode == TransportMode.Walk) && recommendation.DistanceKm <= 5)
+                else if (recommendation.Mode is TransportMode.Bike or TransportMode.Walk && recommendation.DistanceKm <= 5)
                     score += 10;
                 else
                     score -= 10; // Penalize slower modes
@@ -773,11 +763,11 @@ public class TravelAdvisorService : ITravelAdvisorService
             else if (priority.Contains("cheap") || priority.Contains("cost") || priority.Contains("inexpensive") || priority.Contains("affordable"))
             {
                 // Higher score for cheaper modes
-                if (recommendation.Mode == TransportMode.Walk || recommendation.Mode == TransportMode.Bike)
+                if (recommendation.Mode is TransportMode.Walk or TransportMode.Bike)
                     score += 20; // Free modes
                 else if (recommendation.Mode == TransportMode.Bus)
                     score += 15; // Public transport is usually affordable
-                else if (recommendation.Mode == TransportMode.Car && recommendation.DistanceKm <= 100)
+                else if (recommendation is { Mode: TransportMode.Car, DistanceKm: <= 100 })
                     score += 10; // Car can be cost-effective for shorter trips with multiple people
                 else if (recommendation.Mode == TransportMode.Plane)
                     score -= 15; // Planes are usually expensive
@@ -796,11 +786,11 @@ public class TravelAdvisorService : ITravelAdvisorService
                 // Higher score for more comfortable modes for the distance
                 if (recommendation.Mode == TransportMode.Car)
                     score += 15; // Cars are generally comfortable
-                else if (recommendation.Mode == TransportMode.Train && recommendation.DistanceKm > 50)
+                else if (recommendation is { Mode: TransportMode.Train, DistanceKm: > 50 })
                     score += 10; // Trains are comfortable for longer journeys
-                else if (recommendation.Mode == TransportMode.Plane && recommendation.DistanceKm > 500)
+                else if (recommendation is { Mode: TransportMode.Plane, DistanceKm: > 500 })
                     score += 5; // Planes can be comfortable for very long distances
-                else if (recommendation.Mode == TransportMode.Walk && recommendation.DistanceKm > 3)
+                else if (recommendation is { Mode: TransportMode.Walk, DistanceKm: > 3 })
                     score -= 15; // Walking long distances isn't comfortable
             }
         }
@@ -872,8 +862,8 @@ public class TravelAdvisorService : ITravelAdvisorService
             }
 
             // Get the last message (usually the assistant's response)
-            var lastMessage = response.Messages[response.Messages.Count - 1];
-            string? textContent = lastMessage.Text;
+            var lastMessage = response.Messages[^1];
+            string textContent = lastMessage.Text;
 
             // If the content is null or empty, return null
             if (string.IsNullOrEmpty(textContent))
@@ -883,7 +873,7 @@ public class TravelAdvisorService : ITravelAdvisorService
             }
 
             // Check if the content appears to be JSON (function call format)
-            if (textContent.TrimStart().StartsWith("{") && textContent.TrimEnd().EndsWith("}"))
+            if (textContent.TrimStart().StartsWith('{') && textContent.TrimEnd().EndsWith('}'))
             {
                 _logger.LogInformation("Response appears to be in JSON format, attempting to parse");
 
@@ -897,7 +887,7 @@ public class TravelAdvisorService : ITravelAdvisorService
                     if (root.TryGetProperty("name", out var nameElement))
                     {
                         string functionName = nameElement.GetString() ?? "";
-                        _logger.LogInformation($"Detected function call format with function name: {functionName}");
+                        _logger.LogInformation("Detected function call format with function name: {FunctionName}", functionName);
 
                         // Handle different function types
                         return HandleFunctionCall(functionName, root);
@@ -952,7 +942,7 @@ public class TravelAdvisorService : ITravelAdvisorService
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, $"Error handling function call {functionName}");
+            _logger.LogError(ex, "Error handling function call {FunctionName}", functionName);
             return "I apologize, but I encountered an error processing your question. Could you please rephrase it?";
         }
     }
@@ -963,33 +953,35 @@ public class TravelAdvisorService : ITravelAdvisorService
     private string GenerateTravelSafetyTips(JsonElement arguments)
     {
         // Create a comprehensive response about night travel safety
-        return @"If you're making this trip at night, here are some important considerations:
+        return """
+               If you're making this trip at night, here are some important considerations:
 
-1. Visibility: Nighttime reduces visibility significantly. If biking, ensure you have proper front and rear lights, reflective clothing, and consider routes with good street lighting.
+               1. Visibility: Nighttime reduces visibility significantly. If biking, ensure you have proper front and rear lights, reflective clothing, and consider routes with good street lighting.
 
-2. Safety: Some areas may be less safe at night. Stick to well-lit, populated routes when possible.
+               2. Safety: Some areas may be less safe at night. Stick to well-lit, populated routes when possible.
 
-3. Public Transportation: Bus schedules often reduce frequency at night, so check the schedule beforehand to avoid long waits.
+               3. Public Transportation: Bus schedules often reduce frequency at night, so check the schedule beforehand to avoid long waits.
 
-4. Driving Considerations:
-   - Be extra cautious of wildlife that may be more active at night
-   - Reduce your speed slightly to account for reduced visibility
-   - Ensure your headlights are working properly
-   - Be aware of drowsiness if driving late
+               4. Driving Considerations:
+                  - Be extra cautious of wildlife that may be more active at night
+                  - Reduce your speed slightly to account for reduced visibility
+                  - Ensure your headlights are working properly
+                  - Be aware of drowsiness if driving late
 
-5. Ride-sharing options like Uber or Lyft might be good alternatives if you're concerned about night travel.
+               5. Ride-sharing options like Uber or Lyft might be good alternatives if you're concerned about night travel.
 
-6. Weather: Night temperatures can drop significantly, so dress appropriately if walking or biking.
+               6. Weather: Night temperatures can drop significantly, so dress appropriately if walking or biking.
 
-7. Phone battery: Ensure your phone is fully charged for emergencies.
+               7. Phone battery: Ensure your phone is fully charged for emergencies.
 
-Would you like more specific information about any of these considerations?";
+               Would you like more specific information about any of these considerations?
+               """;
     }
 
     /// <summary>
     /// Replaces verbose function call messages with minimal emoji
     /// </summary>
-    private string ReplaceVerboseFunctionCallMessages(string text)
+    private static string ReplaceVerboseFunctionCallMessages(string text)
     {
         if (string.IsNullOrEmpty(text))
             return text;
@@ -999,7 +991,7 @@ Would you like more specific information about any of these considerations?";
             text.Contains("all information provided was internally generated"))
         {
             // Remove the entire note
-            text = System.Text.RegularExpressions.Regex.Replace(
+            text = Regex.Replace(
                 text,
                 @"\s*\(Note:.*?function calls.*?data\.\)\s*$",
                 " 🧠");
@@ -1009,7 +1001,7 @@ Would you like more specific information about any of these considerations?";
                  text.Contains("tool was used"))
         {
             // Remove the entire note
-            text = System.Text.RegularExpressions.Regex.Replace(
+            text = Regex.Replace(
                 text,
                 @"\s*\(Note:.*?function.*?used.*?\)\s*$",
                 " 🛠️");

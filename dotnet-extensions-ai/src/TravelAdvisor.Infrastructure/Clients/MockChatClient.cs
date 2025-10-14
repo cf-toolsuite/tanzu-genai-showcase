@@ -27,7 +27,7 @@ public class MockChatClient : IChatClient
     {
         _logger = logger;
         _useMockData = useMockData;
-        _logger?.LogInformation($"MockChatClient initialized with useMockData={useMockData}");
+        _logger?.LogInformation("MockChatClient initialized with useMockData={UseMockData}", useMockData);
     }
 
     /// <summary>
@@ -78,7 +78,7 @@ public class MockChatClient : IChatClient
     /// <summary>
     /// Get client metadata
     /// </summary>
-    public ChatClientMetadata Metadata => new ChatClientMetadata();
+    public ChatClientMetadata Metadata => new();
 
     /// <summary>
     /// Get a service (not implemented)

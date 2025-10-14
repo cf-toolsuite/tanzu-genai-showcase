@@ -18,6 +18,11 @@ public class GenAIOptions
     public string ApiUrl { get; set; } = string.Empty;
 
     /// <summary>
+    /// Gets or sets the URL used to retrieve available models, wire format, and other configuration details.
+    /// </summary>
+    public string ConfigUrl { get; set; } = string.Empty;
+
+    /// <summary>
     /// Model to use for AI completions
     /// </summary>
     public string Model { get; set; } = string.Empty;

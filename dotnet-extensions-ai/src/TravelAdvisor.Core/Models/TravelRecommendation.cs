@@ -38,17 +38,17 @@ public class TravelRecommendation
     /// <summary>
     /// List of steps in the journey
     /// </summary>
-    public List<TravelStep> Steps { get; set; } = new List<TravelStep>();
+    public List<TravelStep> Steps { get; set; } = [];
 
     /// <summary>
     /// Pros of this transportation mode
     /// </summary>
-    public List<string> Pros { get; set; } = new List<string>();
+    public List<string> Pros { get; set; } = [];
 
     /// <summary>
     /// Cons of this transportation mode
     /// </summary>
-    public List<string> Cons { get; set; } = new List<string>();
+    public List<string> Cons { get; set; } = [];
 
     /// <summary>
     /// Environmental impact score (0-100, higher is better/greener)

@@ -11,7 +11,7 @@
         </button>
     </div>
 
-    <div class="@(collapseNavMenu ? "hidden" : "block") md:block">
+    <div class="@(_collapseNavMenu ? "hidden" : "block") md:block">
         <nav class="flex flex-col p-4 space-y-2">
             <NavLink href="" Match="NavLinkMatch.All">
                 <div class="flex items-center space-x-3 p-2 rounded-md text-white hover:bg-indigo-700 transition duration-150">
@@ -44,10 +44,10 @@
 </div>
 
 @code {
-    private bool collapseNavMenu = true;
+    private bool _collapseNavMenu = true;
 
     private void ToggleNavMenu()
     {
-        collapseNavMenu = !collapseNavMenu;
+        _collapseNavMenu = !_collapseNavMenu;
     }
 }

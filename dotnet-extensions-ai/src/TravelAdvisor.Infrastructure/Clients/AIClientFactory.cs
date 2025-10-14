@@ -1,6 +1,8 @@
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using OpenAI;
+using OpenAI.Chat;
+using System.ClientModel;
 using TravelAdvisor.Infrastructure.Options;
 
 namespace TravelAdvisor.Infrastructure.Clients;
@@ -16,14 +18,10 @@ public interface IAIClientFactory
     IChatClient CreateClient(GenAIOptions options, ILogger logger);
 }
 
-/// <summary>
-/// Factory for creating the appropriate AI client based on configuration
-/// </summary>
+/// <inheritdoc/>
 public class AIClientFactory : IAIClientFactory
 {
-    /// <summary>
-    /// Creates an appropriate IChatClient based on the provided options
-    /// </summary>
+    /// <inheritdoc/>
     public IChatClient CreateClient(GenAIOptions options, ILogger logger)
     {
         // Validate essential options
@@ -33,24 +31,15 @@ public class AIClientFactory : IAIClientFactory
         LogConfiguration(options, logger);
 
         // Create appropriate client based on API URL
-        if (IsAzureOpenAI(options.ApiUrl))
-        {
-            return CreateAzureOpenAIClient(options, logger);
-        }
-        else if (IsOfficialOpenAIEndpoint(options.ApiUrl))
-        {
-            return CreateOfficialOpenAIClient(options, logger);
-        }
-        else
-        {
-            return CreateCustomEndpointClient(options, logger);
-        }
+        return IsAzureOpenAI(options.ApiUrl)
+            ? CreateAzureOpenAIClient(options, logger)
+            : CreateOpenAIClient(options, logger);
     }
 
     /// <summary>
     /// Validates that the required options are present
     /// </summary>
-    private void ValidateOptions(GenAIOptions options)
+    private static void ValidateOptions(GenAIOptions options)
     {
         if (string.IsNullOrEmpty(options.ApiKey) || string.IsNullOrEmpty(options.ApiUrl))
         {
@@ -73,24 +62,24 @@ public class AIClientFactory : IAIClientFactory
     /// <summary>
     /// Logs the configuration (without sensitive data)
     /// </summary>
-    private void LogConfiguration(GenAIOptions options, ILogger logger)
+    private static void LogConfiguration(GenAIOptions options, ILogger logger)
     {
         logger.LogInformation("Configuring AI client with:");
         // Mask API key for security
-        logger.LogInformation($"API Key: {MaskApiKey(options.ApiKey)}");
-        logger.LogInformation($"API URL: {options.ApiUrl}");
-        logger.LogInformation($"Model: {options.Model}");
+        logger.LogInformation("API Key: {MaskApiKey}", MaskApiKey(options.ApiKey));
+        logger.LogInformation("API URL: {OptionsApiUrl}", options.ApiUrl);
+        logger.LogInformation("Model: {OptionsModel}", options.Model);
 
         if (!string.IsNullOrEmpty(options.ServiceName))
         {
-            logger.LogInformation($"Service Name: {options.ServiceName}");
+            logger.LogInformation("Service Name: {OptionsServiceName}", options.ServiceName);
         }
     }
 
     /// <summary>
     /// Creates an Azure OpenAI client
     /// </summary>
-    private IChatClient CreateAzureOpenAIClient(GenAIOptions options, ILogger logger)
+    private static IChatClient CreateAzureOpenAIClient(GenAIOptions options, ILogger logger)
     {
         logger.LogInformation("Creating Azure OpenAI client");
 
@@ -115,20 +104,16 @@ public class AIClientFactory : IAIClientFactory
     /// <summary>
     /// Creates an OpenAI client using the official SDK
     /// </summary>
-    private IChatClient CreateOfficialOpenAIClient(GenAIOptions options, ILogger logger)
+    private static IChatClient CreateOpenAIClient(GenAIOptions options, ILogger logger)
     {
         logger.LogInformation("Creating standard OpenAI client");
 
         try
         {
-            // Create a direct OpenAI client with the API key
-            var openAIClient = new OpenAIClient(options.ApiKey);
+            var openAiClientOptions = new OpenAIClientOptions { Endpoint = new Uri($"{options.ApiUrl}/openai") };
+            var apiKeyCredential = new ApiKeyCredential(options.ApiKey);
 
-            // Get the chat client with the specified model
-            var chatClient = openAIClient.GetChatClient(options.Model);
-            logger.LogInformation($"Successfully created OpenAI client with model: {options.Model}");
-
-            return chatClient.AsIChatClient();
+            return new ChatClient(options.Model, apiKeyCredential, openAiClientOptions).AsIChatClient();
         }
         catch (Exception ex)
         {
@@ -137,54 +122,19 @@ public class AIClientFactory : IAIClientFactory
         }
     }
 
-    /// <summary>
-    /// Creates a client for custom OpenAI-compatible endpoints
-    /// </summary>
-    private IChatClient CreateCustomEndpointClient(GenAIOptions options, ILogger logger)
-    {
-        logger.LogInformation($"Creating client for custom endpoint: {options.ApiUrl}");
-
-        try
-        {
-            // Create a HttpClient with the base address set to our custom endpoint
-            var httpClient = new HttpClient
-            {
-                BaseAddress = new Uri(options.ApiUrl)
-            };
-
-            // Add standard Authorization header
-            httpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {options.ApiKey}");
-
-            // Create the custom client implementation
-            return new CustomEndpointChatClient(httpClient, options.Model, options.ApiKey, logger);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(ex, "Error creating custom endpoint client");
-            throw new InvalidOperationException($"Failed to create custom endpoint client: {ex.Message}", ex);
-        }
-    }
 
     /// <summary>
     /// Checks if the API URL is for Azure OpenAI
     /// </summary>
-    private bool IsAzureOpenAI(string apiUrl)
+    private static bool IsAzureOpenAI(string apiUrl)
     {
         return !string.IsNullOrEmpty(apiUrl) && apiUrl.Contains("openai.azure.com");
     }
 
     /// <summary>
-    /// Checks if the API URL is for the official OpenAI service
-    /// </summary>
-    private bool IsOfficialOpenAIEndpoint(string apiUrl)
-    {
-        return string.IsNullOrEmpty(apiUrl) || apiUrl.Contains("api.openai.com");
-    }
-
-    /// <summary>
     /// Masks API key for logging purposes
     /// </summary>
-    private string MaskApiKey(string apiKey)
+    private static string MaskApiKey(string apiKey)
     {
         if (string.IsNullOrEmpty(apiKey))
         {
@@ -193,9 +143,9 @@ public class AIClientFactory : IAIClientFactory
 
         if (apiKey.Length <= 8)
         {
-            return "***" + apiKey.Substring(apiKey.Length - 3);
+            return $"***{apiKey[^3..]}";
         }
 
-        return apiKey.Substring(0, 3) + "..." + apiKey.Substring(apiKey.Length - 3);
+        return apiKey[..3] + "..." + apiKey[^3..];
     }
 }

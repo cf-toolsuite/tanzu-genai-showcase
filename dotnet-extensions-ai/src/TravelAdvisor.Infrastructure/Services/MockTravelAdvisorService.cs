@@ -9,18 +9,14 @@ namespace TravelAdvisor.Infrastructure.Services;
 /// <summary>
 /// Mock implementation of ITravelAdvisorService for development/testing
 /// </summary>
-public class MockTravelAdvisorService : ITravelAdvisorService
+public class MockTravelAdvisorService(
+    IMapService mapService,
+    ILogger<MockTravelAdvisorService> logger)
+    : ITravelAdvisorService
 {
-    private readonly ILogger<MockTravelAdvisorService> _logger;
-    private readonly IMapService _mapService;
-
-    public MockTravelAdvisorService(
-        IMapService mapService,
-        ILogger<MockTravelAdvisorService> logger)
-    {
-        _mapService = mapService ?? throw new ArgumentNullException(nameof(mapService));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-    }
+    private readonly ILogger<MockTravelAdvisorService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly IMapService _mapService = mapService ?? throw new ArgumentNullException(nameof(mapService));
+    private static JsonSerializerOptions _serializerOptions = new() { PropertyNameCaseInsensitive = true };
 
     /// <inheritdoc />
     public Task<TravelQuery> ProcessNaturalLanguageQueryAsync(string query)
@@ -30,34 +26,35 @@ public class MockTravelAdvisorService : ITravelAdvisorService
             _logger.LogInformation("Processing natural language query with mock service: {Query}", query);
 
             // Provide a substantial mock response with example travel data
-            string jsonResponse = @"{
-                  ""Origin"": ""Mill Creek, WA"",
-                  ""Destination"": ""Ballard, WA"",
-                  ""TravelTime"": {
-                    ""DepartureTime"": null,
-                    ""ArrivalTime"": null,
-                    ""IsFlexible"": true
-                  },
-                  ""Preferences"": {
-                    ""Priority"": ""faster"",
-                    ""ConsiderWalking"": true,
-                    ""ConsiderBiking"": true,
-                    ""ConsiderPublicTransport"": true,
-                    ""ConsiderDriving"": true,
-                    ""ConsiderTrain"": true,
-                    ""ConsiderFlying"": false,
-                    ""MaxWalkingDistance"": null,
-                    ""MaxBikingDistance"": null,
-                    ""MaxTravelTime"": null,
-                    ""MaxCost"": null
-                  },
-                  ""AdditionalContext"": ""Travel from Mill Creek to Ballard""
-                }";
+            const string jsonResponse = """
+                                        {
+                                          "Origin": "Mill Creek, WA",
+                                          "Destination": "Ballard, WA",
+                                          "TravelTime": {
+                                            "DepartureTime": null,
+                                            "ArrivalTime": null,
+                                            "IsFlexible": true
+                                          },
+                                          "Preferences": {
+                                            "Priority": "faster",
+                                            "ConsiderWalking": true,
+                                            "ConsiderBiking": true,
+                                            "ConsiderPublicTransport": true,
+                                            "ConsiderDriving": true,
+                                            "ConsiderTrain": true,
+                                            "ConsiderFlying": false,
+                                            "MaxWalkingDistance": null,
+                                            "MaxBikingDistance": null,
+                                            "MaxTravelTime": null,
+                                            "MaxCost": null
+                                          },
+                                          "AdditionalContext": "Travel from Mill Creek to Ballard"
+                                        }
+                                        """;
 
             try
             {
-                var travelQuery = JsonSerializer.Deserialize<TravelQuery>(jsonResponse,
-                    new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+                var travelQuery = JsonSerializer.Deserialize<TravelQuery>(jsonResponse, _serializerOptions);
 
                 if (travelQuery == null)
                 {
@@ -177,7 +174,7 @@ public class MockTravelAdvisorService : ITravelAdvisorService
             recommendations = recommendations.OrderByDescending(r => r.OverallScore).ToList();
 
             // Mark the top recommendation as recommended
-            if (recommendations.Any())
+            if (recommendations.Count != 0)
             {
                 recommendations[0].IsRecommended = true;
             }
@@ -187,7 +184,7 @@ public class MockTravelAdvisorService : ITravelAdvisorService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error generating recommendations with mock service");
-            return new List<TravelRecommendation>();
+            return [];
         }
     }
 
@@ -259,35 +256,39 @@ public class MockTravelAdvisorService : ITravelAdvisorService
             {
                 return Task.FromResult($"The journey from {query.Origin} to {query.Destination} by {recommendation.Mode} will take approximately {recommendation.DurationMinutes} minutes.");
             }
-            else if (question.Contains("cost", StringComparison.OrdinalIgnoreCase) ||
-                     question.Contains("price", StringComparison.OrdinalIgnoreCase) ||
-                     question.Contains("expensive", StringComparison.OrdinalIgnoreCase))
+
+            if (question.Contains("cost", StringComparison.OrdinalIgnoreCase) ||
+                question.Contains("price", StringComparison.OrdinalIgnoreCase) ||
+                question.Contains("expensive", StringComparison.OrdinalIgnoreCase))
             {
                 string response = recommendation.EstimatedCost.HasValue
                     ? $"The estimated cost for traveling from {query.Origin} to {query.Destination} by {recommendation.Mode} is approximately ${recommendation.EstimatedCost.Value:F2}."
                     : $"I don't have exact cost information for traveling from {query.Origin} to {query.Destination} by {recommendation.Mode}, as it can vary based on factors like fuel prices, transit fares, and other variables.";
                 return Task.FromResult(response);
             }
-            else if (question.Contains("distance", StringComparison.OrdinalIgnoreCase) ||
-                     question.Contains("far", StringComparison.OrdinalIgnoreCase) ||
-                     question.Contains("miles", StringComparison.OrdinalIgnoreCase) ||
-                     question.Contains("kilometers", StringComparison.OrdinalIgnoreCase))
+
+            if (question.Contains("distance", StringComparison.OrdinalIgnoreCase) ||
+                question.Contains("far", StringComparison.OrdinalIgnoreCase) ||
+                question.Contains("miles", StringComparison.OrdinalIgnoreCase) ||
+                question.Contains("kilometers", StringComparison.OrdinalIgnoreCase))
             {
                 return Task.FromResult($"The distance from {query.Origin} to {query.Destination} is approximately {recommendation.DistanceKm:F1} kilometers.");
             }
-            else if (question.Contains("route", StringComparison.OrdinalIgnoreCase) ||
-                     question.Contains("path", StringComparison.OrdinalIgnoreCase) ||
-                     question.Contains("directions", StringComparison.OrdinalIgnoreCase) ||
-                     question.Contains("steps", StringComparison.OrdinalIgnoreCase))
+
+            if (question.Contains("route", StringComparison.OrdinalIgnoreCase) ||
+                question.Contains("path", StringComparison.OrdinalIgnoreCase) ||
+                question.Contains("directions", StringComparison.OrdinalIgnoreCase) ||
+                question.Contains("steps", StringComparison.OrdinalIgnoreCase))
             {
                 var stepsDescription = string.Join("\n", recommendation.Steps.Select(step =>
                     $"- {step.Description} ({step.DistanceKm:F1} km, {step.DurationMinutes} mins)"));
 
                 return Task.FromResult($"Here's the route from {query.Origin} to {query.Destination} by {recommendation.Mode}:\n{stepsDescription}");
             }
-            else if (question.Contains("environment", StringComparison.OrdinalIgnoreCase) ||
-                     question.Contains("eco", StringComparison.OrdinalIgnoreCase) ||
-                     question.Contains("green", StringComparison.OrdinalIgnoreCase))
+
+            if (question.Contains("environment", StringComparison.OrdinalIgnoreCase) ||
+                question.Contains("eco", StringComparison.OrdinalIgnoreCase) ||
+                question.Contains("green", StringComparison.OrdinalIgnoreCase))
             {
                 var environmentalRating = recommendation.EnvironmentalScore switch
                 {
@@ -300,10 +301,8 @@ public class MockTravelAdvisorService : ITravelAdvisorService
 
                 return Task.FromResult($"Traveling by {recommendation.Mode} from {query.Origin} to {query.Destination} is {environmentalRating}. It has an environmental score of {recommendation.EnvironmentalScore}/100.");
             }
-            else
-            {
-                return Task.FromResult($"I don't have specific information to answer that question about traveling from {query.Origin} to {query.Destination} by {recommendation.Mode}. Please ask about travel time, cost, distance, route directions, or environmental impact.");
-            }
+
+            return Task.FromResult($"I don't have specific information to answer that question about traveling from {query.Origin} to {query.Destination} by {recommendation.Mode}. Please ask about travel time, cost, distance, route directions, or environmental impact.");
         }
         catch (Exception ex)
         {
@@ -616,9 +615,9 @@ public class MockTravelAdvisorService : ITravelAdvisorService
             if (priority.Contains("fast") || priority.Contains("quick") || priority.Contains("time"))
             {
                 // Higher score for faster modes (plane for long distances, car for medium, bike/walk for very short)
-                if (recommendation.Mode == TransportMode.Plane && recommendation.DistanceKm > 300)
+                if (recommendation is { Mode: TransportMode.Plane, DistanceKm: > 300 })
                     score += 20;
-                else if (recommendation.Mode == TransportMode.Car && recommendation.DistanceKm is > 10 and <= 300)
+                else if (recommendation is { Mode: TransportMode.Car, DistanceKm: > 10 and <= 300 })
                     score += 15;
                 else if ((recommendation.Mode == TransportMode.Bike || recommendation.Mode == TransportMode.Walk) && recommendation.DistanceKm <= 5)
                     score += 10;
@@ -630,11 +629,11 @@ public class MockTravelAdvisorService : ITravelAdvisorService
             else if (priority.Contains("cheap") || priority.Contains("cost") || priority.Contains("inexpensive") || priority.Contains("affordable"))
             {
                 // Higher score for cheaper modes
-                if (recommendation.Mode == TransportMode.Walk || recommendation.Mode == TransportMode.Bike)
+                if (recommendation.Mode is TransportMode.Walk or TransportMode.Bike)
                     score += 20; // Free modes
                 else if (recommendation.Mode == TransportMode.Bus)
                     score += 15; // Public transport is usually affordable
-                else if (recommendation.Mode == TransportMode.Car && recommendation.DistanceKm <= 100)
+                else if (recommendation is { Mode: TransportMode.Car, DistanceKm: <= 100 })
                     score += 10; // Car can be cost-effective for shorter trips with multiple people
                 else if (recommendation.Mode == TransportMode.Plane)
                     score -= 15; // Planes are usually expensive
@@ -653,11 +652,11 @@ public class MockTravelAdvisorService : ITravelAdvisorService
                 // Higher score for more comfortable modes for the distance
                 if (recommendation.Mode == TransportMode.Car)
                     score += 15; // Cars are generally comfortable
-                else if (recommendation.Mode == TransportMode.Train && recommendation.DistanceKm > 50)
+                else if (recommendation is { Mode: TransportMode.Train, DistanceKm: > 50 })
                     score += 10; // Trains are comfortable for longer journeys
-                else if (recommendation.Mode == TransportMode.Plane && recommendation.DistanceKm > 500)
+                else if (recommendation is { Mode: TransportMode.Plane, DistanceKm: > 500 })
                     score += 5; // Planes can be comfortable for very long distances
-                else if (recommendation.Mode == TransportMode.Walk && recommendation.DistanceKm > 3)
+                else if (recommendation is { Mode: TransportMode.Walk, DistanceKm: > 3 })
                     score -= 15; // Walking long distances isn't comfortable
             }
         }

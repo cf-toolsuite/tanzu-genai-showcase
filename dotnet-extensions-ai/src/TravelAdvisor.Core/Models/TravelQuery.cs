@@ -18,12 +18,12 @@ public class TravelQuery
     /// <summary>
     /// When the user wants to travel
     /// </summary>
-    public TravelTime TravelTime { get; set; } = new TravelTime();
+    public TravelTime TravelTime { get; set; } = new();
 
     /// <summary>
     /// User preferences for the journey
     /// </summary>
-    public TravelPreferences Preferences { get; set; } = new TravelPreferences();
+    public TravelPreferences Preferences { get; set; } = new();
 
     /// <summary>
     /// Optional additional context or requirements from the user
@@ -33,7 +33,7 @@ public class TravelQuery
     /// <summary>
     /// Indicates if there was an error processing the query
     /// </summary>
-    public bool HasError { get; set; } = false;
+    public bool HasError { get; set; }
 
     /// <summary>
     /// Error message if HasError is true
@@ -55,16 +55,6 @@ public class TravelTime
     /// Date and time for arrival
     /// </summary>
     public DateTime? ArrivalTime { get; set; }
-
-    /// <summary>
-    /// Whether the user has a specific schedule
-    /// </summary>
-    public bool HasSpecificSchedule => DepartureTime.HasValue || ArrivalTime.HasValue;
-
-    /// <summary>
-    /// Whether the time is flexible
-    /// </summary>
-    public bool IsFlexible { get; set; }
 }
 
 /// <summary>

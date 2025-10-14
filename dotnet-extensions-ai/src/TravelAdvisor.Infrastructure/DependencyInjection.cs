@@ -1,13 +1,15 @@
+using System.Net.Http.Headers;
+using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Steeltoe.Configuration.CloudFoundry;
+using System.Text.Json;
 using TravelAdvisor.Core.Services;
-using TravelAdvisor.Infrastructure.CloudFoundry;
-using TravelAdvisor.Infrastructure.Services;
-using TravelAdvisor.Infrastructure.Options;
 using TravelAdvisor.Infrastructure.Clients;
+using TravelAdvisor.Infrastructure.Options;
+using TravelAdvisor.Infrastructure.Services;
 
 namespace TravelAdvisor.Infrastructure;
 
@@ -27,19 +29,79 @@ public static class DependencyInjection
         services.AddHttpClient();
 
         // Check if mock data is enabled
-        bool useMockData = IsMockDataEnabled();
+        var useMockData = IsMockDataEnabled(configuration.GetValue<string>("Use_Mock_Data") ?? "false");
 
-        // IMPORTANT: Configure GenAIOptions from configuration BEFORE adding Cloud Foundry services
-        // This ensures that the default values from appsettings.json are loaded first
-        services.Configure<GenAIOptions>(configuration.GetSection("GenAI"));
+        services.AddOptions<GenAIOptions>()
+            .BindConfiguration("GenAI")
+            .PostConfigure<IOptions<CloudFoundryServicesOptions>, ILogger<GenAIOptions>>((options, vcapServices, logger) =>
+            {
+                var genAIService = vcapServices.Value.GetServicesOfType("genai").FirstOrDefault();
+                if (genAIService == null)
+                {
+                    return;
+                }
 
-        // Add Cloud Foundry service bindings - this will override the GenAIOptions if service bindings exist
-        services.AddCloudFoundryServices(configuration);
+                var endpointCredentials = genAIService.Credentials["endpoint"];
+                options.ApiKey = endpointCredentials["api_key"].Value ?? options.ApiKey;
+                options.ApiUrl = endpointCredentials["api_base"].Value ?? options.ApiUrl;
+                var configUrl = endpointCredentials["config_url"].Value;
+                if (!string.IsNullOrEmpty(configUrl))
+                {
+                    options.ConfigUrl = configUrl;
+                    using var httpClient = new HttpClient();
+                    httpClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", options.ApiKey);
+
+                    // TODO: Async code (like running an HTTP request) here is not ideal
+                    var response = httpClient.GetAsync(options.ConfigUrl).GetAwaiter().GetResult();
+                    if (response.IsSuccessStatusCode)
+                    {
+                        options.Model = FindChatModel(response.Content.ReadAsStringAsync().GetAwaiter().GetResult());
+                    }
+                }
+            });
 
         // Register services based on environment configuration (real or mock)
         RegisterServices(services, configuration, useMockData);
 
         return services;
+    }
+
+    private static string FindChatModel(string response)
+    {
+        try
+        {
+            var config = JsonSerializer.Deserialize<JsonElement>(response);
+
+            string? chatModel = null;
+
+            if (!config.TryGetProperty("advertisedModels", out var models))
+            {
+                return chatModel ?? throw new InvalidOperationException("No chat model found in config");
+            }
+
+            foreach (var model in models.EnumerateArray())
+            {
+                if (model.TryGetProperty("name", out var nameElement) &&
+                    model.TryGetProperty("capabilities", out var capabilitiesElement))
+                {
+                    var modelName = nameElement.GetString();
+                    var capabilities = capabilitiesElement.EnumerateArray()
+                        .Select(c => c.GetString())
+                        .ToList();
+
+                    if (capabilities.Contains("CHAT"))
+                    {
+                        return modelName!;
+                    }
+                }
+            }
+
+            return chatModel ?? throw new InvalidOperationException("No chat model found in config");
+        }
+        catch (Exception ex)
+        {
+            throw new InvalidOperationException($"Failed to parse model configuration: {ex.Message}", ex);
+        }
     }
 
     /// <summary>
@@ -53,44 +115,20 @@ public static class DependencyInjection
         // Configure options
         services.Configure<GoogleMapsOptions>(configuration.GetSection("GoogleMaps"));
 
-        // Register the Maps services
-        services.AddSingleton<IMapService>(sp =>
-        {
-            if (useMockData)
-            {
-                var mockLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<MockGoogleMapsService>();
-                return new MockGoogleMapsService(mockLogger);
-            }
-            else
-            {
-                var serviceLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<GoogleMapsService>();
-                var options = sp.GetRequiredService<IOptions<GoogleMapsOptions>>();
-                return new GoogleMapsService(options, serviceLogger);
-            }
-        });
-
         // Add AI services
-        RegisterAIServices(services, configuration, useMockData);
+        RegisterAIServices(services, useMockData);
 
         // Register the Travel Advisor services
-        services.AddSingleton<ITravelAdvisorService>(sp =>
+        if (useMockData)
         {
-            var mapService = sp.GetRequiredService<IMapService>();
-
-            if (useMockData)
-            {
-                var mockLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<MockTravelAdvisorService>();
-                return new MockTravelAdvisorService(mapService, mockLogger);
-            }
-            else
-            {
-                var chatClient = sp.GetRequiredService<IChatClient>();
-                var promptFactory = sp.GetRequiredService<IPromptFactory>();
-                var genAiOptions = sp.GetRequiredService<IOptionsMonitor<GenAIOptions>>();
-                var serviceLogger = sp.GetRequiredService<ILoggerFactory>().CreateLogger<TravelAdvisorService>();
-                return new TravelAdvisorService(chatClient, promptFactory, mapService, genAiOptions, serviceLogger);
-            }
-        });
+            services.AddSingleton<IMapService, MockGoogleMapsService>();
+            services.AddSingleton<ITravelAdvisorService, MockTravelAdvisorService>();
+        }
+        else
+        {
+            services.AddSingleton<IMapService, GoogleMapsService>();
+            services.AddSingleton<ITravelAdvisorService, TravelAdvisorService>();
+        }
     }
 
     /// <summary>
@@ -98,127 +136,33 @@ public static class DependencyInjection
     /// </summary>
     private static void RegisterAIServices(
         IServiceCollection services,
-        IConfiguration configuration,
         bool useMockData)
     {
         // Register mock services if mock data is enabled
         if (useMockData)
         {
-            RegisterMockAIServices(services);
+            services.AddSingleton<IChatClient, MockChatClient>();
             return;
         }
 
-        try
-        {
-            // Get a logger for debugging
-            ILogger? logger = null;
-            var serviceProvider = services.BuildServiceProvider();
-            try
-            {
-                var loggerFactory = serviceProvider.GetService<ILoggerFactory>();
-                if (loggerFactory != null)
-                {
-                    logger = loggerFactory.CreateLogger("DependencyInjection");
-                }
-            }
-            catch
-            {
-                // If we can't get a logger, just continue without it
-            }
+        // Register the AI client factory
+        services.AddSingleton<IAIClientFactory, AIClientFactory>();
 
-            // Log the current configuration values for debugging
-            if (logger != null)
-            {
-                var apiKey = configuration["GenAI:ApiKey"];
-                var apiUrl = configuration["GenAI:ApiUrl"];
-                var model = configuration["GenAI:Model"];
+        // Register the ChatClient with dependency injection
+        services.AddSingleton<IChatClient>(sp => {
+            var factory = sp.GetRequiredService<IAIClientFactory>();
+            var options = sp.GetRequiredService<IOptions<GenAIOptions>>().Value;
+            var logger = sp.GetRequiredService<ILogger<AIClientFactory>>();
 
-                logger.LogInformation("Configuration values from appsettings.json:");
-                logger.LogInformation($"GenAI:ApiKey: {(string.IsNullOrEmpty(apiKey) ? "Not set" : apiKey.Substring(0, Math.Min(5, apiKey.Length)) + "...")}");
-                logger.LogInformation($"GenAI:ApiUrl: {apiUrl}");
-                logger.LogInformation($"GenAI:Model: {model}");
-
-                // Also log environment variables
-                var envApiKey = Environment.GetEnvironmentVariable("GENAI__APIKEY");
-                var envApiUrl = Environment.GetEnvironmentVariable("GENAI__APIURL");
-                var envModel = Environment.GetEnvironmentVariable("GENAI__MODEL");
-
-                logger.LogInformation("Environment variables:");
-                logger.LogInformation($"GENAI__APIKEY: {(string.IsNullOrEmpty(envApiKey) ? "Not set" : "Set (value hidden)")}");
-                logger.LogInformation($"GENAI__APIURL: {envApiUrl}");
-                logger.LogInformation($"GENAI__MODEL: {envModel}");
-
-                // Get the current GenAIOptions from the service provider to see what was actually configured
-                try {
-                    var optionsSnapshot = serviceProvider.GetService<IOptionsSnapshot<GenAIOptions>>();
-                    if (optionsSnapshot != null)
-                    {
-                        var options = optionsSnapshot.Value;
-                        logger.LogInformation("Actual GenAIOptions after service binding:");
-                        logger.LogInformation($"ApiKey: {(string.IsNullOrEmpty(options.ApiKey) ? "Not set" : options.ApiKey.Substring(0, Math.Min(5, options.ApiKey.Length)) + "...")}");
-                        logger.LogInformation($"ApiUrl: {options.ApiUrl}");
-                        logger.LogInformation($"Model: {options.Model}");
-                        logger.LogInformation($"ServiceName: {options.ServiceName}");
-                    }
-                }
-                catch (Exception ex) {
-                    logger.LogWarning($"Could not retrieve configured GenAIOptions: {ex.Message}");
-                }
-            }
-
-            // Register the AI client factory
-            services.AddSingleton<IAIClientFactory, AIClientFactory>();
-
-            // Register the ChatClient with dependency injection
-            services.AddSingleton<IChatClient>(sp => {
-                var factory = sp.GetRequiredService<IAIClientFactory>();
-                var options = sp.GetRequiredService<IOptions<GenAIOptions>>().Value;
-                var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-                var clientLogger = loggerFactory.CreateLogger("AIClient");
-
-                // Log the options that will be used to create the client
-                clientLogger.LogInformation("Creating AI client with options:");
-                clientLogger.LogInformation($"ApiKey: {(string.IsNullOrEmpty(options.ApiKey) ? "Not set" : options.ApiKey.Substring(0, Math.Min(5, options.ApiKey.Length)) + "...")}");
-                clientLogger.LogInformation($"ApiUrl: {options.ApiUrl}");
-                clientLogger.LogInformation($"Model: {options.Model}");
-                clientLogger.LogInformation($"ServiceName: {options.ServiceName}");
-
-                return factory.CreateClient(options, clientLogger);
-            });
-
-            // Register the PromptFactory
-            services.AddSingleton<IPromptFactory, PromptFactory>();
-        }
-        catch (Exception ex)
-        {
-            // If there's an error setting up the client, provide a detailed error message
-            throw new InvalidOperationException(
-                $"Failed to initialize AI client: {ex.Message}\n" +
-                "Please check your GenAI credentials and ensure they are correctly configured.", ex);
-        }
-    }
-
-    /// <summary>
-    /// Registers mock AI services when mock data is enabled
-    /// </summary>
-    private static void RegisterMockAIServices(IServiceCollection services)
-    {
-        services.AddSingleton<IChatClient>(sp =>
-        {
-            var loggerFactory = sp.GetRequiredService<ILoggerFactory>();
-            var clientLogger = loggerFactory.CreateLogger<MockChatClient>();
-            return new MockChatClient(clientLogger, true);
+            return factory.CreateClient(options, logger);
         });
-
-        services.AddSingleton<IPromptFactory, PromptFactory>();
     }
 
     /// <summary>
     /// Checks if mock data is enabled via environment variable
     /// </summary>
-    private static bool IsMockDataEnabled()
+    private static bool IsMockDataEnabled(string useMockData)
     {
-        string useMockDataStr = Environment.GetEnvironmentVariable("USE_MOCK_DATA") ?? "false";
-        return useMockDataStr.ToLowerInvariant() == "true" || useMockDataStr == "1";
+        return useMockData.Equals("true", StringComparison.InvariantCultureIgnoreCase) || useMockData == "1";
     }
 }

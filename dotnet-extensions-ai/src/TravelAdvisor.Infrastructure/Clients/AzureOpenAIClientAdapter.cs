@@ -1,5 +1,5 @@
-using Microsoft.Extensions.AI;
 using System.Reflection;
+using Microsoft.Extensions.AI;
 using TravelAdvisor.Infrastructure.Utilities;
 
 namespace TravelAdvisor.Infrastructure.Clients;
@@ -44,8 +44,8 @@ public class AzureOpenAIClientAdapter : IChatClient
 
         // Try to get the GetService method but don't fail if it doesn't exist
         _getServiceMethod = azureClientType.GetMethod("GetService",
-                                new[] { typeof(Type), typeof(object) }) ??
-                            azureClientType.GetMethod("GetService", new[] { typeof(Type) });
+                                [typeof(Type), typeof(object)]) ??
+                            azureClientType.GetMethod("GetService", [typeof(Type)]);
     }
 
     /// <summary>
@@ -71,7 +71,7 @@ public class AzureOpenAIClientAdapter : IChatClient
             // Invoke the method using reflection
             var result = _getResponseAsyncMethod.Invoke(
                 _azureClient,
-                new object?[] { messages, options, cancellationToken });
+                [messages, options, cancellationToken]);
 
             if (result == null)
             {
@@ -111,7 +111,7 @@ public class AzureOpenAIClientAdapter : IChatClient
             // Invoke the method using reflection
             var result = _getStreamingResponseAsyncMethod.Invoke(
                 _azureClient,
-                new object?[] { messages, options, cancellationToken });
+                [messages, options, cancellationToken]);
 
             if (result == null)
             {
@@ -137,7 +137,7 @@ public class AzureOpenAIClientAdapter : IChatClient
     /// <summary>
     /// Implements IChatClient.Metadata to provide client metadata
     /// </summary>
-    public ChatClientMetadata Metadata => new ChatClientMetadata();
+    public ChatClientMetadata Metadata => new();
 
     /// <summary>
     /// Implements IChatClient.GetService for service resolution
@@ -157,11 +157,12 @@ public class AzureOpenAIClientAdapter : IChatClient
                 var parameters = _getServiceMethod.GetParameters();
                 if (parameters.Length == 2)
                 {
-                    return _getServiceMethod.Invoke(_azureClient, new object?[] { serviceType, key });
+                    return _getServiceMethod.Invoke(_azureClient, [serviceType, key]);
                 }
-                else if (parameters.Length == 1)
+
+                if (parameters.Length == 1)
                 {
-                    return _getServiceMethod.Invoke(_azureClient, new object?[] { serviceType });
+                    return _getServiceMethod.Invoke(_azureClient, [serviceType]);
                 }
             }
             catch (Exception ex)
@@ -224,10 +225,10 @@ public class AzureOpenAIClientAdapter : IChatClient
         }
 
         // Try with (apiKey, endpoint, deploymentName) constructor
-        var constructor = clientType.GetConstructor(new[] { typeof(string), typeof(string), typeof(string) });
+        var constructor = clientType.GetConstructor([typeof(string), typeof(string), typeof(string)]);
         if (constructor != null)
         {
-            var instance = constructor.Invoke(new object[] { apiKey, endpoint, deploymentName });
+            var instance = constructor.Invoke([apiKey, endpoint, deploymentName]);
             if (instance == null)
             {
                 throw new InvalidOperationException("Failed to create Azure OpenAI client instance");
@@ -236,10 +237,10 @@ public class AzureOpenAIClientAdapter : IChatClient
         }
 
         // Try with (apiKey, endpoint) constructor
-        constructor = clientType.GetConstructor(new[] { typeof(string), typeof(string) });
+        constructor = clientType.GetConstructor([typeof(string), typeof(string)]);
         if (constructor != null)
         {
-            var client = constructor.Invoke(new object[] { apiKey, endpoint });
+            var client = constructor.Invoke([apiKey, endpoint]);
             if (client == null)
             {
                 throw new InvalidOperationException("Failed to create Azure OpenAI client instance");

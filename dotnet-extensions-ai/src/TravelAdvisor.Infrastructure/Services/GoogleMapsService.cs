@@ -12,22 +12,16 @@ namespace TravelAdvisor.Infrastructure.Services;
 /// <summary>
 /// Implementation of IGoogleMapsService using Google Maps API
 /// </summary>
-public class GoogleMapsService : IGoogleMapsService
+public class GoogleMapsService(
+    IOptions<GoogleMapsOptions> options,
+    ILogger<GoogleMapsService> logger,
+    HttpClient? httpClient = null)
+    : IGoogleMapsService
 {
-    private readonly ILogger<GoogleMapsService> _logger;
-    private readonly GoogleMapsOptions _options;
-    private readonly HttpClient _httpClient;
+    private readonly ILogger<GoogleMapsService> _logger = logger ?? throw new ArgumentNullException(nameof(logger));
+    private readonly GoogleMapsOptions _options = options.Value ?? throw new ArgumentNullException(nameof(options));
+    private readonly HttpClient _httpClient = httpClient ?? new HttpClient();
     private const string BaseUrl = "https://maps.googleapis.com/maps/api";
-
-    public GoogleMapsService(
-        IOptions<GoogleMapsOptions> options,
-        ILogger<GoogleMapsService> logger,
-        HttpClient? httpClient = null)
-    {
-        _options = options.Value ?? throw new ArgumentNullException(nameof(options));
-        _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _httpClient = httpClient ?? new HttpClient();
-    }
 
     /// <inheritdoc />
     public async Task<(double distanceKm, int durationMinutes)> CalculateDistanceAndDurationAsync(
@@ -46,7 +40,7 @@ public class GoogleMapsService : IGoogleMapsService
             // Log the API key for debugging (first few characters)
             string keyPrefix = string.IsNullOrEmpty(_options.ApiKey)
                 ? "empty"
-                : (_options.ApiKey.Length > 5 ? _options.ApiKey.Substring(0, 5) + "..." : _options.ApiKey);
+                : (_options.ApiKey.Length > 5 ? _options.ApiKey[..5] + "..." : _options.ApiKey);
             _logger.LogInformation("Using Google Maps API key starting with: {KeyPrefix}", keyPrefix);
 
             // Add more detailed logging to debug the API key issue
@@ -67,7 +61,7 @@ public class GoogleMapsService : IGoogleMapsService
                                 $"&key={_options.ApiKey}";
 
             _logger.LogDebug("Google Maps API request URL: {RequestUrl}",
-                requestUrl.Replace(_options.ApiKey ?? "", "[API_KEY]")); // Log URL without exposing full API key
+                requestUrl.Replace(_options.ApiKey, "[API_KEY]")); // Log URL without exposing full API key
 
             // Make the request with explicit HttpRequestMessage to ensure headers are set correctly
             var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
@@ -129,7 +123,7 @@ public class GoogleMapsService : IGoogleMapsService
             // Log the API key for debugging (first few characters)
             string keyPrefix = string.IsNullOrEmpty(_options.ApiKey)
                 ? "empty"
-                : (_options.ApiKey.Length > 5 ? _options.ApiKey.Substring(0, 5) + "..." : _options.ApiKey);
+                : (_options.ApiKey.Length > 5 ? _options.ApiKey[..5] + "..." : _options.ApiKey);
             _logger.LogInformation("Using Google Maps API key starting with: {KeyPrefix}", keyPrefix);
 
             // Add more detailed logging to debug the API key issue
@@ -150,7 +144,7 @@ public class GoogleMapsService : IGoogleMapsService
                                 $"&key={_options.ApiKey}";
 
             _logger.LogDebug("Google Maps API request URL: {RequestUrl}",
-                requestUrl.Replace(_options.ApiKey ?? "", "[API_KEY]")); // Log URL without exposing full API key
+                requestUrl.Replace(_options.ApiKey, "[API_KEY]")); // Log URL without exposing full API key
 
             // Make the request with explicit HttpRequestMessage to ensure headers are set correctly
             var request = new HttpRequestMessage(HttpMethod.Get, requestUrl);
@@ -189,9 +183,7 @@ public class GoogleMapsService : IGoogleMapsService
                 var step = new TravelStep
                 {
                     // Use Regex.Replace instead of string.Replace for pattern matching
-                    Description = googleStep.HtmlInstructions != null
-                        ? Regex.Replace(googleStep.HtmlInstructions, "<[^>]+>", "")
-                        : string.Empty,
+                    Description = Regex.Replace(googleStep.HtmlInstructions, "<[^>]+>", ""),
                     Mode = ParseGoogleMode(googleStep.TravelMode),
                     DurationMinutes = (int)Math.Ceiling(googleStep.Duration.Value / 60.0), // Convert seconds to minutes
                     DistanceKm = googleStep.Distance.Value / 1000.0 // Convert meters to km
@@ -267,34 +259,34 @@ public class DirectionsResponse
     public string? ErrorMessage { get; set; }
 
     [JsonPropertyName("routes")]
-    public List<Route> Routes { get; set; } = new List<Route>();
+    public List<Route> Routes { get; set; } = [];
 }
 
 public class Route
 {
     [JsonPropertyName("legs")]
-    public List<Leg> Legs { get; set; } = new List<Leg>();
+    public List<Leg> Legs { get; set; } = [];
 }
 
 public class Leg
 {
     [JsonPropertyName("distance")]
-    public ValueText Distance { get; set; } = new ValueText();
+    public ValueText Distance { get; set; } = new();
 
     [JsonPropertyName("duration")]
-    public ValueText Duration { get; set; } = new ValueText();
+    public ValueText Duration { get; set; } = new();
 
     [JsonPropertyName("steps")]
-    public List<Step> Steps { get; set; } = new List<Step>();
+    public List<Step> Steps { get; set; } = [];
 }
 
 public class Step
 {
     [JsonPropertyName("distance")]
-    public ValueText Distance { get; set; } = new ValueText();
+    public ValueText Distance { get; set; } = new();
 
     [JsonPropertyName("duration")]
-    public ValueText Duration { get; set; } = new ValueText();
+    public ValueText Duration { get; set; } = new();
 
     [JsonPropertyName("html_instructions")]
     public string HtmlInstructions { get; set; } = string.Empty;

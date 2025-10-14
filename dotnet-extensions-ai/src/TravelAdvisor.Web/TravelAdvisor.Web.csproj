@@ -14,7 +14,8 @@
 
   <ItemGroup>
     <PackageReference Include="Markdig" Version="0.42.0" />
-    <PackageReference Include="Steeltoe.Management.EndpointCore" Version="3.3.0" />
+    <PackageReference Include="Steeltoe.Configuration.CloudFoundry" Version="4.0.0" />
+    <PackageReference Include="Steeltoe.Management.Endpoint" Version="4.0.0" />
   </ItemGroup>
 
 </Project>
