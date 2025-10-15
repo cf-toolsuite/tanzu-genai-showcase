@@ -44,10 +44,16 @@ This document provides solutions for common issues you might encounter when work
 
 **Solution**:
 
-1. Verify your `.env` file exists in the correct location (`src/TravelAdvisor.Web/.env`).
-2. Check the format of your environment variables (use double underscores for nested settings):
+1. Verify your user secrets are properly configured:
 
+   ```bash
+   cd src/TravelAdvisor.Web
+   dotnet user-secrets list
    ```
+
+2. Check the format of your configuration keys (use colons for nested settings):
+
+   ```bash
    GENAI__APIKEY=your_api_key
    ```
 
@@ -57,8 +63,8 @@ This document provides solutions for common issues you might encounter when work
    export GENAI__APIKEY=your_api_key
    ```
 
-4. Check the application logs for environment variable loading errors.
-5. Ensure the `DotEnv.cs` utility is correctly loading the file.
+4. Check the application logs for configuration loading errors.
+5. Ensure user secrets are initialized: `dotnet user-secrets init`
 
 ## API Key Issues
 
@@ -68,7 +74,13 @@ This document provides solutions for common issues you might encounter when work
 
 **Solution**:
 
-1. Verify your API keys are correctly set in the `.env` file.
+1. Verify your API keys are correctly set in user secrets:
+
+   ```bash
+   dotnet user-secrets set "GenAI:ApiKey" "your_api_key"
+   dotnet user-secrets set "GoogleMaps:ApiKey" "your_api_key"
+   ```
+
 2. Check that the API keys have the necessary permissions.
 3. For Google Maps, ensure the API key has the required APIs enabled:
    - Directions API

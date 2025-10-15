@@ -32,7 +32,7 @@ A .NET 9 Blazor application showcasing the integration of LLMs with the Tanzu Pl
 ### Quick Start
 
 1. Clone this repository
-2. Configure environment variables in `src/.env`
+2. Configure credentials for Google Maps and an AI service (see [Configuration Guide](docs/CONFIGURATION.md))
 3. Build and run the application:
 
 ```bash
@@ -75,7 +75,7 @@ For detailed information about the application, refer to the following documenta
 
 - [Architecture Overview](docs/ARCHITECTURE.md): System architecture, components, and data flow
 - [API Documentation](docs/API.md): Detailed API reference and usage examples
-- [Configuration Guide](docs/CONFIGURATION.md): Environment variables and configuration options
+- [Configuration Guide](docs/CONFIGURATION.md): Environment variables, .env files, and configuration options
 - [Developer Guide](docs/DEVELOPER.md): Setup, development workflow, and best practices
 - [Deployment Guide](docs/DEPLOYMENT.md): Deployment instructions for Tanzu Platform
 - [User Guide](docs/USER.md): End-user instructions for using the application

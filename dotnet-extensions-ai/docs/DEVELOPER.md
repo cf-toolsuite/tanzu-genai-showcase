@@ -26,21 +26,20 @@ git clone https://github.com/cf-toolsuite/tanzu-genai-showcase
 cd tanzu-genai-showcase/dotnet-extensions-ai
 ```
 
-### 2. Configure Environment Variables
+### 2. Configure User Secrets
 
-Create a `.env` file in the `src/TravelAdvisor.Web` directory:
+Initialize user secrets for local development:
 
 ```bash
-cp src/TravelAdvisor.Web/.env.example src/TravelAdvisor.Web/.env
+cd src/TravelAdvisor.Web
+dotnet user-secrets init
 ```
 
-Edit the `.env` file to include:
+Add your API keys to user secrets:
 
 ```bash
-GENAI__APIKEY=your_llm_api_key
-GENAI__APIURL=your_llm_api_url
-GENAI__MODEL=your_llm_model_name
-GOOGLEMAPS__APIKEY=your_google_maps_api_key
+dotnet user-secrets set "GenAI:ApiKey" "your_llm_api_key"
+dotnet user-secrets set "GoogleMaps:ApiKey" "your_google_maps_api_key"
 ```
 
 ### 3. Build and Run
@@ -123,9 +122,10 @@ The application uses Tailwind CSS for styling. When making UI changes:
 
 ### Common Issues
 
-1. **Missing Environment Variables**: Ensure the `.env` file is properly configured and loaded
+1. **Missing User Secrets**: Ensure user secrets are properly configured using `dotnet user-secrets list`
 2. **API Key Issues**: Verify your API keys are valid and have the necessary permissions
 3. **Build Errors**: Run `dotnet clean` followed by `dotnet build` to resolve build issues
+4. **Configuration Issues**: Check that secrets are set with the correct key format (e.g., `GenAI:ApiKey`)
 
 ### Debugging
 
