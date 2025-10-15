@@ -22,4 +22,4 @@ cfenv==0.5.3
 
 # Production dependencies
 dj-database-url==3.0.1
-psycopg2-binary==2.9.10
+psycopg2-binary==2.9.11
