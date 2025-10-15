@@ -17,15 +17,19 @@ TravelAdvisor supports multiple ways to configure the application:
 
 1. **Cloud Foundry Service Bindings** - When running in Cloud Foundry (highest precedence)
 2. **Environment Variables** - System-level or process-level environment variables
-3. **User Secrets** - The .NET user secrets system for local development
-4. **appsettings.json** - Default configuration values
+3. **.env Files** - Local development configuration files
+4. **User Secrets** - The .NET user secrets system for local development
+5. **appsettings.json** - Default configuration values
 
 The application loads configuration in the following order (later sources override earlier ones):
 
 1. Default values from appsettings.json
-2. User secrets (for local development)
-3. Environment variables
-4. Cloud Foundry service bindings (highest precedence)
+2. .env files (if present)
+3. User secrets (for local development)
+4. Environment variables
+5. Cloud Foundry service bindings (highest precedence)
+
+For more information on .NET configuration patterns, see the [Microsoft Configuration Documentation](https://learn.microsoft.com/dotnet/core/extensions/configuration).
 
 ## Environment Variable Naming
 
@@ -34,49 +38,47 @@ In ASP.NET Core, environment variables with double underscores (`__`) are automa
 - `GENAI__APIKEY` maps to `GenAI:ApiKey` in the configuration
 - `GOOGLEMAPS__APIKEY` maps to `GoogleMaps:ApiKey` in the configuration
 
-## Using User Secrets for Local Development
+## Local Development Configuration
 
-For local development, use the .NET user secrets system to store sensitive configuration:
+For local development, you have two main options for storing sensitive configuration:
 
-### Setup Instructions
+### Option 1: .env Files
 
-1. Initialize user secrets for the Web project:
+Create a `.env` file in the project root with your configuration:
+
+```bash
+# GenAI Configuration
+GENAI__APIKEY=your-openai-api-key-here
+GENAI__APIURL=https://api.openai.com/v1
+GENAI__MODEL=gpt-4o-mini
+
+# Google Maps Configuration
+GOOGLEMAPS__APIKEY=your-google-maps-api-key-here
+```
+
+The application automatically loads `.env` files using the `dotenv.net` library.
+
+### Option 2: User Secrets
+
+Alternatively, use the .NET user secrets system:
+
+1. Initialize user secrets:
 
    ```bash
    cd src/TravelAdvisor.Web
    dotnet user-secrets init
    ```
 
-2. Add your API keys to user secrets:
+2. Add your API keys:
 
    ```bash
    dotnet user-secrets set "GenAI:ApiKey" "your_genai_api_key_here"
    dotnet user-secrets set "GoogleMaps:ApiKey" "your_googlemaps_api_key_here"
    ```
 
-3. Run the application normally:
+For more information on User Secrets, see the [Microsoft User Secrets Documentation](https://learn.microsoft.com/aspnet/core/security/app-secrets).
 
-   ```bash
-   dotnet run --project src/TravelAdvisor.Web
-   ```
-
-### Viewing User Secrets
-
-To view your configured secrets:
-
-```bash
-dotnet user-secrets list
-```
-
-### Removing User Secrets
-
-To remove a secret:
-
-```bash
-dotnet user-secrets remove "GenAI:ApiKey"
-```
-
-## Available Environment Variables
+## Configuration Reference
 
 ### GenAI Configuration
 
@@ -92,6 +94,14 @@ dotnet user-secrets remove "GenAI:ApiKey"
 | Environment Variable | Configuration Key | Description | Default |
 |---------------------|-------------------|-------------|---------|
 | `GOOGLEMAPS__APIKEY` | `GoogleMaps:ApiKey` | API key for Google Maps | _(required)_ |
+
+### Application Settings
+
+| Environment Variable | Configuration Key | Description | Default |
+|---------------------|-------------------|-------------|---------|
+| `USE_MOCK_DATA` | `Use_Mock_Data` | Use mock data instead of real APIs | `false` |
+
+For logging configuration, see the [Microsoft Logging Documentation](https://learn.microsoft.com/dotnet/core/extensions/logging).
 
 ## Cloud Foundry Service Bindings
 
@@ -124,22 +134,28 @@ cf bind-service travel-advisor travel-advisor-llm
 
 If you're experiencing issues with configuration:
 
-1. **User Secrets Issues**:
+1. **.env File Issues**:
+   - Ensure the `.env` file is in the project root directory
+   - Verify the file format uses `KEY=value` syntax
+   - Check that environment variables use double underscores (`__`) for hierarchical configuration
+   - Make sure the `.env` file is not empty and contains valid key-value pairs
+
+2. **User Secrets Issues**:
    - Verify user secrets are initialized: `dotnet user-secrets list`
    - Check that you're in the correct project directory (`src/TravelAdvisor.Web`)
    - Ensure secrets are set with the correct key format (e.g., `GenAI:ApiKey`)
 
-2. **Environment Variables**:
-   - Verify that environment variables are formatted correctly (e.g., `GenAI__ApiKey` maps to `GenAI:ApiKey`)
+3. **Environment Variables**:
+   - Verify that environment variables are formatted correctly (e.g., `GENAI__APIKEY` maps to `GenAI:ApiKey`)
    - Check for any console log messages about configuration loading
    - Try setting the environment variables directly in your terminal session
 
-3. **Cloud Foundry Service Bindings**:
+4. **Cloud Foundry Service Bindings**:
    - Verify services are bound to your application: `cf services`
    - Check that service credentials contain the required fields (`api_key`, `api_base`, etc.)
    - Review application logs for service binding detection messages
 
-4. **General**:
+5. **General**:
    - Restart your application after making configuration changes
    - Use `dotnet user-secrets list` to verify your local configuration
    - Check the application logs for detailed configuration information

@@ -1,8 +1,8 @@
+using System.ClientModel;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Logging;
 using OpenAI;
 using OpenAI.Chat;
-using System.ClientModel;
 using TravelAdvisor.Infrastructure.Options;
 
 namespace TravelAdvisor.Infrastructure.Clients;
@@ -53,9 +53,7 @@ public class AIClientFactory : IAIClientFactory
 
         if (string.IsNullOrEmpty(options.Model))
         {
-            throw new InvalidOperationException(
-                "GenAI model name is required. " +
-                "Please specify the model using GenAI:Model configuration.");
+            throw new InvalidOperationException("GenAI model name is required. Please specify the model using GenAI:Model configuration.");
         }
     }
 
@@ -64,10 +62,9 @@ public class AIClientFactory : IAIClientFactory
     /// </summary>
     private static void LogConfiguration(GenAIOptions options, ILogger logger)
     {
-        logger.LogInformation("Configuring AI client with:");
+        logger.LogInformation("API URL: {OptionsApiUrl}", options.ApiUrl);
         // Mask API key for security
         logger.LogInformation("API Key: {MaskApiKey}", MaskApiKey(options.ApiKey));
-        logger.LogInformation("API URL: {OptionsApiUrl}", options.ApiUrl);
         logger.LogInformation("Model: {OptionsModel}", options.Model);
 
         if (!string.IsNullOrEmpty(options.ServiceName))
@@ -86,10 +83,7 @@ public class AIClientFactory : IAIClientFactory
         try
         {
             // Try to create the client directly using the Azure OpenAI SDK
-            var client = new AzureOpenAIClientAdapter(
-                options.ApiKey,
-                options.ApiUrl,
-                options.Model);
+            var client = new AzureOpenAIClientAdapter(options.ApiKey, options.ApiUrl, options.Model);
 
             logger.LogInformation("Successfully created Azure OpenAI client");
             return client;

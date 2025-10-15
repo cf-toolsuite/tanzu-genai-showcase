@@ -1,7 +1,9 @@
+using dotenv.net;
 using Steeltoe.Configuration.CloudFoundry;
 using Steeltoe.Management.Endpoint.Actuators.All;
 using TravelAdvisor.Infrastructure;
 
+DotEnv.Load();
 var builder = WebApplication.CreateBuilder(args);
 
 // Add Cloud Foundry configuration provider

@@ -16,6 +16,7 @@
     <PackageReference Include="Markdig" Version="0.42.0" />
     <PackageReference Include="Steeltoe.Configuration.CloudFoundry" Version="4.0.0" />
     <PackageReference Include="Steeltoe.Management.Endpoint" Version="4.0.0" />
+    <PackageReference Include="dotenv.net" Version="4.0.0" />
   </ItemGroup>
 
 </Project>
