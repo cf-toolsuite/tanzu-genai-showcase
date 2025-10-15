@@ -233,6 +233,7 @@ public class AzureOpenAIClientAdapter : IChatClient
             {
                 throw new InvalidOperationException("Failed to create Azure OpenAI client instance");
             }
+
             return instance;
         }
 
@@ -257,29 +258,6 @@ public class AzureOpenAIClientAdapter : IChatClient
         }
 
         throw new InvalidOperationException("Could not find a suitable constructor for the Azure OpenAI client");
-    }
-
-    /// <summary>
-    /// Gets a method from a type with proper error handling
-    /// </summary>
-    private static MethodInfo GetMethod(Type type, string methodName)
-    {
-        if (type == null)
-        {
-            throw new ArgumentNullException(nameof(type));
-        }
-
-        if (string.IsNullOrEmpty(methodName))
-        {
-            throw new ArgumentNullException(nameof(methodName));
-        }
-
-        var method = type.GetMethod(methodName);
-        if (method == null)
-        {
-            throw new InvalidOperationException($"Method {methodName} not found on type {type.FullName}");
-        }
-        return method;
     }
 
     /// <summary>

@@ -152,8 +152,8 @@ public class MockTravelAdvisorService(
                         EstimatedCost = EstimateCost(mode, distanceKm),
                         EnvironmentalScore = CalculateEnvironmentalScore(mode),
                         ConvenienceScore = CalculateConvenienceScore(mode, durationMinutes),
-                        Pros = GeneratePros(mode, durationMinutes, distanceKm),
-                        Cons = GenerateCons(mode, durationMinutes, distanceKm)
+                        Pros = GeneratePros(mode),
+                        Cons = GenerateCons(mode)
                     };
 
                     // Calculate preference match score
@@ -201,21 +201,24 @@ public class MockTravelAdvisorService(
             // Generate a standard explanation based on mode
             string explanation = recommendation.Mode switch
             {
-                TransportMode.Walk => $"Walking from {query.Origin} to {query.Destination} is a great option for this distance " +
-                                      $"of {recommendation.DistanceKm:F1} km. It will take approximately {recommendation.DurationMinutes} minutes, " +
-                                      $"but it's healthy, environmentally friendly, and completely free. The route is straightforward and pleasant for walking.",
+                TransportMode.Walk =>
+                    $"Walking from {query.Origin} to {query.Destination} is a great option for this distance " +
+                    $"of {recommendation.DistanceKm:F1} km. It will take approximately {recommendation.DurationMinutes} minutes, " +
+                    $"but it's healthy, environmentally friendly, and completely free. The route is straightforward and pleasant for walking.",
 
                 TransportMode.Bike => $"Biking from {query.Origin} to {query.Destination} is an excellent choice. " +
                                       $"The {recommendation.DistanceKm:F1} km route will take about {recommendation.DurationMinutes} minutes. " +
                                       $"Biking offers a good balance of speed and flexibility while being environmentally friendly and good exercise.",
 
-                TransportMode.Bus => $"Taking public transportation from {query.Origin} to {query.Destination} is convenient " +
-                                     $"and affordable. The journey of {recommendation.DistanceKm:F1} km will take approximately {recommendation.DurationMinutes} minutes. " +
-                                     $"While there may be a few transfers, you'll be able to rest or use your time productively during the trip.",
+                TransportMode.Bus =>
+                    $"Taking public transportation from {query.Origin} to {query.Destination} is convenient " +
+                    $"and affordable. The journey of {recommendation.DistanceKm:F1} km will take approximately {recommendation.DurationMinutes} minutes. " +
+                    $"While there may be a few transfers, you'll be able to rest or use your time productively during the trip.",
 
-                TransportMode.Car => $"Driving from {query.Origin} to {query.Destination} is the most flexible option. " +
-                                     $"The {recommendation.DistanceKm:F1} km journey will take about {recommendation.DurationMinutes} minutes. " +
-                                     $"While not the most environmentally friendly choice, it offers the most convenience and direct route.",
+                TransportMode.Car =>
+                    $"Driving from {query.Origin} to {query.Destination} is the most flexible option. " +
+                    $"The {recommendation.DistanceKm:F1} km journey will take about {recommendation.DurationMinutes} minutes. " +
+                    $"While not the most environmentally friendly choice, it offers the most convenience and direct route.",
 
                 TransportMode.Train => $"Taking the train from {query.Origin} to {query.Destination} is comfortable " +
                                        $"for this {recommendation.DistanceKm:F1} km journey. It will take approximately {recommendation.DurationMinutes} minutes. " +
@@ -254,7 +257,8 @@ public class MockTravelAdvisorService(
                 question.Contains("long", StringComparison.OrdinalIgnoreCase) ||
                 question.Contains("duration", StringComparison.OrdinalIgnoreCase))
             {
-                return Task.FromResult($"The journey from {query.Origin} to {query.Destination} by {recommendation.Mode} will take approximately {recommendation.DurationMinutes} minutes.");
+                return Task.FromResult(
+                    $"The journey from {query.Origin} to {query.Destination} by {recommendation.Mode} will take approximately {recommendation.DurationMinutes} minutes.");
             }
 
             if (question.Contains("cost", StringComparison.OrdinalIgnoreCase) ||
@@ -299,10 +303,12 @@ public class MockTravelAdvisorService(
                     _ => "one of the least environmentally friendly options"
                 };
 
-                return Task.FromResult($"Traveling by {recommendation.Mode} from {query.Origin} to {query.Destination} is {environmentalRating}. It has an environmental score of {recommendation.EnvironmentalScore}/100.");
+                return Task.FromResult(
+                    $"Traveling by {recommendation.Mode} from {query.Origin} to {query.Destination} is {environmentalRating}. It has an environmental score of {recommendation.EnvironmentalScore}/100.");
             }
 
-            return Task.FromResult($"I don't have specific information to answer that question about traveling from {query.Origin} to {query.Destination} by {recommendation.Mode}. Please ask about travel time, cost, distance, route directions, or environmental impact.");
+            return Task.FromResult(
+                $"I don't have specific information to answer that question about traveling from {query.Origin} to {query.Destination} by {recommendation.Mode}. Please ask about travel time, cost, distance, route directions, or environmental impact.");
         }
         catch (Exception ex)
         {
@@ -485,7 +491,7 @@ public class MockTravelAdvisorService(
         return Math.Max(0, baseScore - durationPenalty);
     }
 
-    private List<string> GeneratePros(TransportMode mode, int durationMinutes, double distanceKm)
+    private static List<string> GeneratePros(TransportMode mode)
     {
         var pros = new List<string>();
 
@@ -543,7 +549,7 @@ public class MockTravelAdvisorService(
         return pros;
     }
 
-    private List<string> GenerateCons(TransportMode mode, int durationMinutes, double distanceKm)
+    private List<string> GenerateCons(TransportMode mode)
     {
         var cons = new List<string>();
 

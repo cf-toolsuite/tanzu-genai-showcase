@@ -229,8 +229,8 @@ public class TravelAdvisorService(
                         EstimatedCost = EstimateCost(mode, distanceKm),
                         EnvironmentalScore = CalculateEnvironmentalScore(mode),
                         ConvenienceScore = CalculateConvenienceScore(mode, durationMinutes),
-                        Pros = GeneratePros(mode, durationMinutes, distanceKm),
-                        Cons = GenerateCons(mode, durationMinutes, distanceKm)
+                        Pros = GeneratePros(mode),
+                        Cons = GenerateCons(mode)
                     };
 
                     // Calculate preference match score
@@ -619,7 +619,7 @@ public class TravelAdvisorService(
         return Math.Max(0, baseScore - durationPenalty);
     }
 
-    private List<string> GeneratePros(TransportMode mode, int durationMinutes, double distanceKm)
+    private List<string> GeneratePros(TransportMode mode)
     {
         var pros = new List<string>();
 
@@ -677,7 +677,7 @@ public class TravelAdvisorService(
         return pros;
     }
 
-    private List<string> GenerateCons(TransportMode mode, int durationMinutes, double distanceKm)
+    private List<string> GenerateCons(TransportMode mode)
     {
         var cons = new List<string>();
 
@@ -921,23 +921,25 @@ public class TravelAdvisorService(
         try
         {
             // Extract arguments if available
-            JsonElement arguments = root.TryGetProperty("arguments", out var args) ? args : default;
+            _ = root.TryGetProperty("arguments", out var args) ? args : default;
 
             // Handle different function types
             switch (functionName)
             {
                 case "getTravelSafetyTips":
-                    return GenerateTravelSafetyTips(arguments);
+                    return GenerateTravelSafetyTips();
 
                 case "getWeatherInfo":
-                    return "When traveling at night, check the weather forecast before departing as conditions can change and affect visibility and road safety.";
+                    return
+                        "When traveling at night, check the weather forecast before departing as conditions can change and affect visibility and road safety.";
 
                 case "getTrafficInfo":
                     return "Traffic conditions are typically lighter at night, but be aware that some roads may be closed for maintenance during late hours.";
 
                 default:
                     // For unknown functions, provide a generic response
-                    return $"I found some information about {functionName}, but I need to present it in a more readable format. Please ask a more specific question.";
+                    return
+                        $"I found some information about {functionName}, but I need to present it in a more readable format. Please ask a more specific question.";
             }
         }
         catch (Exception ex)
@@ -950,7 +952,7 @@ public class TravelAdvisorService(
     /// <summary>
     /// Generates travel safety tips for night travel
     /// </summary>
-    private string GenerateTravelSafetyTips(JsonElement arguments)
+    private static string GenerateTravelSafetyTips()
     {
         // Create a comprehensive response about night travel safety
         return """

@@ -54,7 +54,9 @@ public class MockGoogleMapsService(ILogger<MockGoogleMapsService> logger) : IGoo
     /// Provides realistic mock distance and duration data for the given origin and destination
     /// </summary>
     private (double distanceKm, int durationMinutes) GetMockDistanceAndDuration(
-        string origin, string destination, TransportMode mode)
+        string origin,
+        string destination,
+        TransportMode mode)
     {
         // For Mill Creek, WA to Ballard, WA - approximately 35km and realistic travel times
         if ((origin.Contains("Mill Creek", StringComparison.OrdinalIgnoreCase) &&
@@ -62,16 +64,16 @@ public class MockGoogleMapsService(ILogger<MockGoogleMapsService> logger) : IGoo
             (destination.Contains("Mill Creek", StringComparison.OrdinalIgnoreCase) &&
              origin.Contains("Ballard", StringComparison.OrdinalIgnoreCase)))
         {
-            double distanceKm = 35.0;
+            const double distanceKm = 35.0;
             int durationMinutes = mode switch
             {
-                TransportMode.Walk => 420,     // 7 hours
-                TransportMode.Bike => 130,     // ~2.2 hours
-                TransportMode.Bus => 110,      // ~1.8 hours with transfers
-                TransportMode.Car => 50,       // ~50 minutes by car
-                TransportMode.Train => 90,     // ~1.5 hours including transit to/from stations
-                TransportMode.Plane => 0,      // Not applicable for this distance
-                _ => 50                        // Default to car time
+                TransportMode.Walk => 420, // 7 hours
+                TransportMode.Bike => 130, // ~2.2 hours
+                TransportMode.Bus => 110, // ~1.8 hours with transfers
+                TransportMode.Car => 50, // ~50 minutes by car
+                TransportMode.Train => 90, // ~1.5 hours including transit to/from stations
+                TransportMode.Plane => 0, // Not applicable for this distance
+                _ => 50 // Default to car time
             };
 
             return (distanceKm, durationMinutes);
@@ -92,7 +94,7 @@ public class MockGoogleMapsService(ILogger<MockGoogleMapsService> logger) : IGoo
             (destination.Contains("Mill Creek", StringComparison.OrdinalIgnoreCase) &&
              origin.Contains("Ballard", StringComparison.OrdinalIgnoreCase)))
         {
-            var (distanceKm, durationMinutes) = GetMockDistanceAndDuration(origin, destination, mode);
+            (double distanceKm, int durationMinutes) = GetMockDistanceAndDuration(origin, destination, mode);
             var steps = new List<TravelStep>();
 
             switch (mode)
@@ -102,22 +104,22 @@ public class MockGoogleMapsService(ILogger<MockGoogleMapsService> logger) : IGoo
                     {
                         Description = "Head south on WA-527 S from Mill Creek",
                         Mode = mode,
-                        DurationMinutes = 10,
-                        DistanceKm = 7.5
+                        DurationMinutes = durationMinutes,
+                        DistanceKm = distanceKm
                     });
                     steps.Add(new TravelStep
                     {
                         Description = "Take I-405 S and I-5 S to 15th Ave NW in Seattle",
                         Mode = mode,
-                        DurationMinutes = 25,
-                        DistanceKm = 20.0
+                        DurationMinutes = durationMinutes,
+                        DistanceKm = distanceKm
                     });
                     steps.Add(new TravelStep
                     {
                         Description = "Follow 15th Ave NW to Ballard",
                         Mode = mode,
-                        DurationMinutes = 15,
-                        DistanceKm = 7.5
+                        DurationMinutes = durationMinutes,
+                        DistanceKm = distanceKm
                     });
                     break;
 
@@ -126,29 +128,28 @@ public class MockGoogleMapsService(ILogger<MockGoogleMapsService> logger) : IGoo
                     {
                         Description = "Take Bus 105 from Mill Creek Park & Ride",
                         Mode = mode,
-                        DurationMinutes = 35,
-                        DistanceKm = 15.0
+                        DurationMinutes = durationMinutes,
                     });
                     steps.Add(new TravelStep
                     {
                         Description = "Transfer to Bus 512 at Lynnwood Transit Center",
                         Mode = mode,
-                        DurationMinutes = 10,
-                        DistanceKm = 0.2
+                        DurationMinutes = durationMinutes,
+                        DistanceKm = distanceKm
                     });
                     steps.Add(new TravelStep
                     {
                         Description = "Take Bus 512 to Northgate Station",
                         Mode = mode,
-                        DurationMinutes = 25,
-                        DistanceKm = 12.0
+                        DurationMinutes = durationMinutes,
+                        DistanceKm = distanceKm
                     });
                     steps.Add(new TravelStep
                     {
                         Description = "Transfer to Bus 40 to Ballard",
                         Mode = mode,
-                        DurationMinutes = 40,
-                        DistanceKm = 7.8
+                        DurationMinutes = durationMinutes,
+                        DistanceKm = distanceKm
                     });
                     break;
 
@@ -157,22 +158,22 @@ public class MockGoogleMapsService(ILogger<MockGoogleMapsService> logger) : IGoo
                     {
                         Description = "Take Interurban Trail south from Mill Creek",
                         Mode = mode,
-                        DurationMinutes = 45,
-                        DistanceKm = 12.5
+                        DurationMinutes = durationMinutes,
+                        DistanceKm = distanceKm
                     });
                     steps.Add(new TravelStep
                     {
                         Description = "Continue on Burke-Gilman Trail west",
                         Mode = mode,
-                        DurationMinutes = 50,
-                        DistanceKm = 15.0
+                        DurationMinutes = durationMinutes,
+                        DistanceKm = distanceKm
                     });
                     steps.Add(new TravelStep
                     {
                         Description = "Take 8th Ave NW north to Ballard",
                         Mode = mode,
-                        DurationMinutes = 35,
-                        DistanceKm = 7.5
+                        DurationMinutes = durationMinutes,
+                        DistanceKm = distanceKm
                     });
                     break;
 
@@ -181,22 +182,22 @@ public class MockGoogleMapsService(ILogger<MockGoogleMapsService> logger) : IGoo
                     {
                         Description = "Walk south on Bothell-Everett Highway",
                         Mode = mode,
-                        DurationMinutes = 120,
-                        DistanceKm = 10.0
+                        DurationMinutes = durationMinutes,
+                        DistanceKm = distanceKm
                     });
                     steps.Add(new TravelStep
                     {
                         Description = "Continue on Lake City Way NE",
                         Mode = mode,
-                        DurationMinutes = 150,
-                        DistanceKm = 12.5
+                        DurationMinutes = durationMinutes,
+                        DistanceKm = distanceKm
                     });
                     steps.Add(new TravelStep
                     {
                         Description = "Follow N 45th St west to Ballard",
                         Mode = mode,
-                        DurationMinutes = 150,
-                        DistanceKm = 12.5
+                        DurationMinutes = durationMinutes,
+                        DistanceKm = distanceKm
                     });
                     break;
 
@@ -215,7 +216,9 @@ public class MockGoogleMapsService(ILogger<MockGoogleMapsService> logger) : IGoo
     #region Fallback Methods
 
     private (double distanceKm, int durationMinutes) EstimateDistanceAndDuration(
-        string origin, string destination, TransportMode mode)
+        string origin,
+        string destination,
+        TransportMode mode)
     {
         // This is a simplistic distance estimation for when the API call fails
 
@@ -233,8 +236,8 @@ public class MockGoogleMapsService(ILogger<MockGoogleMapsService> logger) : IGoo
         return mode switch
         {
             TransportMode.Walk => (int)(distanceKm * 12), // Approx. 5 km/h = 12 min/km
-            TransportMode.Bike => (int)(distanceKm * 4),  // Approx. 15 km/h = 4 min/km
-            TransportMode.Bus => (int)(distanceKm * 2),   // Approx. 30 km/h = 2 min/km
+            TransportMode.Bike => (int)(distanceKm * 4), // Approx. 15 km/h = 4 min/km
+            TransportMode.Bus => (int)(distanceKm * 2), // Approx. 30 km/h = 2 min/km
             TransportMode.Car => (int)(distanceKm * 0.8), // Approx. 75 km/h = 0.8 min/km
             TransportMode.Train => (int)(distanceKm * 0.6), // Approx. 100 km/h = 0.6 min/km
             TransportMode.Plane => (int)(distanceKm * 0.2) + 120, // Approx. 300 km/h + 2h for airport procedures

@@ -12,7 +12,9 @@ public static class AsyncEnumerableUtilities
     {
         public static readonly EmptyAsyncEnumerable<T> Instance = new();
 
-        private EmptyAsyncEnumerable() { }
+        private EmptyAsyncEnumerable()
+        {
+        }
 
         public IAsyncEnumerator<T> GetAsyncEnumerator(CancellationToken cancellationToken = default)
         {

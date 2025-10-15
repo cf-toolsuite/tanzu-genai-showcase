@@ -45,7 +45,7 @@ public class GoogleMapsService(
 
             // Add more detailed logging to debug the API key issue
             _logger.LogDebug("API Key length: {Length}, API Key is null or empty: {IsEmpty}",
-                _options.ApiKey?.Length ?? 0, string.IsNullOrEmpty(_options.ApiKey));
+                _options.ApiKey.Length, string.IsNullOrEmpty(_options.ApiKey));
 
             // Verify we're not using a dummy key
             if (string.IsNullOrEmpty(_options.ApiKey) || _options.ApiKey.StartsWith("dummy"))
@@ -128,7 +128,7 @@ public class GoogleMapsService(
 
             // Add more detailed logging to debug the API key issue
             _logger.LogDebug("API Key length: {Length}, API Key is null or empty: {IsEmpty}",
-                _options.ApiKey?.Length ?? 0, string.IsNullOrEmpty(_options.ApiKey));
+                _options.ApiKey.Length, string.IsNullOrEmpty(_options.ApiKey));
 
             // Verify we're not using a dummy key
             if (string.IsNullOrEmpty(_options.ApiKey) || _options.ApiKey.StartsWith("dummy"))
@@ -235,7 +235,7 @@ public class GoogleMapsService(
 
     private TransportMode ParseGoogleMode(string googleMode)
     {
-        return googleMode?.ToLower() switch
+        return googleMode.ToLower() switch
         {
             "walking" => TransportMode.Walk,
             "bicycling" => TransportMode.Bike,

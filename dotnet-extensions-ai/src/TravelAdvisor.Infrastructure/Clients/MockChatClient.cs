@@ -91,7 +91,9 @@ public class MockChatClient : IChatClient
     /// <summary>
     /// Dispose resources
     /// </summary>
-    public void Dispose() { }
+    public void Dispose()
+    {
+    }
 
     /// <summary>
     /// Gets a mock travel response

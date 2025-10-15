@@ -57,12 +57,12 @@ Required for the `dotnet-extensions-ai` project.
 
 ### Semantic Kernel
 
-- **Documentation**: [https://learn.microsoft.com/en-us/semantic-kernel/overview/](https://learn.microsoft.com/en-us/semantic-kernel/overview/)
+- **Documentation**: [https://learn.microsoft.com/semantic-kernel/overview/](https://learn.microsoft.com/semantic-kernel/overview/)
 - **GitHub**: [https://github.com/microsoft/semantic-kernel](https://github.com/microsoft/semantic-kernel)
 
 ### Steeltoe
 
-- **Documentation**: [https://docs.steeltoe.io](https://docs.steeltoe.io)
+- **Documentation**: [https://steeltoe.io/docs](https://steeltoe.io/docs)
 - **GitHub**: [https://github.com/SteeltoeOSS/Steeltoe](https://github.com/SteeltoeOSS/Steeltoe)
 
 ## Go Development

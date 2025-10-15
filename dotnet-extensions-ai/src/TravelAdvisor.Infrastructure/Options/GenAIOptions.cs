@@ -30,7 +30,7 @@ public class GenAIOptions
     /// <summary>
     /// Configure the chat options for the AI service
     /// </summary>
-    public ChatOptions ChatOptions { get; set; } = new ();
+    public ChatOptions ChatOptions { get; set; } = new();
 
     /// <summary>
     /// Service name in Cloud Foundry

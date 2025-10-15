@@ -33,7 +33,7 @@ public static class DependencyInjection
 
         services.AddOptions<GenAIOptions>()
             .BindConfiguration("GenAI")
-            .PostConfigure<IOptions<CloudFoundryServicesOptions>, ILogger<GenAIOptions>>((options, vcapServices, logger) =>
+            .PostConfigure<IOptions<CloudFoundryServicesOptions>>((options, vcapServices) =>
             {
                 var genAIService = vcapServices.Value.GetServicesOfType("genai").FirstOrDefault();
                 if (genAIService == null)
@@ -149,7 +149,8 @@ public static class DependencyInjection
         services.AddSingleton<IAIClientFactory, AIClientFactory>();
 
         // Register the ChatClient with dependency injection
-        services.AddSingleton<IChatClient>(sp => {
+        services.AddSingleton<IChatClient>(sp =>
+        {
             var factory = sp.GetRequiredService<IAIClientFactory>();
             var options = sp.GetRequiredService<IOptions<GenAIOptions>>().Value;
             var logger = sp.GetRequiredService<ILogger<AIClientFactory>>();
