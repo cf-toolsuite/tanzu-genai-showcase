@@ -32,7 +32,7 @@
         "symfony/notifier": "7.2.*",
         "symfony/process": "7.3.*",
         "symfony/property-access": "7.2.*",
-        "symfony/property-info": "7.2.*",
+        "symfony/property-info": "7.3.*",
         "symfony/runtime": "7.3.*",
         "symfony/security-bundle": "7.2.*",
         "symfony/serializer": "7.3.*",
