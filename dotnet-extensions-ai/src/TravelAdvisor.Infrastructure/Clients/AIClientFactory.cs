@@ -104,7 +104,14 @@ public class AIClientFactory : IAIClientFactory
 
         try
         {
-            var openAiClientOptions = new OpenAIClientOptions { Endpoint = new Uri($"{options.ApiUrl}/openai") };
+            var openAiClientOptions = new OpenAIClientOptions();
+
+            // Interactions with the GenAI tile require appending /openai to the base URL
+            if (!options.ApiUrl.Contains("api.openai.com", StringComparison.OrdinalIgnoreCase))
+            {
+                openAiClientOptions.Endpoint = new Uri($"{options.ApiUrl}/openai");
+            }
+
             var apiKeyCredential = new ApiKeyCredential(options.ApiKey);
 
             return new ChatClient(options.Model, apiKeyCredential, openAiClientOptions).AsIChatClient();

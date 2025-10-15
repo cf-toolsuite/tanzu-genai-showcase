@@ -2,7 +2,7 @@
 applications:
 - name: travel-advisor
   path: src/TravelAdvisor.Web/bin/Release/net9.0/linux-x64/publish
-  memory: 512M
+  memory: 256M
   buildpacks:
     - dotnet_core_buildpack
   env:
