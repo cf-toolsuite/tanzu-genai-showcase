@@ -69,7 +69,7 @@
                         </div>
                     }
 
-                    @if (Recommendations != null && Recommendations.Count > 0)
+                    @if (Recommendations is { Count: > 0 })
                     {
                     <div class="mt-6">
                     <h3 class="text-sm font-medium text-gray-700 mb-2">Available Transportation Options:</h3>
@@ -91,7 +91,7 @@
                     </div>
                     }
 
-                    @if (Recommendations != null && Recommendations.Count == 0)
+                    @if (Recommendations is { Count: 0 })
                     {
                         <div class="mt-6 bg-yellow-50 border-l-4 border-yellow-400 p-4">
                             <div class="flex">
@@ -295,8 +295,8 @@
     private string Explanation { get; set; } = string.Empty;
     private string ErrorMessage { get; set; } = string.Empty;
 
-    private bool IsProcessing { get; set; } = false;
-    private bool IsProcessingFollowUp { get; set; } = false;
+    private bool IsProcessing { get; set; }
+    private bool IsProcessingFollowUp { get; set; }
 
     private TravelQuery? CurrentQuery { get; set; }
     private List<TravelRecommendation>? Recommendations { get; set; }
@@ -330,7 +330,7 @@
             if (CurrentQuery.HasError)
             {
                 ErrorMessage = CurrentQuery.ErrorMessage;
-                Recommendations = new List<TravelRecommendation>(); // Empty list for error cases
+                Recommendations = []; // Empty list for error cases
                 return;
             }
 
@@ -338,7 +338,7 @@
             Recommendations = await TravelAdvisorService.GenerateRecommendationsAsync(CurrentQuery);
 
             // Select the recommended option
-            if (Recommendations != null && Recommendations.Count > 0)
+            if (Recommendations is { Count: > 0 })
             {
                 var recommended = Recommendations.FirstOrDefault(r => r.IsRecommended) ?? Recommendations[0];
                 await SelectRecommendation(recommended);
@@ -347,7 +347,7 @@
         catch (Exception ex)
         {
             ErrorMessage = $"An error occurred: {ex.Message}";
-            Recommendations = new List<TravelRecommendation>();
+            Recommendations = [];
         }
         finally
         {

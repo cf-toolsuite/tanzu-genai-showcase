@@ -1,13 +1,12 @@
-namespace TravelAdvisor.Infrastructure.Options
+namespace TravelAdvisor.Infrastructure.Options;
+
+/// <summary>
+/// Configuration options for Google Maps API
+/// </summary>
+public class GoogleMapsOptions
 {
     /// <summary>
-    /// Configuration options for Google Maps API
+    /// Google Maps API key
     /// </summary>
-    public class GoogleMapsOptions
-    {
-        /// <summary>
-        /// Google Maps API key
-        /// </summary>
-        public string ApiKey { get; set; } = string.Empty;
-    }
+    public string ApiKey { get; set; } = string.Empty;
 }

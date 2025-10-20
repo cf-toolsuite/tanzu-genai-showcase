@@ -1,28 +1,39 @@
-namespace TravelAdvisor.Infrastructure.Options
+using Microsoft.Extensions.AI;
+
+namespace TravelAdvisor.Infrastructure.Options;
+
+/// <summary>
+/// Configuration options for GenAI services
+/// </summary>
+public class GenAIOptions
 {
     /// <summary>
-    /// Configuration options for GenAI services
+    /// API key for the GenAI service
     /// </summary>
-    public class GenAIOptions
-    {
-        /// <summary>
-        /// API key for the GenAI service
-        /// </summary>
-        public string ApiKey { get; set; } = string.Empty;
+    public string ApiKey { get; set; } = string.Empty;
 
-        /// <summary>
-        /// API endpoint URL for the GenAI service
-        /// </summary>
-        public string ApiUrl { get; set; } = string.Empty;
+    /// <summary>
+    /// API endpoint URL for the GenAI service
+    /// </summary>
+    public string ApiUrl { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Model to use for AI completions
-        /// </summary>
-        public string Model { get; set; } = string.Empty;
+    /// <summary>
+    /// Gets or sets the URL used to retrieve available models, wire format, and other configuration details.
+    /// </summary>
+    public string ConfigUrl { get; set; } = string.Empty;
 
-        /// <summary>
-        /// Service name in Cloud Foundry
-        /// </summary>
-        public string ServiceName { get; set; } = "travel-advisor-llm";
-    }
+    /// <summary>
+    /// Model to use for AI completions
+    /// </summary>
+    public string Model { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Configure the chat options for the AI service
+    /// </summary>
+    public ChatOptions ChatOptions { get; set; } = new();
+
+    /// <summary>
+    /// Service name in Cloud Foundry
+    /// </summary>
+    public string ServiceName { get; set; } = "travel-advisor-llm";
 }
