@@ -86,9 +86,13 @@ public class GoogleMapsService(
                 response.Routes.Count == 0 ||
                 response.Routes[0].Legs.Count == 0)
             {
-                _logger.LogWarning("Failed to get directions. Status: {Status}", response?.Status);
+                var errorMsg = !string.IsNullOrEmpty(response?.ErrorMessage)
+                    ? response.ErrorMessage
+                    : "No error message provided";
+                _logger.LogWarning("Failed to get directions. Status: {Status}, Error: {ErrorMessage}, Origin: {Origin}, Destination: {Destination}",
+                    response?.Status, errorMsg, origin, destination);
                 // Throw an exception to inform the calling code that the API request failed
-                throw new Exception($"Google Maps API request failed with status: {response?.Status}. Please check your API key configuration.");
+                throw new Exception($"Google Maps API request failed with status: {response?.Status}. Error: {errorMsg}. Origin: '{origin}', Destination: '{destination}'");
             }
 
             // Extract the information we need
@@ -169,9 +173,13 @@ public class GoogleMapsService(
                 response.Routes.Count == 0 ||
                 response.Routes[0].Legs.Count == 0)
             {
-                _logger.LogWarning("Failed to get directions. Status: {Status}", response?.Status);
+                var errorMsg = !string.IsNullOrEmpty(response?.ErrorMessage)
+                    ? response.ErrorMessage
+                    : "No error message provided";
+                _logger.LogWarning("Failed to get directions. Status: {Status}, Error: {ErrorMessage}, Origin: {Origin}, Destination: {Destination}",
+                    response?.Status, errorMsg, origin, destination);
                 // Throw an exception to inform the calling code that the API request failed
-                throw new Exception($"Google Maps API request failed with status: {response?.Status}. Please check your API key configuration.");
+                throw new Exception($"Google Maps API request failed with status: {response?.Status}. Error: {errorMsg}. Origin: '{origin}', Destination: '{destination}'");
             }
 
             // Extract the steps

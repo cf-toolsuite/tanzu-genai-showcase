@@ -84,6 +84,8 @@ public class TravelAdvisorService(
             var response =
                 await _chatClient.GetResponseAsync(history, _genAiOptionsMonitor.CurrentValue.ChatOptions);
 
+            _logger.LogInformation("Received response from LLM for query: {Query}", query);
+
             // Check if the response contains an error (e.g., service unavailable)
             var errorProperty = response.GetType().GetProperty("Error");
             if (errorProperty != null)
@@ -98,13 +100,24 @@ public class TravelAdvisorService(
 
             // Extract content from the response
             var jsonResponse = GetContentFromResponse(response);
+            _logger.LogDebug("Extracted JSON response: {JsonResponse}", jsonResponse ?? "(null)");
 
             // Parse the JSON response
             if (string.IsNullOrEmpty(jsonResponse))
             {
-                _logger.LogWarning("Empty response received from chat client");
+                _logger.LogWarning("Empty response received from chat client, trying fallback extraction");
                 // Try parsing directly from the query instead of using default values
-                return ExtractQueryFromText(query) ?? CreateDefaultQuery(query);
+                var fallbackResult = ExtractQueryFromText(query);
+                if (fallbackResult != null)
+                {
+                    _logger.LogDebug("Fallback extraction succeeded: Origin={Origin}, Destination={Destination}",
+                        fallbackResult.Origin, fallbackResult.Destination);
+                }
+                else
+                {
+                    _logger.LogWarning("Fallback extraction failed, using default query");
+                }
+                return fallbackResult ?? CreateDefaultQuery(query);
             }
 
             // Check if the response is an error message
@@ -138,15 +151,22 @@ public class TravelAdvisorService(
                 if (string.IsNullOrWhiteSpace(travelQuery.Origin) || travelQuery.Origin == "Unknown" ||
                     string.IsNullOrWhiteSpace(travelQuery.Destination) || travelQuery.Destination == "Unknown")
                 {
-                    _logger.LogWarning("Origin or destination missing in parsed response. Attempting fallback extraction.");
+                    _logger.LogWarning("Origin or destination missing in parsed response. Origin='{Origin}', Destination='{Destination}'. Attempting fallback extraction.",
+                        travelQuery.Origin, travelQuery.Destination);
                     var fallbackQuery = ExtractQueryFromText(query);
                     if (fallbackQuery != null)
                     {
+                        _logger.LogDebug("Fallback extraction found: Origin='{Origin}', Destination='{Destination}'",
+                            fallbackQuery.Origin, fallbackQuery.Destination);
                         // Keep any valid data from the original parsed query
                         if (string.IsNullOrWhiteSpace(travelQuery.Origin) || travelQuery.Origin == "Unknown")
                             travelQuery.Origin = fallbackQuery.Origin;
                         if (string.IsNullOrWhiteSpace(travelQuery.Destination) || travelQuery.Destination == "Unknown")
                             travelQuery.Destination = fallbackQuery.Destination;
+                    }
+                    else
+                    {
+                        _logger.LogWarning("Fallback extraction also failed for query: {Query}", query);
                     }
                 }
 
@@ -455,33 +475,46 @@ public class TravelAdvisorService(
     {
         try
         {
+            _logger.LogDebug("Attempting regex extraction from query: {Query}", query);
+
             string origin = "Unknown";
             string destination = "Unknown";
             string priority = string.Empty;
 
             // Simple pattern matching for common travel query formats
             // Look for "from X to Y" pattern
+            // This pattern captures location names that may include commas (e.g., "Mill Creek, WA")
             var fromToMatch = Regex.Match(query,
-                @"from\s+([^,\.;]+(?:,[^,\.;]+)*)\s+to\s+([^,\.;]+(?:,[^,\.;]+)*)",
+                @"from\s+(.+?)\s+to\s+(.+?)(?:\?|\.|\s*$|note|,\s*note)",
                 RegexOptions.IgnoreCase);
 
             if (fromToMatch.Success)
             {
                 origin = fromToMatch.Groups[1].Value.Trim();
                 destination = fromToMatch.Groups[2].Value.Trim();
+                _logger.LogDebug("Regex 'from...to' matched: Origin='{Origin}', Destination='{Destination}'", origin, destination);
+            }
+            else
+            {
+                _logger.LogDebug("Regex 'from...to' did not match");
             }
 
             // If not found, look for "between X and Y" pattern
             if (origin == "Unknown" || destination == "Unknown")
             {
                 var betweenMatch = Regex.Match(query,
-                    @"between\s+([^,\.;]+(?:,[^,\.;]+)*)\s+and\s+([^,\.;]+(?:,[^,\.;]+)*)",
+                    @"from\s+(.+?)\s+to\s+(.+?)(?:\?|\.|\s*$|note|,\s*note)",
                     RegexOptions.IgnoreCase);
 
                 if (betweenMatch.Success)
                 {
                     origin = betweenMatch.Groups[1].Value.Trim();
                     destination = betweenMatch.Groups[2].Value.Trim();
+                    _logger.LogDebug("Regex 'between...and' matched: Origin='{Origin}', Destination='{Destination}'", origin, destination);
+                }
+                else
+                {
+                    _logger.LogDebug("Regex 'between...and' did not match");
                 }
             }
 

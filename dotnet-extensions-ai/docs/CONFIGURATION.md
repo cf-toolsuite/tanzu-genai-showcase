@@ -15,19 +15,19 @@ TravelAdvisor uses a clean configuration approach that follows .NET best practic
 
 TravelAdvisor supports multiple ways to configure the application:
 
-1. **Cloud Foundry Service Bindings** - When running in Cloud Foundry (highest precedence)
-2. **Environment Variables** - System-level or process-level environment variables
-3. **.env Files** - Local development configuration files
-4. **User Secrets** - The .NET user secrets system for local development
-5. **appsettings.json** - Default configuration values
+1. **Cloud Foundry Service Bindings** - When running in Cloud Foundry
+1. **Environment Variables** - System-level or process-level environment variables
+1. **.env Files** - Local development configuration files
+1. **User Secrets** - The .NET user secrets system for local development
+1. **appsettings.json** - Default configuration values
 
 The application loads configuration in the following order (later sources override earlier ones):
 
 1. Default values from appsettings.json
-2. .env files (if present)
-3. User secrets (for local development)
-4. Environment variables
-5. Cloud Foundry service bindings (highest precedence)
+1. .env files (if present)
+1. Environment variables
+1. User secrets (for local development)
+1. Cloud Foundry service bindings (highest precedence)
 
 For more information on .NET configuration patterns, see the [Microsoft Configuration Documentation](https://learn.microsoft.com/dotnet/core/extensions/configuration).
 
