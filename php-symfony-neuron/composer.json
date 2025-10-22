@@ -12,7 +12,7 @@
         "doctrine/annotations": "^2.0",
         "doctrine/doctrine-bundle": "^2.10",
         "doctrine/doctrine-migrations-bundle": "^3.2",
-        "doctrine/orm": "^2.15",
+        "doctrine/orm": "^3.5",
         "dompdf/dompdf": "^2.0",
         "inspector-apm/neuron-ai": "^2.4",
         "phpdocumentor/reflection-docblock": "^5.3",
