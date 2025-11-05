@@ -9,7 +9,7 @@ pytz==2025.2  # Timezone support
 
 # CrewAI and dependencies
 crewai==1.2.1  # Latest stable version with improved event system
-langchain==1.0.0
+langchain==1.0.3
 langchain-openai==1.0.1
 pydantic==2.12.3  # Maintain compatibility with CrewAI's Pydantic v2 usage
 google-search-results==2.4.2  # SerpAPI client
