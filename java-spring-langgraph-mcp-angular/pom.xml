@@ -29,7 +29,7 @@
         <maven.compiler.target>${java.version}</maven.compiler.target>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <spring-boot.version>3.5.7</spring-boot.version>
-        <spring-ai.version>1.1.0-M3</spring-ai.version>
+        <spring-ai.version>1.1.0-RC1</spring-ai.version>
         <langchain4j.version>1.8.0</langchain4j.version>
         <langgraph4j.version>1.7.2</langgraph4j.version>
         <node.version>v20.13.0</node.version>
