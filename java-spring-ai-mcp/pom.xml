@@ -25,13 +25,13 @@
     <properties>
         <java.version>21</java.version>
         <cfenv.version>3.4.0</cfenv.version>
-        <json-io.version>4.61.0</json-io.version>
+        <json-io.version>4.63.0</json-io.version>
         <spring-framework.version>6.2.5</spring-framework.version>
         <spring-ai.version>1.1.0-M1-PLATFORM-2</spring-ai.version>
         <spring-boot-hc5.version>1.2.1</spring-boot-hc5.version>
         <spring-cloud.version>2025.0.0</spring-cloud.version>
 		<spring-cloud-bindings.version>2.0.4</spring-cloud-bindings.version>
-        <mcp.version>0.14.1</mcp.version>
+        <mcp.version>0.16.0</mcp.version>
         <micrometer-version>1.14.5</micrometer-version>
         <vaadin.version>24.7.1</vaadin.version>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>

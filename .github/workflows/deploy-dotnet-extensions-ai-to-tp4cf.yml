@@ -84,7 +84,7 @@ jobs:
           echo '{"GOOGLEMAPS__APIKEY": "${{ secrets.GOOGLEMAPS_API_KEY }}"}' > env_vars.json
           cat env_vars.json
       - name: Upload env vars file
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
           name: env-vars
           path: env_vars.json
