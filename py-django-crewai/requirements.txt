@@ -8,7 +8,7 @@ gunicorn==23.0.0
 pytz==2025.2  # Timezone support
 
 # CrewAI and dependencies
-crewai==1.6.0  # Latest stable version with improved event system
+crewai==1.6.1  # Latest stable version with improved event system
 langchain==1.1.0
 langchain-openai==1.1.0
 pydantic==2.12.4  # Maintain compatibility with CrewAI's Pydantic v2 usage
