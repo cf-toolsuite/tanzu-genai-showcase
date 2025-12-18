@@ -15,7 +15,7 @@ group :development do
 end
 
 group :test do
-  gem 'minitest', '~> 5.18'
+  gem 'minitest', '~> 6.0'
   gem 'rack-test', '~> 2.1'
   gem 'webmock', '~> 3.18'
   gem 'mocha', '~> 2.0'
