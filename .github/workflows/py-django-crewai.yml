@@ -76,7 +76,7 @@ jobs:
         python manage.py collectstatic --noinput || echo "Static collection skipped"
 
     - name: Upload build artifacts
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: frontend-build
         path: |
@@ -106,7 +106,7 @@ jobs:
         zip -r dist/py-django-crewai.zip . -x "*.git*" "*.env*" "*.pyc" "__pycache__/*" "*.github/*" "dist/*" "frontend/node_modules/*"
 
     - name: Upload package artifact
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: py-django-crewai-package
         path: py-django-crewai/dist
