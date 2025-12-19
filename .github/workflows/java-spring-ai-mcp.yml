@@ -44,21 +44,21 @@ jobs:
 
     - name: Upload client artifacts
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: java-spring-ai-mcp-client
         path: java-spring-ai-mcp/client/target/*.jar
 
     - name: Upload server artifacts
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: java-spring-ai-mcp-server
         path: java-spring-ai-mcp/server/target/*.jar
 
     - name: Upload api artifacts
       if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-      uses: actions/upload-artifact@v5
+      uses: actions/upload-artifact@v6
       with:
         name: java-spring-ai-mcp-api
         path: java-spring-ai-mcp/api/target/*.jar
