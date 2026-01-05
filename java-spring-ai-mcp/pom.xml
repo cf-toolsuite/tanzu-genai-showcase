@@ -25,7 +25,7 @@
     <properties>
         <java.version>21</java.version>
         <cfenv.version>3.4.0</cfenv.version>
-        <json-io.version>4.70.0</json-io.version>
+        <json-io.version>4.72.0</json-io.version>
         <spring-framework.version>6.2.5</spring-framework.version>
         <spring-ai.version>1.1.0-M1-PLATFORM-2</spring-ai.version>
         <spring-boot-hc5.version>1.2.1</spring-boot-hc5.version>
