@@ -1,17 +1,17 @@
 # Django framework
-Django==5.2.8
-python-dotenv==1.2.1
+Django==5.2.18
+python-dotenv==1.2.4
 whitenoise==6.11.0
-geopy==2.4.1
-requests==2.32.5
+geopy==2.5.0
+requests==2.34.2
 gunicorn==23.0.0
 pytz==2025.2  # Timezone support
 
 # CrewAI and dependencies
-crewai==1.6.0  # Latest stable version with improved event system
-langchain==1.1.0
-langchain-openai==1.1.0
-pydantic==2.12.4  # Maintain compatibility with CrewAI's Pydantic v2 usage
+crewai==1.15.28  # Latest stable version with improved event system
+langchain==1.4.6
+langchain-openai==1.7.2
+pydantic==2.12.5  # Maintain compatibility with CrewAI's Pydantic v2 usage
 google-search-results==2.4.2  # SerpAPI client
 
 # Movie database API
