@@ -1,0 +1,278 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Managed from pacphi/mise-dotfiles. Replaces Dependabot version updates (2026-10-21).",
+  "extends": [
+    "config:recommended"
+  ],
+  "minimumReleaseAge": "3 days",
+  "internalChecksFilter": "strict",
+  "osvVulnerabilityAlerts": true,
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": [
+      "security"
+    ]
+  },
+  "packageRules": [
+    {
+      "description": "nuget dotnet-extensions-ai/**: settings",
+      "matchCategories": [
+        "dotnet"
+      ],
+      "matchFileNames": [
+        "dotnet-extensions-ai/**"
+      ],
+      "schedule": [
+        "* 0-5 * * 1"
+      ],
+      "labels": [
+        "dependencies",
+        "dotnet"
+      ]
+    },
+    {
+      "description": "gomod go-fiber-langchaingo/**: settings",
+      "matchCategories": [
+        "golang"
+      ],
+      "matchFileNames": [
+        "go-fiber-langchaingo/**"
+      ],
+      "schedule": [
+        "* 0-5 * * 1"
+      ],
+      "labels": [
+        "dependencies",
+        "go"
+      ]
+    },
+    {
+      "description": "maven java-spring-ai-mcp/**: settings",
+      "matchCategories": [
+        "java"
+      ],
+      "matchFileNames": [
+        "java-spring-ai-mcp/**"
+      ],
+      "schedule": [
+        "* 0-5 * * 1"
+      ],
+      "labels": [
+        "dependencies",
+        "java"
+      ]
+    },
+    {
+      "description": "maven java-spring-langgraph-mcp-angular/**: settings",
+      "matchCategories": [
+        "java"
+      ],
+      "matchFileNames": [
+        "java-spring-langgraph-mcp-angular/**"
+      ],
+      "schedule": [
+        "* 0-5 * * 1"
+      ],
+      "labels": [
+        "dependencies",
+        "java"
+      ]
+    },
+    {
+      "description": "npm java-spring-langgraph-mcp-angular/frontend/**: settings",
+      "matchCategories": [
+        "js"
+      ],
+      "matchFileNames": [
+        "java-spring-langgraph-mcp-angular/frontend/**"
+      ],
+      "schedule": [
+        "* 0-5 * * 1"
+      ],
+      "labels": [
+        "dependencies",
+        "javascript",
+        "angular"
+      ]
+    },
+    {
+      "description": "npm java-spring-langgraph-mcp-angular/frontend/**: ignore @angular/*",
+      "matchCategories": [
+        "js"
+      ],
+      "matchFileNames": [
+        "java-spring-langgraph-mcp-angular/frontend/**"
+      ],
+      "matchPackageNames": [
+        "@angular/*"
+      ],
+      "enabled": false,
+      "matchUpdateTypes": [
+        "major"
+      ]
+    },
+    {
+      "description": "npm js-langchain-react/**: settings",
+      "matchCategories": [
+        "js"
+      ],
+      "matchFileNames": [
+        "js-langchain-react/**"
+      ],
+      "schedule": [
+        "* 0-5 * * 1"
+      ],
+      "labels": [
+        "dependencies",
+        "javascript",
+        "react"
+      ]
+    },
+    {
+      "description": "npm js-langchain-react/**: ignore react",
+      "matchCategories": [
+        "js"
+      ],
+      "matchFileNames": [
+        "js-langchain-react/**"
+      ],
+      "matchPackageNames": [
+        "react"
+      ],
+      "enabled": false,
+      "matchUpdateTypes": [
+        "major"
+      ]
+    },
+    {
+      "description": "npm js-langchain-react/**: ignore react-dom",
+      "matchCategories": [
+        "js"
+      ],
+      "matchFileNames": [
+        "js-langchain-react/**"
+      ],
+      "matchPackageNames": [
+        "react-dom"
+      ],
+      "enabled": false,
+      "matchUpdateTypes": [
+        "major"
+      ]
+    },
+    {
+      "description": "composer php-symfony-neuron/**: settings",
+      "matchCategories": [
+        "php"
+      ],
+      "matchFileNames": [
+        "php-symfony-neuron/**"
+      ],
+      "schedule": [
+        "* 0-5 * * 1"
+      ],
+      "labels": [
+        "dependencies",
+        "php",
+        "symfony"
+      ]
+    },
+    {
+      "description": "composer php-symfony-neuron/**: ignore symfony/*",
+      "matchCategories": [
+        "php"
+      ],
+      "matchFileNames": [
+        "php-symfony-neuron/**"
+      ],
+      "matchPackageNames": [
+        "symfony/*"
+      ],
+      "enabled": false,
+      "matchUpdateTypes": [
+        "major"
+      ]
+    },
+    {
+      "description": "pip py-django-crewai/**: settings",
+      "matchCategories": [
+        "python"
+      ],
+      "matchFileNames": [
+        "py-django-crewai/**"
+      ],
+      "schedule": [
+        "* 0-5 * * 1"
+      ],
+      "labels": [
+        "dependencies",
+        "python",
+        "django"
+      ]
+    },
+    {
+      "description": "pip py-django-crewai/**: ignore django",
+      "matchCategories": [
+        "python"
+      ],
+      "matchFileNames": [
+        "py-django-crewai/**"
+      ],
+      "matchPackageNames": [
+        "django"
+      ],
+      "enabled": false,
+      "matchUpdateTypes": [
+        "major"
+      ]
+    },
+    {
+      "description": "npm py-django-crewai/frontend/**: settings",
+      "matchCategories": [
+        "js"
+      ],
+      "matchFileNames": [
+        "py-django-crewai/frontend/**"
+      ],
+      "schedule": [
+        "* 0-5 * * 1"
+      ],
+      "labels": [
+        "dependencies",
+        "javascript",
+        "frontend"
+      ]
+    },
+    {
+      "description": "bundler ruby-sinatra-fastmcp/**: settings",
+      "matchCategories": [
+        "ruby"
+      ],
+      "matchFileNames": [
+        "ruby-sinatra-fastmcp/**"
+      ],
+      "schedule": [
+        "* 0-5 * * 1"
+      ],
+      "labels": [
+        "dependencies",
+        "ruby",
+        "sinatra"
+      ]
+    },
+    {
+      "description": "github-actions: settings",
+      "matchCategories": [
+        "ci"
+      ],
+      "schedule": [
+        "* 0-5 * * 1"
+      ],
+      "labels": [
+        "dependencies",
+        "github-actions"
+      ]
+    }
+  ],
+  "prConcurrentLimit": 53
+}
