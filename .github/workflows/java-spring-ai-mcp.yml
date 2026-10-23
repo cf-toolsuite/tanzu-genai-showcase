@@ -1,16 +1,11 @@
 name: java-spring-ai-mcp CI
 
+# Automatic push/pull_request runs are off: this subproject is incomplete and does
+# not compile against its current Spring AI / Spring Boot versions. Run on demand
+# until it is migrated.
 on:
   workflow_call:
   workflow_dispatch:
-  push:
-    paths:
-      - 'java-spring-ai-mcp/**'
-      - '.github/workflows/java-spring-ai-mcp.yml'
-  pull_request:
-    paths:
-      - 'java-spring-ai-mcp/**'
-      - '.github/workflows/java-spring-ai-mcp.yml'
 
 permissions:
   contents: read
