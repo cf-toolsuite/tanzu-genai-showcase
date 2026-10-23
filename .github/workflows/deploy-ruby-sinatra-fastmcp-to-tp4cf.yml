@@ -86,7 +86,7 @@ jobs:
           }' > env_vars.json
           cat env_vars.json
       - name: Upload env vars file
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: env-vars
           path: env_vars.json
