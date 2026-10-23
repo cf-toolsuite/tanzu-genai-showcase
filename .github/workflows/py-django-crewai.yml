@@ -95,7 +95,7 @@ jobs:
     - uses: actions/checkout@v6
 
     - name: Download frontend build
-      uses: actions/download-artifact@v6
+      uses: actions/download-artifact@v7
       with:
         name: frontend-build
         path: py-django-crewai
