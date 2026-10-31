@@ -1,6 +1,6 @@
 module github.com/cf-toolsuite/tanzu-genai-showcase/go-fiber-langchaingo
 
-go 1.24.4
+go 1.25.0
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.15
@@ -23,5 +23,5 @@ require (
 	github.com/rivo/uniseg v0.4.7 // indirect
 	github.com/valyala/bytebufferpool v1.0.0 // indirect
 	github.com/valyala/fasthttp v1.71.0 // indirect
-	golang.org/x/sys v0.41.0 // indirect
+	golang.org/x/sys v0.44.0 // indirect
 )
