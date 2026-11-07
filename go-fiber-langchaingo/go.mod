@@ -1,6 +1,6 @@
 module github.com/cf-toolsuite/tanzu-genai-showcase/go-fiber-langchaingo
 
-go 1.24.4
+go 1.25
 
 require (
 	github.com/gofiber/fiber/v2 v2.52.15
@@ -15,7 +15,7 @@ require (
 	github.com/gofiber/template v1.8.3 // indirect
 	github.com/gofiber/utils v1.2.0 // indirect
 	github.com/google/uuid v1.6.0 // indirect
-	github.com/klauspost/compress v1.19.2 // indirect
+	github.com/klauspost/compress v1.20.2 // indirect
 	github.com/mattn/go-colorable v0.1.14 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/mattn/go-runewidth v0.0.16 // indirect
