@@ -6,7 +6,7 @@ echo "Setting up favicon generation..."
 mkdir -p static/images
 
 # Install required packages
-pip install cairosvg==2.7.1 Pillow==10.2.0
+pip install -r "$(dirname "$0")/favicon_requirements.txt"
 
 # Generate ICO file from SVG
 python generate_favicon.py

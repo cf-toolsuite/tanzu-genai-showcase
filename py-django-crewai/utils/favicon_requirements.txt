@@ -1,2 +1,2 @@
 cairosvg==2.9.1
-Pillow==12.3.0
+Pillow==13.0.0
