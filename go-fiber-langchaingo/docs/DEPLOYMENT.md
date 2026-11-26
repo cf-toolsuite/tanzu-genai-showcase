@@ -26,7 +26,7 @@ Before deploying the application, ensure you have the following:
 - Cloud Foundry CLI installed and configured
 - Access to the GenAI tile and LLM service instances
 - Congress.gov API key (get your API key at https://api.congress.gov/sign-up/)
-- Go 1.24+ installed (for building the application)
+- Go 1.25+ installed (for building the application)
 
 ## Deployment to Tanzu Platform for Cloud Foundry
 
@@ -163,7 +163,7 @@ cf logs congress-chatbot
 1. Create a `Dockerfile` in the project root:
 
 ```dockerfile
-FROM golang:1.24-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 WORKDIR /app
 COPY . .
@@ -325,7 +325,7 @@ stages:
 
 build:
   stage: build
-  image: golang:1.24
+  image: golang:1.25
   script:
     - go build -o congress-chatbot cmd/server/main.go
   artifacts:
@@ -334,7 +334,7 @@ build:
 
 test:
   stage: test
-  image: golang:1.24
+  image: golang:1.25
   script:
     - go test ./...
 
@@ -356,7 +356,7 @@ deploy:
 The `ci/bitbucket/bitbucket-pipelines.yml` contains a pipeline configuration for Bitbucket Pipelines:
 
 ```yaml
-image: golang:1.24
+image: golang:1.25
 
 pipelines:
   default:
@@ -435,7 +435,7 @@ pipelines:
    - Ensure the Go version is compatible:
 
    ```bash
-   cf set-env congress-chatbot GOVERSION go1.24
+   cf set-env congress-chatbot GOVERSION go1.25
    ```
 
 #### Application Crashes After Starting
